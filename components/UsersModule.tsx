@@ -59,7 +59,7 @@ const UsersModule: React.FC<UsersModuleProps> = ({ users, setUsers, roles, setRo
     };
   }, [auditLogs]);
 
-  // Precise Diff Calculation for Audit Visibility
+  // Forensic Delta Engine: Generates structured change strings for the audit log
   const calculateDelta = (oldData: any, newData: any) => {
     const deltas: string[] = [];
     
@@ -73,7 +73,7 @@ const UsersModule: React.FC<UsersModuleProps> = ({ users, setUsers, roles, setRo
       }
     });
 
-    // Deep Permissions Scan
+    // Deep Permissions Scan for User and Role objects
     if (oldData.permissions && newData.permissions) {
       const oldP = oldData.permissions as UserPermissions;
       const newP = newData.permissions as UserPermissions;
@@ -86,7 +86,7 @@ const UsersModule: React.FC<UsersModuleProps> = ({ users, setUsers, roles, setRo
 
     return deltas.length > 0 
       ? `MODIFICATION TRACE: ${deltas.join(' | ')}`
-      : 'CONTEXT UPDATE: Record verified/saved without attribute mutation.';
+      : 'CONTEXT VERIFIED: Record saved without attribute mutations.';
   };
 
   const jumpToTrace = (entityName: string) => {
@@ -236,58 +236,93 @@ const UsersModule: React.FC<UsersModuleProps> = ({ users, setUsers, roles, setRo
     return '-';
   };
 
-  const LogInspectorModal = ({ log }: { log: AuditLog }) => (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-300">
-      <div className="w-full max-w-2xl bg-white rounded-[2.5rem] shadow-2xl overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-200">
-        <div className="px-10 py-8 bg-slate-900 text-white flex justify-between items-center relative overflow-hidden">
-          <div className="relative z-10 flex items-center space-x-4">
-            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl shadow-lg ${
-              log.action === 'CREATE' ? 'bg-emerald-600' : 
-              log.action === 'DELETE' ? 'bg-rose-600' : 'bg-indigo-600'
-            }`}>
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+  const LogInspectorModal = ({ log }: { log: AuditLog }) => {
+    // Parse the modification trace if present
+    const isTrace = log.details.startsWith('MODIFICATION TRACE:');
+    const deltas = isTrace 
+      ? log.details.replace('MODIFICATION TRACE: ', '').split(' | ') 
+      : null;
+
+    return (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-300">
+        <div className="w-full max-w-2xl bg-white rounded-[2.5rem] shadow-2xl overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-200">
+          <div className="px-10 py-8 bg-slate-900 text-white flex justify-between items-center relative overflow-hidden">
+            <div className="relative z-10 flex items-center space-x-5">
+              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl shadow-xl transform -rotate-3 border-4 border-white/10 ${
+                log.action === 'CREATE' ? 'bg-emerald-600' : 
+                log.action === 'DELETE' ? 'bg-rose-600' : 'bg-indigo-600'
+              }`}>
+                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+              </div>
+              <div>
+                <h3 className="text-2xl font-black uppercase tracking-tight italic">Forensic Analysis</h3>
+                <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-[0.3em]">Hash: {log.id}</p>
+              </div>
             </div>
-            <div>
-              <h3 className="text-xl font-black uppercase tracking-tight italic">Forensic Detail View</h3>
-              <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest">Transaction Hash: {log.id}</p>
-            </div>
+            <button onClick={() => setSelectedLog(null)} className="relative z-10 p-3 bg-white/5 hover:bg-white/10 rounded-full transition-all border border-white/10">
+              <svg className="w-6 h-6 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+            <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-600 rounded-full blur-[120px] opacity-10 -mr-32 -mt-32"></div>
           </div>
-          <button onClick={() => setSelectedLog(null)} className="relative z-10 p-2 hover:bg-white/10 rounded-full transition-colors">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-          </button>
-        </div>
-        <div className="p-10 space-y-8">
-           <div className="grid grid-cols-2 gap-8">
-              <div>
-                <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Execution Moment</label>
-                <div className="text-sm font-black text-slate-800">{new Date(log.timestamp).toLocaleString()}</div>
-              </div>
-              <div>
-                <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Authorized Actor</label>
-                <div className="text-sm font-black text-slate-800">{log.actor}</div>
-              </div>
-              <div>
-                <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Target Subject</label>
-                <div className="text-sm font-black text-slate-800 uppercase italic">{log.entityName} ({log.entityType})</div>
-              </div>
-              <div>
-                <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest">System Operation</label>
-                <span className="inline-block px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-[10px] font-black uppercase border border-slate-200">{log.action}</span>
-              </div>
-           </div>
-           <div className="p-6 bg-slate-50 rounded-[1.5rem] border border-slate-200">
-              <label className="text-[9px] font-black uppercase text-indigo-600 tracking-[0.2em] mb-3 block">Functional Payload Details</label>
-              <div className="text-xs font-medium text-slate-700 leading-relaxed italic">
-                 {log.details}
-              </div>
-           </div>
-           <div className="pt-6 border-t border-slate-100 flex justify-end">
-              <button onClick={() => setSelectedLog(null)} className="px-10 py-3 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-black transition-all">Close Inspector</button>
-           </div>
+
+          <div className="p-10 space-y-10">
+             <div className="grid grid-cols-2 gap-10">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest block mb-1">Execution Moment</label>
+                  <div className="text-sm font-black text-slate-800">{new Date(log.timestamp).toLocaleString()}</div>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest block mb-1">Authorized Actor</label>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-black text-slate-600 border border-slate-200">SA</div>
+                    <div className="text-sm font-black text-slate-800">{log.actor}</div>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest block mb-1">Target Subject</label>
+                  <div className="text-sm font-black text-indigo-600 uppercase italic">{log.entityName} <span className="text-slate-300 not-italic ml-1">({log.entityType})</span></div>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest block mb-1">Operation Type</label>
+                  <span className="inline-block px-3 py-1 bg-slate-100 text-slate-700 rounded-lg text-[10px] font-black uppercase border border-slate-200 shadow-sm">{log.action}</span>
+                </div>
+             </div>
+
+             <div className="p-8 bg-slate-50 rounded-[2.5rem] border border-slate-200 relative overflow-hidden shadow-inner min-h-[160px]">
+                <label className="text-[10px] font-black uppercase text-indigo-600 tracking-[0.2em] mb-5 block">Functional Payload Visualizer</label>
+                
+                {deltas ? (
+                  <div className="space-y-4">
+                    {deltas.map((d, i) => {
+                      const [field, values] = d.split('] ');
+                      const [oldVal, newVal] = values.split(' → ');
+                      return (
+                        <div key={i} className="flex items-center justify-between p-4 bg-white rounded-2xl border border-slate-200 shadow-sm group hover:border-indigo-200 transition-all">
+                           <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest w-24 truncate">{field.replace('[', '')}</span>
+                           <div className="flex items-center space-x-4 flex-1 justify-center">
+                              <span className="text-[10px] font-bold text-rose-500 line-through decoration-2 opacity-60">{oldVal}</span>
+                              <svg className="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                              <span className="text-[11px] font-black text-emerald-600 uppercase italic tracking-tight">{newVal}</span>
+                           </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-xs font-medium text-slate-700 leading-relaxed italic border-l-4 border-indigo-200 pl-6 py-2">
+                     {log.details}
+                  </div>
+                )}
+             </div>
+
+             <div className="pt-6 border-t border-slate-100 flex justify-end">
+                <button onClick={() => setSelectedLog(null)} className="px-14 py-4 bg-slate-900 text-white rounded-[1.5rem] font-black text-[10px] uppercase tracking-widest shadow-2xl hover:bg-indigo-600 transition-all transform active:scale-95 border-b-4 border-slate-950">Close Forensic Stream</button>
+             </div>
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const logsByDate = useMemo(() => {
     const groups: Record<string, AuditLog[]> = {};
@@ -300,85 +335,83 @@ const UsersModule: React.FC<UsersModuleProps> = ({ users, setUsers, roles, setRo
   }, [filteredLogs]);
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="space-y-8 animate-in fade-in duration-500">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
-          <h2 className="text-2xl font-black text-slate-800 tracking-tight italic uppercase">Identity & Access Governance</h2>
-          <p className="text-sm text-slate-500 font-medium">Provision organizational credentials and monitor security lifecycle events.</p>
+          <h2 className="text-3xl font-black text-slate-800 tracking-tighter italic uppercase leading-none">Security Governance</h2>
+          <p className="text-sm text-slate-500 font-medium mt-3">Identity provisioning and immutable forensic logging system.</p>
         </div>
         <div className="flex items-center space-x-3">
           {activeTab === 'AUDIT' && (
             <button 
               onClick={exportAuditCSV}
-              className="flex items-center space-x-2 px-6 py-3 bg-slate-800 text-white rounded-2xl font-black shadow-xl hover:bg-slate-700 transition-all text-[10px] uppercase tracking-widest border border-slate-700"
+              className="flex items-center space-x-2 px-8 py-4 bg-slate-800 text-white rounded-[1.5rem] font-black shadow-xl hover:bg-slate-700 transition-all text-[10px] uppercase tracking-widest border border-slate-700"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-              <span>Export Audit</span>
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+              <span>Export Audit Ledger</span>
             </button>
           )}
           <button 
             disabled={activeTab === 'AUDIT'}
             onClick={() => { setEditingUser(undefined); setEditingRole(undefined); setIsModalOpen(true); }}
-            className={`flex items-center justify-center space-x-2 px-6 py-3 rounded-2xl font-black shadow-xl transition-all transform active:scale-95 text-[10px] uppercase tracking-widest ${activeTab === 'AUDIT' ? 'bg-slate-100 text-slate-400 cursor-not-allowed shadow-none' : 'bg-indigo-600 text-white shadow-indigo-100 hover:bg-indigo-700'}`}
+            className={`flex items-center justify-center space-x-3 px-8 py-4 rounded-[1.5rem] font-black shadow-2xl transition-all transform active:scale-95 text-[10px] uppercase tracking-[0.2em] ${activeTab === 'AUDIT' ? 'bg-slate-100 text-slate-400 cursor-not-allowed shadow-none' : 'bg-indigo-600 text-white shadow-indigo-100 hover:bg-indigo-700'}`}
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
-            <span>{activeTab === 'ROLES' ? 'Design Role' : 'New Provision'}</span>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+            <span>{activeTab === 'ROLES' ? 'Construct Blueprint' : 'Authorize New Identity'}</span>
           </button>
         </div>
       </div>
 
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-1 bg-slate-200/50 rounded-2xl w-full border border-slate-200">
-        <div className="flex p-1 space-x-1 overflow-x-auto no-scrollbar">
+      <div className="flex bg-slate-200/50 p-1.5 rounded-[2.5rem] border border-slate-200 w-full shadow-inner overflow-x-auto no-scrollbar">
           {(['USERS', 'ROLES', 'MATRIX', 'AUDIT'] as const).map(tab => (
             <button 
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-8 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-[0.15em] transition-all whitespace-nowrap ${activeTab === tab ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-500 hover:text-slate-800'}`}
+              className={`flex-1 min-w-[120px] py-4 rounded-[1.8rem] text-[10px] font-black uppercase tracking-[0.2em] transition-all whitespace-nowrap ${activeTab === tab ? 'bg-white text-indigo-600 shadow-xl scale-[1.02]' : 'text-slate-500 hover:text-slate-800'}`}
             >
-              {tab === 'ROLES' ? 'Security Tiers' : tab === 'MATRIX' ? 'Auth Matrix' : tab === 'AUDIT' ? 'Audit Stream' : 'Staff Records'}
+              {tab === 'ROLES' ? 'Access Tiers' : tab === 'MATRIX' ? 'Auth Matrix' : tab === 'AUDIT' ? 'Forensic Stream' : 'Staff Registry'}
             </button>
           ))}
-        </div>
       </div>
 
-      <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden min-h-[400px]">
+      <div className="bg-white rounded-[4rem] border border-slate-200 shadow-sm overflow-hidden min-h-[500px]">
         {activeTab === 'AUDIT' ? (
           <div className="animate-in fade-in duration-500">
-             <div className="grid grid-cols-1 md:grid-cols-5 gap-4 p-8 border-b border-slate-100 bg-slate-50/30">
+             <div className="grid grid-cols-1 md:grid-cols-5 gap-6 p-10 border-b border-slate-100 bg-slate-50/50">
                {[
-                 { label: 'Total Events', value: auditTrends.total, color: 'text-slate-800' },
-                 { label: 'Today\'s Activity', value: auditTrends.today, color: 'text-indigo-600' },
-                 { label: 'Initializations', value: auditTrends.creations, color: 'text-emerald-600' },
-                 { label: 'Modifications', value: auditTrends.modifications, color: 'text-sky-600' },
-                 { label: 'Security Shifts', value: auditTrends.security, color: 'text-rose-600' }
+                 { label: 'Integrity Points', value: auditTrends.total, color: 'text-slate-800' },
+                 { label: 'Active Sessions', value: auditTrends.today, color: 'text-indigo-600' },
+                 { label: 'Provisioned', value: auditTrends.creations, color: 'text-emerald-600' },
+                 { label: 'Mutations', value: auditTrends.modifications, color: 'text-sky-600' },
+                 { label: 'Policy Shifts', value: auditTrends.security, color: 'text-rose-600' }
                ].map((stat, i) => (
-                 <div key={i} className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm">
+                 <div key={i} className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm transition-transform hover:-translate-y-1">
                     <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">{stat.label}</div>
-                    <div className={`text-2xl font-black ${stat.color}`}>{stat.value}</div>
+                    <div className={`text-3xl font-black italic tracking-tighter tabular-nums ${stat.color}`}>{stat.value}</div>
                  </div>
                ))}
              </div>
              
-             <div className="p-5 border-b border-slate-100 flex flex-col md:flex-row items-center justify-between gap-4 bg-white/80 backdrop-blur-md sticky top-0 z-10">
-                <div className="relative max-w-md w-full">
+             <div className="px-10 py-6 border-b border-slate-100 flex flex-col md:flex-row items-center justify-between gap-6 bg-white/80 backdrop-blur-md sticky top-0 z-20 shadow-sm">
+                <div className="relative max-w-lg w-full">
                   <input 
                     type="text" 
-                    placeholder="Search by Identity or Modification Hash..." 
+                    placeholder="Search Audit Ledger (Identity, Hash, Action)..." 
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold focus:ring-4 focus:ring-indigo-500/10 transition-all shadow-sm outline-none"
+                    className="w-full pl-14 pr-6 py-4 bg-slate-50 border border-slate-200 rounded-3xl text-sm font-bold focus:ring-8 focus:ring-indigo-500/5 transition-all shadow-inner outline-none italic"
                   />
-                  <svg className="w-5 h-5 text-slate-400 absolute left-4 top-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                  <svg className="w-6 h-6 text-slate-300 absolute left-5 top-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                 </div>
                 
-                <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
+                <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200 overflow-x-auto no-scrollbar">
                    {['ALL', 'CREATE', 'UPDATE', 'DELETE', 'STATUS_CHANGE'].map(act => (
                      <button
                       key={act}
                       onClick={() => setActionFilter(act)}
-                      className={`px-4 py-2 text-[8px] font-black uppercase tracking-tighter rounded-lg transition-all ${actionFilter === act ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-700'}`}
+                      className={`px-5 py-3 text-[9px] font-black uppercase tracking-tighter rounded-xl transition-all whitespace-nowrap ${actionFilter === act ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-400 hover:text-slate-700'}`}
                      >
-                       {act.replace('_', ' ')}
+                       {act === 'STATUS_CHANGE' ? 'LIFECYCLE' : act === 'UPDATE' ? 'MUTATION' : act.replace('_', ' ')}
                      </button>
                    ))}
                 </div>
@@ -386,57 +419,57 @@ const UsersModule: React.FC<UsersModuleProps> = ({ users, setUsers, roles, setRo
              
              <div className="overflow-x-auto custom-scrollbar">
                <table className="w-full text-left border-collapse">
-                 <thead className="bg-slate-900 text-[10px] uppercase font-black tracking-widest text-slate-400 border-b border-slate-800">
+                 <thead className="bg-slate-950 text-[10px] uppercase font-black tracking-widest text-slate-500 border-b border-slate-900">
                     <tr>
-                      <th className="px-10 py-5">Forensic Mutation Details</th>
-                      <th className="px-10 py-5 text-center">Class</th>
-                      <th className="px-10 py-5">Entity Subject</th>
-                      <th className="px-10 py-5">Operator Context</th>
-                      <th className="px-10 py-5 text-right">Execution Moment</th>
+                      <th className="px-12 py-7">Forensic Event Detail</th>
+                      <th className="px-12 py-7 text-center">Class</th>
+                      <th className="px-12 py-7">Subject Entity</th>
+                      <th className="px-12 py-7">Authorized Actor</th>
+                      <th className="px-12 py-7 text-right">Moment</th>
                     </tr>
                  </thead>
                  <tbody>
                     {logsByDate.map(([date, logs]) => (
                       <React.Fragment key={date}>
-                        <tr className="bg-slate-50/50 sticky top-[77px] z-[5]">
-                          <td colSpan={5} className="px-10 py-2 text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] border-y border-slate-100 backdrop-blur-md italic">{date}</td>
+                        <tr className="bg-slate-50/80 sticky top-[92px] z-[15] backdrop-blur-md">
+                          <td colSpan={5} className="px-12 py-3 text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] border-y border-slate-100 italic">{date}</td>
                         </tr>
                         {logs.map((log) => (
-                          <tr key={log.id} onClick={() => setSelectedLog(log)} className="hover:bg-indigo-50/20 cursor-pointer transition-colors group">
-                            <td className="px-10 py-6 max-w-md">
+                          <tr key={log.id} onClick={() => setSelectedLog(log)} className="hover:bg-indigo-50/30 cursor-pointer transition-all group border-b border-slate-50 last:border-0">
+                            <td className="px-12 py-8 max-w-md">
                                <div className="flex flex-col">
-                                  <div className="flex items-center space-x-2 mb-2">
-                                    <span className={`px-2 py-0.5 rounded text-[8px] font-black border ${
+                                  <div className="flex items-center space-x-3 mb-3">
+                                    <span className={`px-2.5 py-1 rounded text-[8px] font-black border transition-all ${
                                       log.action === 'CREATE' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
                                       log.action === 'DELETE' ? 'bg-rose-50 text-rose-600 border-rose-100' :
                                       log.action === 'STATUS_CHANGE' ? 'bg-amber-50 text-amber-600 border-amber-100' :
                                       'bg-indigo-50 text-indigo-600 border-indigo-100'
-                                    }`}>{log.action.replace('_', ' ')}</span>
-                                    <span className="font-mono text-[9px] text-slate-300 font-bold uppercase tracking-tighter">HASH: {log.id}</span>
+                                    }`}>{log.action === 'STATUS_CHANGE' ? 'LIFECYCLE' : log.action}</span>
+                                    <span className="font-mono text-[9px] text-slate-300 font-bold tracking-tighter uppercase">NX-TRC: {log.id}</span>
                                   </div>
-                                  <span className="text-xs font-black text-slate-700 leading-relaxed italic tracking-tight group-hover:text-indigo-900 transition-colors line-clamp-2">{log.details}</span>
+                                  <span className="text-xs font-black text-slate-700 leading-relaxed italic tracking-tight group-hover:text-indigo-900 transition-colors line-clamp-1">{log.details}</span>
                                </div>
                             </td>
-                            <td className="px-10 py-6 text-center">
-                               <span className="px-2.5 py-1 bg-slate-100 text-slate-500 rounded-lg text-[8px] font-black uppercase tracking-widest border border-slate-200">
+                            <td className="px-12 py-8 text-center">
+                               <span className="px-3 py-1.5 bg-white border border-slate-100 text-slate-500 rounded-xl text-[9px] font-black uppercase tracking-widest shadow-sm group-hover:shadow-indigo-100 transition-all">
                                   {log.entityType}
                                </span>
                             </td>
-                            <td className="px-10 py-6">
-                               <span className="text-[11px] font-black text-slate-900 uppercase tracking-tighter hover:text-indigo-600 transition-all">{log.entityName}</span>
+                            <td className="px-12 py-8">
+                               <span className="text-[12px] font-black text-slate-900 uppercase tracking-tighter hover:text-indigo-600 transition-all italic underline decoration-transparent group-hover:decoration-indigo-200 underline-offset-4">{log.entityName}</span>
                             </td>
-                            <td className="px-10 py-6">
-                               <div className="flex items-center space-x-3">
-                                  <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center text-[10px] font-black text-white shadow-lg group-hover:-rotate-6 transition-transform">{log.actor.charAt(0)}</div>
+                            <td className="px-12 py-8">
+                               <div className="flex items-center space-x-4">
+                                  <div className="w-9 h-9 rounded-xl bg-slate-900 flex items-center justify-center text-[10px] font-black text-white shadow-xl group-hover:-rotate-12 transition-transform border border-white/20">{log.actor.charAt(0)}</div>
                                   <div className="flex flex-col">
-                                    <span className="text-[11px] font-bold text-slate-600">{log.actor}</span>
-                                    <span className="text-[8px] text-slate-400 font-black uppercase tracking-tighter italic">Verified Actor</span>
+                                    <span className="text-[11px] font-black text-slate-800 uppercase tracking-tight">{log.actor}</span>
+                                    <span className="text-[8px] text-slate-400 font-black uppercase tracking-widest italic opacity-60">Identity Verified</span>
                                   </div>
                                </div>
                             </td>
-                            <td className="px-10 py-6 text-right">
-                               <div className="text-[10px] font-black text-slate-800 uppercase tracking-tighter">{new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</div>
-                               <div className="text-[8px] font-bold text-slate-400 mt-1 uppercase tracking-widest opacity-60">Sequence Post</div>
+                            <td className="px-12 py-8 text-right">
+                               <div className="text-[11px] font-black text-slate-900 italic tabular-nums">{new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</div>
+                               <div className="text-[9px] font-bold text-slate-300 mt-1 uppercase tracking-widest opacity-60">SEQ-POST</div>
                             </td>
                           </tr>
                         ))}
@@ -444,12 +477,12 @@ const UsersModule: React.FC<UsersModuleProps> = ({ users, setUsers, roles, setRo
                     ))}
                     {filteredLogs.length === 0 && (
                       <tr>
-                        <td colSpan={5} className="px-10 py-24 text-center">
+                        <td colSpan={5} className="px-12 py-32 text-center">
                            <div className="flex flex-col items-center opacity-40">
-                             <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-6">
-                               <svg className="w-10 h-10 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                             <div className="w-24 h-24 bg-slate-50 rounded-[2rem] flex items-center justify-center mb-8 border-2 border-dashed border-slate-200">
+                               <svg className="w-12 h-12 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                              </div>
-                             <h5 className="text-sm font-black text-slate-400 uppercase tracking-[0.2em]">Zero mutation evidence in selected window.</h5>
+                             <h5 className="text-sm font-black text-slate-400 uppercase tracking-[0.3em]">Zero mutations captured in current cluster context.</h5>
                            </div>
                         </td>
                       </tr>
@@ -460,66 +493,70 @@ const UsersModule: React.FC<UsersModuleProps> = ({ users, setUsers, roles, setRo
           </div>
         ) : (
           <>
-            <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/30">
-              <div className="relative max-w-md w-full">
+            <div className="px-10 py-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+              <div className="relative max-w-lg w-full">
                 <input 
                   type="text" 
-                  placeholder={`Search active ${activeTab.toLowerCase()}...`} 
+                  placeholder={`Query active ${activeTab.toLowerCase()} registry...`} 
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3 bg-white border border-slate-100 rounded-2xl text-sm font-bold focus:ring-2 focus:ring-indigo-500 shadow-sm transition-all outline-none"
+                  className="w-full pl-14 pr-6 py-4 bg-white border border-slate-200 rounded-3xl text-sm font-bold focus:ring-8 focus:ring-indigo-500/5 shadow-sm transition-all outline-none italic"
                 />
-                <svg className="w-5 h-5 text-slate-400 absolute left-4 top-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                <svg className="w-6 h-6 text-slate-300 absolute left-5 top-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+              </div>
+              <div className="flex items-center space-x-2">
+                 <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></div>
+                 <span className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em]">{filteredUsers.length + filteredRoles.length} Records Detected</span>
               </div>
             </div>
             
             <div className="overflow-x-auto custom-scrollbar">
               {activeTab === 'USERS' && (
                 <table className="w-full text-left">
-                  <thead className="bg-slate-50 text-[10px] uppercase font-black tracking-widest text-slate-400 border-b border-slate-100">
+                  <thead className="bg-slate-950 text-[10px] uppercase font-black tracking-widest text-slate-500 border-b border-slate-900">
                     <tr>
-                      <th className="px-10 py-5">Staff Identity</th>
-                      <th className="px-10 py-5">Designation</th>
-                      <th className="px-10 py-5">Auth Profile</th>
-                      <th className="px-10 py-5">Account Lifecycle</th>
-                      <th className="px-10 py-5 text-right">Actions</th>
+                      <th className="px-12 py-7">Staff Identity Node</th>
+                      <th className="px-12 py-7">Designation Tier</th>
+                      <th className="px-12 py-7">Authority Map</th>
+                      <th className="px-12 py-7">Account Lifecycle</th>
+                      <th className="px-12 py-7 text-right">Operation</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
                     {filteredUsers.map((user) => (
                       <tr key={user.id} className="hover:bg-slate-50/50 transition-colors group">
-                        <td className="px-10 py-6">
-                          <div className="flex items-center space-x-4">
-                            <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 font-black border-2 border-white shadow-sm group-hover:bg-indigo-600 group-hover:text-white transition-all transform group-hover:-rotate-3">
+                        <td className="px-12 py-8">
+                          <div className="flex items-center space-x-6">
+                            <div className="w-14 h-14 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 font-black border-2 border-white shadow-xl group-hover:bg-indigo-600 group-hover:text-white transition-all transform group-hover:-rotate-3 group-hover:scale-105 text-xl">
                               {user.name.charAt(0)}
                             </div>
                             <div className="flex flex-col min-w-0">
-                              <span className="font-black text-slate-800 text-sm tracking-tight truncate uppercase">{user.name}</span>
-                              <span className="text-[10px] text-slate-400 font-bold truncate uppercase tracking-widest">{user.email}</span>
+                              <span className="font-black text-slate-800 text-base tracking-tighter truncate uppercase italic">{user.name}</span>
+                              <span className="text-[10px] text-slate-400 font-bold truncate uppercase tracking-widest mt-1">{user.email}</span>
                             </div>
                           </div>
                         </td>
-                        <td className="px-10 py-6">
-                          <span className="px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest bg-indigo-50 text-indigo-600 border border-indigo-100">
+                        <td className="px-12 py-8">
+                          <span className="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-indigo-50 text-indigo-600 border border-indigo-100 shadow-sm">
                             {user.role}
                           </span>
                         </td>
-                        <td className="px-10 py-6">
-                          <div className="flex items-center space-x-1.5">
+                        <td className="px-12 py-8">
+                          <div className="flex items-center space-x-2">
                             {Object.entries(user.permissions).map(([mod, level]) => (
-                              <div key={mod} className={`w-6 h-6 rounded-lg flex items-center justify-center text-[8px] font-black text-white ${getPermColor(level as string)}`} title={`${mod.toUpperCase()}: ${level}`}>
+                              <div key={mod} className={`w-7 h-7 rounded-xl flex items-center justify-center text-[9px] font-black text-white ${getPermColor(level as string)} transition-transform hover:scale-125 cursor-help`} title={`${mod.toUpperCase()}: ${level}`}>
                                 {getPermLabel(level as string)}
                               </div>
                             ))}
                           </div>
                         </td>
-                        <td className="px-10 py-6">
-                           <button onClick={() => toggleUserStatus(user)} className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all flex items-center space-x-2 border ${user.status === 'Active' ? 'bg-emerald-50 text-emerald-600 border-emerald-100 hover:bg-emerald-100' : 'bg-rose-50 text-rose-600 border-rose-100 hover:bg-rose-100'}`}>
-                             <div className={`w-1.5 h-1.5 rounded-full ${user.status === 'Active' ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></div>
+                        <td className="px-12 py-8">
+                           <button onClick={() => toggleUserStatus(user)} className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all flex items-center space-x-3 border-2 ${user.status === 'Active' ? 'bg-emerald-50 text-emerald-600 border-emerald-100 hover:bg-emerald-100 shadow-sm' : 'bg-rose-50 text-rose-600 border-rose-100 hover:bg-rose-100'}`}>
+                             <div className={`w-2 h-2 rounded-full ${user.status === 'Active' ? 'bg-emerald-500 animate-pulse shadow-[0_0_8px_#10b981]' : 'bg-rose-500 shadow-[0_0_8px_#f43f5e]'}`}></div>
                              <span>{user.status}</span>
                            </button>
                         </td>
-                        <td className="px-10 py-6 text-right">
+                        <td className="px-12 py-8 text-right">
                            <ActionMenu actions={getUserActions(user)} />
                         </td>
                       </tr>
@@ -530,13 +567,13 @@ const UsersModule: React.FC<UsersModuleProps> = ({ users, setUsers, roles, setRo
 
               {activeTab === 'ROLES' && (
                 <table className="w-full text-left">
-                  <thead className="bg-slate-50 text-[10px] uppercase font-black tracking-widest text-slate-400 border-b border-slate-100">
+                  <thead className="bg-slate-950 text-[10px] uppercase font-black tracking-widest text-slate-500 border-b border-slate-900">
                     <tr>
-                      <th className="px-10 py-5">Access Blueprint Name</th>
-                      <th className="px-10 py-5">Active Allocations</th>
-                      <th className="px-10 py-5">Modular Authorities</th>
-                      <th className="px-10 py-5">Tier Type</th>
-                      <th className="px-10 py-5 text-right">Actions</th>
+                      <th className="px-12 py-7">Access Blueprint Profile</th>
+                      <th className="px-12 py-7 text-center">Active Allocations</th>
+                      <th className="px-12 py-7">Modular Sovereignty</th>
+                      <th className="px-12 py-7 text-center">Blueprint Class</th>
+                      <th className="px-12 py-7 text-right">Operation</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
@@ -544,32 +581,32 @@ const UsersModule: React.FC<UsersModuleProps> = ({ users, setUsers, roles, setRo
                       const assignedCount = users.filter(u => u.role === role.name).length;
                       return (
                         <tr key={role.id} className="hover:bg-slate-50/50 transition-colors group">
-                          <td className="px-10 py-6">
-                            <div className="font-black text-slate-800 text-sm tracking-tight italic uppercase">{role.name}</div>
-                            <div className="text-[10px] text-slate-400 font-bold mt-0.5 truncate uppercase tracking-tighter">{role.description || 'Custom organizational security blueprint.'}</div>
+                          <td className="px-12 py-8">
+                            <div className="font-black text-slate-800 text-base tracking-tighter italic uppercase underline decoration-transparent group-hover:decoration-indigo-200 underline-offset-4 transition-all">{role.name}</div>
+                            <div className="text-[10px] text-slate-400 font-bold mt-1.5 truncate uppercase tracking-widest opacity-80">{role.description || 'Custom organizational security blueprint.'}</div>
                           </td>
-                          <td className="px-10 py-6 text-xs font-black text-slate-600">
-                             <div className="flex items-center space-x-2">
-                               <div className="w-6 h-6 rounded-lg bg-slate-100 flex items-center justify-center font-bold">{assignedCount}</div>
-                               <span className="text-[9px] uppercase tracking-widest text-slate-400">Linked Accounts</span>
+                          <td className="px-12 py-8 text-center">
+                             <div className="inline-flex items-center space-x-3 px-4 py-2 bg-slate-50 rounded-2xl border border-slate-100 shadow-inner group-hover:bg-white transition-all">
+                               <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-black text-xs shadow-lg">{assignedCount}</div>
+                               <span className="text-[9px] uppercase tracking-[0.2em] font-black text-slate-400">Linked</span>
                              </div>
                           </td>
-                          <td className="px-10 py-6">
-                            <div className="flex items-center space-x-1.5">
+                          <td className="px-12 py-8">
+                            <div className="flex items-center space-x-2">
                               {Object.entries(role.permissions).map(([mod, level]) => (
-                                <div key={mod} className={`w-7 h-7 rounded-xl flex items-center justify-center text-[10px] font-black text-white ${getPermColor(level as string)} transition-transform group-hover:scale-110 shadow-sm`} title={`${mod.toUpperCase()}: ${level}`}>
+                                <div key={mod} className={`w-8 h-8 rounded-xl flex items-center justify-center text-[10px] font-black text-white ${getPermColor(level as string)} transition-transform group-hover:scale-110 shadow-lg border-2 border-white/20`} title={`${mod.toUpperCase()}: ${level}`}>
                                     {getPermLabel(level as string)}
                                 </div>
                               ))}
                             </div>
                           </td>
-                          <td className="px-10 py-6">
-                            <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${role.isSystem ? 'text-slate-500 bg-slate-100 border border-slate-200' : 'text-emerald-600 bg-emerald-50 border border-emerald-100 shadow-sm'}`}>
-                              {role.isSystem ? 'CORE' : 'CUSTOM'}
+                          <td className="px-12 py-8 text-center">
+                            <span className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest ${role.isSystem ? 'text-slate-500 bg-slate-100 border border-slate-200' : 'text-emerald-600 bg-emerald-50 border border-emerald-100 shadow-md animate-pulse'}`}>
+                              {role.isSystem ? 'CORE-SYS' : 'USR-DEFINED'}
                             </span>
                           </td>
-                          <td className="px-10 py-6 text-right">
-                             <ActionMenu actions={getRoleActions(role)} label={role.isSystem ? 'LOCKED' : 'ACTION'} />
+                          <td className="px-12 py-8 text-right">
+                             <ActionMenu actions={getRoleActions(role)} label={role.isSystem ? 'LOCKED' : 'AUTHORIZE'} />
                           </td>
                         </tr>
                       );
@@ -579,30 +616,30 @@ const UsersModule: React.FC<UsersModuleProps> = ({ users, setUsers, roles, setRo
               )}
 
               {activeTab === 'MATRIX' && (
-                <table className="w-full text-left">
-                  <thead className="bg-slate-900 text-[10px] uppercase font-black tracking-widest text-slate-400">
+                <table className="w-full text-left border-collapse">
+                  <thead className="bg-slate-950 text-[10px] uppercase font-black tracking-widest text-slate-500">
                     <tr>
-                      <th className="px-10 py-6">Staff Designation</th>
-                      <th className="px-10 py-6 text-center">Company Domain</th>
-                      <th className="px-10 py-6 text-center">Administration</th>
-                      <th className="px-10 py-6 text-center">Transactions</th>
-                      <th className="px-10 py-6 text-center">Analytics</th>
-                      <th className="px-10 py-6 text-center">Audit Lock</th>
+                      <th className="px-12 py-8">Staff Designation Matrix</th>
+                      <th className="px-12 py-8 text-center">Company Domain</th>
+                      <th className="px-12 py-8 text-center">Administration</th>
+                      <th className="px-12 py-8 text-center">Transactions</th>
+                      <th className="px-12 py-8 text-center">Analytic Engine</th>
+                      <th className="px-12 py-8 text-center">Live Status</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {filteredUsers.map((user) => (
-                      <tr key={user.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-10 py-6 font-black text-slate-800 text-xs italic uppercase">{user.name} <span className="ml-2 text-[9px] text-indigo-400 font-bold uppercase tracking-tighter">({user.role})</span></td>
+                      <tr key={user.id} className="hover:bg-slate-50 transition-all border-b border-slate-50">
+                        <td className="px-12 py-8 font-black text-slate-800 text-sm italic uppercase tracking-tighter">{user.name} <span className="ml-3 text-[10px] text-indigo-400 font-black uppercase tracking-widest">[{user.role}]</span></td>
                         {(['company', 'administration', 'transaction', 'display'] as const).map(mod => (
-                          <td key={mod} className="px-10 py-6 text-center">
-                             <div className={`inline-flex items-center justify-center w-8 h-8 rounded-xl font-black text-white text-[10px] shadow-lg ${getPermColor(user.permissions[mod])}`}>
+                          <td key={mod} className="px-12 py-8 text-center">
+                             <div className={`inline-flex items-center justify-center w-10 h-10 rounded-[1.2rem] font-black text-white text-[11px] shadow-2xl transition-transform hover:scale-125 ${getPermColor(user.permissions[mod])}`}>
                                {getPermLabel(user.permissions[mod])}
                              </div>
                           </td>
                         ))}
-                        <td className="px-10 py-6 text-center">
-                           <div className={`w-2 h-2 rounded-full mx-auto ${user.status === 'Active' ? 'bg-emerald-500 animate-pulse shadow-[0_0_8px_#10b981]' : 'bg-rose-500 shadow-[0_0_8px_#f43f5e]'}`}></div>
+                        <td className="px-12 py-8 text-center">
+                           <div className={`w-3 h-3 rounded-full mx-auto ${user.status === 'Active' ? 'bg-emerald-500 animate-pulse shadow-[0_0_12px_#10b981]' : 'bg-rose-500 shadow-[0_0_12px_#f43f5e]'}`}></div>
                         </td>
                       </tr>
                     ))}
@@ -615,8 +652,8 @@ const UsersModule: React.FC<UsersModuleProps> = ({ users, setUsers, roles, setRo
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
-          <div className="w-full max-w-5xl">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-6 bg-slate-950/80 backdrop-blur-xl animate-in fade-in duration-500">
+          <div className="w-full max-w-6xl max-h-[90vh] overflow-y-auto custom-scrollbar">
             {editingRole || (!editingUser && activeTab === 'ROLES') ? (
               <RoleForm initialData={editingRole} onCancel={() => { setIsModalOpen(false); setEditingRole(undefined); }} onSubmit={handleAddOrEditRole} />
             ) : (

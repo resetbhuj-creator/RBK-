@@ -7,11 +7,12 @@ interface InventoryVoucherFormProps {
   ledgers: Ledger[];
   onSubmit: (data: Omit<Voucher, 'id' | 'status'>) => void;
   onCancel: () => void;
+  getNextId: (type: string) => string;
 }
 
 const COMMON_ADJUSTMENTS = ['Freight Charges', 'Insurance', 'Trade Discount', 'Packaging Charges', 'Rounding Off'];
 
-const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly, items, ledgers, onSubmit, onCancel }) => {
+const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly, items, ledgers, onSubmit, onCancel, getNextId }) => {
   const [vchType, setVchType] = useState<'Sales' | 'Purchase'>('Sales');
   const [supplyType, setSupplyType] = useState<'Local' | 'Central'>('Local');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -24,6 +25,9 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
   const [searchIdx, setSearchIdx] = useState<number | null>(null);
   const [query, setQuery] = useState('');
   const searchRef = useRef<HTMLDivElement>(null);
+
+  // Derived next sequence preview based on active type
+  const nextIdPreview = useMemo(() => getNextId(vchType), [vchType, getNextId]);
 
   const filteredParties = useMemo(() => {
     const group = vchType === 'Sales' ? 'Sundry Debtors' : 'Sundry Creditors';
@@ -172,7 +176,13 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
             {vchType === 'Sales' ? '📤' : '📥'}
           </div>
           <div>
-            <h3 className="text-3xl font-black uppercase italic tracking-tighter leading-none">{vchType === 'Sales' ? 'Outward' : 'Inward'} Supply Invoice</h3>
+            <div className="flex items-center space-x-4">
+              <h3 className="text-3xl font-black uppercase italic tracking-tighter leading-none">{vchType === 'Sales' ? 'Outward' : 'Inward'} Supply Invoice</h3>
+              <div className="px-4 py-1 bg-black/20 rounded-lg border border-white/10 flex items-center space-x-2">
+                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></div>
+                 <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400">Next ID: {nextIdPreview}</span>
+              </div>
+            </div>
             <p className="text-[10px] font-black uppercase tracking-[0.4em] opacity-80 mt-2 italic">Nexus Statutory Engine v5.0 • {supplyType} Jurisdiction</p>
           </div>
         </div>

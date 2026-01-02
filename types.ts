@@ -136,6 +136,14 @@ export interface Adjustment {
   amount: number;
 }
 
+export interface LedgerEntry {
+  id: string;
+  ledgerId: string;
+  ledgerName: string;
+  type: 'Dr' | 'Cr';
+  amount: number;
+}
+
 export interface Voucher {
   id: string;
   type: 'Sales' | 'Purchase' | 'Payment' | 'Receipt' | 'Journal' | 'Contra';
@@ -146,6 +154,7 @@ export interface Voucher {
   narration?: string;
   ledgerId?: string;
   secondaryLedgerId?: string;
+  entries?: LedgerEntry[]; // For multi-ledger double entry
   reference?: string;
   items?: VoucherItem[];
   adjustments?: Adjustment[];
