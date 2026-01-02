@@ -10,7 +10,7 @@ interface UsersModuleProps {
   roles: Role[];
   setRoles: React.Dispatch<React.SetStateAction<Role[]>>;
   auditLogs: AuditLog[];
-  addAuditLog: (log: Omit<AuditLog, 'id' | 'timestamp' | 'actor'>) => void;
+  addAuditLog: (log: Omit<AuditLog, 'id' | 'timestamp' | 'actor'> & { actor?: string }) => void;
 }
 
 const UsersModule: React.FC<UsersModuleProps> = ({ users, setUsers, roles, setRoles, auditLogs, addAuditLog }) => {
@@ -43,19 +43,20 @@ const UsersModule: React.FC<UsersModuleProps> = ({ users, setUsers, roles, setRo
       
       const matchesAction = actionFilter === 'ALL' || log.action === actionFilter;
       
-      return matchesSearch && matchesAction;
+      return (log.entityType === 'USER' || log.entityType === 'ROLE') && matchesSearch && matchesAction;
     });
   }, [auditLogs, searchTerm, actionFilter]);
 
   const auditTrends = useMemo(() => {
     const today = new Date().toDateString();
-    const todayLogs = auditLogs.filter(l => new Date(l.timestamp).toDateString() === today);
+    const userRoleLogs = auditLogs.filter(l => l.entityType === 'USER' || l.entityType === 'ROLE');
+    const todayLogs = userRoleLogs.filter(l => new Date(l.timestamp).toDateString() === today);
     return {
-      total: auditLogs.length,
+      total: userRoleLogs.length,
       today: todayLogs.length,
-      creations: auditLogs.filter(l => l.action === 'CREATE').length,
-      modifications: auditLogs.filter(l => l.action === 'UPDATE').length,
-      security: auditLogs.filter(l => l.action === 'STATUS_CHANGE').length
+      creations: userRoleLogs.filter(l => l.action === 'CREATE').length,
+      modifications: userRoleLogs.filter(l => l.action === 'UPDATE').length,
+      security: userRoleLogs.filter(l => l.action === 'STATUS_CHANGE').length
     };
   }, [auditLogs]);
 
@@ -93,25 +94,6 @@ const UsersModule: React.FC<UsersModuleProps> = ({ users, setUsers, roles, setRo
     setSearchTerm(entityName);
     setActionFilter('ALL');
     setActiveTab('AUDIT');
-  };
-
-  const exportAuditCSV = () => {
-    const headers = ['Timestamp', 'Actor', 'Action', 'Target', 'Details', 'Audit Hash'];
-    const rows = filteredLogs.map(l => [
-      new Date(l.timestamp).toLocaleString(),
-      l.actor,
-      l.action,
-      l.entityName,
-      l.details.replace(/,/g, ';'),
-      l.id
-    ]);
-    const content = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-    const blob = new Blob([content], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `nexus_audit_export_${Date.now()}.csv`;
-    a.click();
   };
 
   const handleAddOrEditUser = (data: any) => {
@@ -186,6 +168,35 @@ const UsersModule: React.FC<UsersModuleProps> = ({ users, setUsers, roles, setRo
     }));
   };
 
+  const deleteUser = (user: User) => {
+    if(confirm(`DESTRUCTION PROTOCOL: Permanently remove ${user.name} from the organizational registry? This action is immutable.`)) {
+      setUsers(prev => prev.filter(u => u.id !== user.id));
+      addAuditLog({
+        action: 'DELETE',
+        entityType: 'USER',
+        entityName: user.name,
+        details: `PURGE SEQUENCE: Staff Identity "${user.name}" [ID: ${user.id}] has been decommissioned and detached from all modules.`
+      });
+    }
+  };
+
+  const deleteRole = (role: Role) => {
+    const linkedUsers = users.filter(u => u.role === role.name);
+    if(linkedUsers.length > 0) {
+      alert(`PURGE REJECTED: Role "${role.name}" is currently assigned to ${linkedUsers.length} staff nodes. Reassign identities before deletion.`);
+      return;
+    }
+    if(confirm(`DESTRUCTION PROTOCOL: Purge security blueprint "${role.name}"?`)) {
+      setRoles(prev => prev.filter(r => r.id !== role.id));
+      addAuditLog({
+        action: 'DELETE',
+        entityType: 'ROLE',
+        entityName: role.name,
+        details: `PURGE SEQUENCE: Security Blueprint "${role.name}" has been revoked and removed from policy storage.`
+      });
+    }
+  };
+
   const getUserActions = (user: User): ActionItem[] => [
     { 
       label: 'Edit Identity', 
@@ -203,22 +214,41 @@ const UsersModule: React.FC<UsersModuleProps> = ({ users, setUsers, roles, setRo
       icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>,
       onClick: () => toggleUserStatus(user),
       variant: user.status === 'Active' ? 'danger' : 'success'
+    },
+    {
+      label: 'Purge Identity',
+      icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>,
+      onClick: () => deleteUser(user),
+      variant: 'danger'
     }
   ];
 
-  const getRoleActions = (role: Role): ActionItem[] => [
-    { 
-      label: 'Trace Blueprint', 
-      icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
-      onClick: () => jumpToTrace(role.name)
-    },
-    { 
-      label: 'Update Blueprint', 
-      icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>,
-      onClick: () => { setEditingRole(role); setIsModalOpen(true); },
-      variant: 'primary'
+  const getRoleActions = (role: Role): ActionItem[] => {
+    const actions: ActionItem[] = [
+      { 
+        label: 'Trace Blueprint', 
+        icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+        onClick: () => jumpToTrace(role.name)
+      },
+      { 
+        label: 'Update Blueprint', 
+        icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>,
+        onClick: () => { setEditingRole(role); setIsModalOpen(true); },
+        variant: 'primary'
+      }
+    ];
+
+    if (!role.isSystem) {
+      actions.push({
+        label: 'Purge Blueprint',
+        icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>,
+        onClick: () => deleteRole(role),
+        variant: 'danger'
+      });
     }
-  ];
+
+    return actions;
+  };
 
   const getPermColor = (level: string) => {
     switch(level) {
@@ -237,7 +267,6 @@ const UsersModule: React.FC<UsersModuleProps> = ({ users, setUsers, roles, setRo
   };
 
   const LogInspectorModal = ({ log }: { log: AuditLog }) => {
-    // Parse the modification trace if present
     const isTrace = log.details.startsWith('MODIFICATION TRACE:');
     const deltas = isTrace 
       ? log.details.replace('MODIFICATION TRACE: ', '').split(' | ') 
@@ -274,7 +303,7 @@ const UsersModule: React.FC<UsersModuleProps> = ({ users, setUsers, roles, setRo
                 <div className="space-y-1">
                   <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest block mb-1">Authorized Actor</label>
                   <div className="flex items-center space-x-2">
-                    <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-black text-slate-600 border border-slate-200">SA</div>
+                    <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-black text-slate-600 border border-slate-200">{log.actor.charAt(0)}</div>
                     <div className="text-sm font-black text-slate-800">{log.actor}</div>
                   </div>
                 </div>
@@ -284,7 +313,9 @@ const UsersModule: React.FC<UsersModuleProps> = ({ users, setUsers, roles, setRo
                 </div>
                 <div className="space-y-1">
                   <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest block mb-1">Operation Type</label>
-                  <span className="inline-block px-3 py-1 bg-slate-100 text-slate-700 rounded-lg text-[10px] font-black uppercase border border-slate-200 shadow-sm">{log.action}</span>
+                  <span className={`inline-block px-3 py-1 rounded-lg text-[10px] font-black uppercase border shadow-sm ${
+                    log.action === 'DELETE' ? 'bg-rose-50 text-rose-700 border-rose-100' : 'bg-slate-100 text-slate-700 border-slate-200'
+                  }`}>{log.action}</span>
                 </div>
              </div>
 
@@ -342,15 +373,6 @@ const UsersModule: React.FC<UsersModuleProps> = ({ users, setUsers, roles, setRo
           <p className="text-sm text-slate-500 font-medium mt-3">Identity provisioning and immutable forensic logging system.</p>
         </div>
         <div className="flex items-center space-x-3">
-          {activeTab === 'AUDIT' && (
-            <button 
-              onClick={exportAuditCSV}
-              className="flex items-center space-x-2 px-8 py-4 bg-slate-800 text-white rounded-[1.5rem] font-black shadow-xl hover:bg-slate-700 transition-all text-[10px] uppercase tracking-widest border border-slate-700"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-              <span>Export Audit Ledger</span>
-            </button>
-          )}
           <button 
             disabled={activeTab === 'AUDIT'}
             onClick={() => { setEditingUser(undefined); setEditingRole(undefined); setIsModalOpen(true); }}
@@ -475,18 +497,6 @@ const UsersModule: React.FC<UsersModuleProps> = ({ users, setUsers, roles, setRo
                         ))}
                       </React.Fragment>
                     ))}
-                    {filteredLogs.length === 0 && (
-                      <tr>
-                        <td colSpan={5} className="px-12 py-32 text-center">
-                           <div className="flex flex-col items-center opacity-40">
-                             <div className="w-24 h-24 bg-slate-50 rounded-[2rem] flex items-center justify-center mb-8 border-2 border-dashed border-slate-200">
-                               <svg className="w-12 h-12 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                             </div>
-                             <h5 className="text-sm font-black text-slate-400 uppercase tracking-[0.3em]">Zero mutations captured in current cluster context.</h5>
-                           </div>
-                        </td>
-                      </tr>
-                    )}
                  </tbody>
                </table>
              </div>
@@ -611,38 +621,6 @@ const UsersModule: React.FC<UsersModuleProps> = ({ users, setUsers, roles, setRo
                         </tr>
                       );
                     })}
-                  </tbody>
-                </table>
-              )}
-
-              {activeTab === 'MATRIX' && (
-                <table className="w-full text-left border-collapse">
-                  <thead className="bg-slate-950 text-[10px] uppercase font-black tracking-widest text-slate-500">
-                    <tr>
-                      <th className="px-12 py-8">Staff Designation Matrix</th>
-                      <th className="px-12 py-8 text-center">Company Domain</th>
-                      <th className="px-12 py-8 text-center">Administration</th>
-                      <th className="px-12 py-8 text-center">Transactions</th>
-                      <th className="px-12 py-8 text-center">Analytic Engine</th>
-                      <th className="px-12 py-8 text-center">Live Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {filteredUsers.map((user) => (
-                      <tr key={user.id} className="hover:bg-slate-50 transition-all border-b border-slate-50">
-                        <td className="px-12 py-8 font-black text-slate-800 text-sm italic uppercase tracking-tighter">{user.name} <span className="ml-3 text-[10px] text-indigo-400 font-black uppercase tracking-widest">[{user.role}]</span></td>
-                        {(['company', 'administration', 'transaction', 'display'] as const).map(mod => (
-                          <td key={mod} className="px-12 py-8 text-center">
-                             <div className={`inline-flex items-center justify-center w-10 h-10 rounded-[1.2rem] font-black text-white text-[11px] shadow-2xl transition-transform hover:scale-125 ${getPermColor(user.permissions[mod])}`}>
-                               {getPermLabel(user.permissions[mod])}
-                             </div>
-                          </td>
-                        ))}
-                        <td className="px-12 py-8 text-center">
-                           <div className={`w-3 h-3 rounded-full mx-auto ${user.status === 'Active' ? 'bg-emerald-500 animate-pulse shadow-[0_0_12px_#10b981]' : 'bg-rose-500 shadow-[0_0_12px_#f43f5e]'}`}></div>
-                        </td>
-                      </tr>
-                    ))}
                   </tbody>
                 </table>
               )}

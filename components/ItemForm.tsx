@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Item } from '../types';
+import { Item, TaxGroup, Tax } from '../types';
 
 interface ItemFormProps {
   initialData?: Item;
   unitMeasures: string[];
+  taxGroups?: TaxGroup[];
+  taxes?: Tax[];
   onQuickUnitAdd?: (unit: string) => void;
   onCancel: () => void;
   onSubmit: (data: Omit<Item, 'id'>) => void;
@@ -22,7 +24,7 @@ const CATEGORIES = [
 
 const GST_SLABS = [0, 5, 12, 18, 28];
 
-const ItemForm: React.FC<ItemFormProps> = ({ initialData, unitMeasures, onQuickUnitAdd, onCancel, onSubmit }) => {
+const ItemForm: React.FC<ItemFormProps> = ({ initialData, unitMeasures, taxGroups = [], taxes = [], onQuickUnitAdd, onCancel, onSubmit }) => {
   const [formData, setFormData] = useState<Omit<Item, 'id'> & { isTaxInclusive: boolean }>({
     name: '',
     category: 'General',
@@ -30,6 +32,7 @@ const ItemForm: React.FC<ItemFormProps> = ({ initialData, unitMeasures, onQuickU
     salePrice: 0,
     hsnCode: '',
     gstRate: 18, // Default to standard 18%
+    taxGroupId: '',
     isTaxInclusive: false
   });
 
@@ -47,6 +50,7 @@ const ItemForm: React.FC<ItemFormProps> = ({ initialData, unitMeasures, onQuickU
         salePrice: initialData.salePrice,
         hsnCode: initialData.hsnCode,
         gstRate: initialData.gstRate || 0,
+        taxGroupId: initialData.taxGroupId || '',
         isTaxInclusive: false
       });
     }
@@ -87,6 +91,17 @@ const ItemForm: React.FC<ItemFormProps> = ({ initialData, unitMeasures, onQuickU
       setNewUnitName('');
       setIsQuickUnitOpen(false);
     }
+  };
+
+  const handleTaxGroupChange = (groupId: string) => {
+    let newRate = formData.gstRate;
+    if (groupId) {
+      const groupTaxes = taxes.filter(t => t.groupId === groupId);
+      if (groupTaxes.length > 0) {
+        newRate = groupTaxes.reduce((sum, t) => sum + t.rate, 0);
+      }
+    }
+    setFormData(prev => ({ ...prev, taxGroupId: groupId, gstRate: newRate }));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -278,41 +293,58 @@ const ItemForm: React.FC<ItemFormProps> = ({ initialData, unitMeasures, onQuickU
           </div>
         </div>
 
-        {/* GST Rate Implementation */}
+        {/* Statutory Mapping Block */}
         <div className="bg-slate-900 rounded-[2.5rem] p-10 text-white relative overflow-hidden shadow-2xl border-b-8 border-indigo-600">
            <div className="relative z-10 space-y-8">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                  <div>
                     <h4 className="text-[11px] font-black uppercase tracking-[0.4em] text-indigo-400 mb-2">Statutory Tax Management</h4>
-                    <p className="text-[10px] text-slate-400 font-medium leading-relaxed max-w-xs">Define the applicable GST slab.</p>
+                    <p className="text-[10px] text-slate-400 font-medium leading-relaxed max-w-xs">Associate with a Tax Group for automated rate derivation.</p>
                  </div>
+                 
+                 <div className="w-full md:w-64 space-y-2">
+                    <label className="text-[10px] font-black uppercase text-indigo-300 tracking-widest ml-1">Regulatory Tax Group</label>
+                    <select 
+                      value={formData.taxGroupId} 
+                      onChange={e => handleTaxGroupChange(e.target.value)}
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-3 text-xs font-black text-white outline-none focus:ring-4 focus:ring-indigo-500/30 transition-all appearance-none cursor-pointer"
+                    >
+                      <option value="" className="bg-slate-900">-- Independent Slab --</option>
+                      {taxGroups.map(tg => <option key={tg.id} value={tg.id} className="bg-slate-900">{tg.name}</option>)}
+                    </select>
+                 </div>
+
                  <div className="text-right">
                     <div className="text-5xl font-black italic tracking-tighter text-indigo-500">{formData.gstRate}%</div>
-                    <div className="text-[9px] font-black uppercase tracking-widest text-slate-500 mt-1">Sovereign Rate</div>
+                    <div className="text-[9px] font-black uppercase tracking-widest text-slate-500 mt-1">Computed Sovereign Rate</div>
                  </div>
               </div>
 
-              <div className="flex bg-white/5 p-1.5 rounded-2xl border border-white/10 backdrop-blur-md">
-                 {GST_SLABS.map(slab => (
-                   <button
-                    key={slab}
-                    type="button"
-                    onClick={() => setFormData({...formData, gstRate: slab})}
-                    className={`flex-1 py-4 text-[11px] font-black uppercase rounded-xl transition-all ${formData.gstRate === slab ? 'bg-white text-slate-900 shadow-xl scale-105' : 'text-slate-400 hover:text-white'}`}
-                   >
-                     {slab}%
-                   </button>
-                 ))}
-                 <div className="w-px bg-white/10 mx-2 self-center h-8"></div>
-                 <div className="relative flex-1">
-                    <input 
-                      type="number" 
-                      placeholder="Custom"
-                      onChange={(e) => setFormData({...formData, gstRate: parseFloat(e.target.value) || 0})}
-                      className="w-full h-full bg-transparent border-none text-[11px] font-black text-center text-white placeholder-slate-600 outline-none"
-                    />
-                 </div>
-              </div>
+              {!formData.taxGroupId && (
+                <div className="animate-in fade-in slide-in-from-top-2">
+                   <div className="flex bg-white/5 p-1.5 rounded-2xl border border-white/10 backdrop-blur-md">
+                      {GST_SLABS.map(slab => (
+                        <button
+                          key={slab}
+                          type="button"
+                          onClick={() => setFormData({...formData, gstRate: slab})}
+                          className={`flex-1 py-4 text-[11px] font-black uppercase rounded-xl transition-all ${formData.gstRate === slab ? 'bg-white text-slate-900 shadow-xl scale-105' : 'text-slate-400 hover:text-white'}`}
+                        >
+                          {slab}%
+                        </button>
+                      ))}
+                      <div className="w-px bg-white/10 mx-2 self-center h-8"></div>
+                      <div className="relative flex-1">
+                          <input 
+                            type="number" 
+                            placeholder="Custom"
+                            onChange={(e) => setFormData({...formData, gstRate: parseFloat(e.target.value) || 0})}
+                            className="w-full h-full bg-transparent border-none text-[11px] font-black text-center text-white placeholder-slate-600 outline-none"
+                          />
+                      </div>
+                   </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                  <div className="p-5 bg-white/5 rounded-2xl border border-white/10 group hover:bg-white/10 transition-colors">

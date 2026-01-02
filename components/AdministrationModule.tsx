@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { ADMINISTRATION_SUB_MENUS } from '../constants';
-import { AdminSubMenu, User, Role, AccountGroup, Tax, TaxGroup, Ledger, Item, AuditLog, Voucher } from '../types';
+import { AdminSubMenu, User, Role, AccountGroup, Tax, TaxGroup, Ledger, Item, AuditLog, Voucher, Company } from '../types';
 import LedgerForm from './LedgerForm';
 import UsersModule from './UsersModule';
 import BackupModule from './BackupModule';
@@ -11,6 +11,7 @@ import ItemForm from './ItemForm';
 import TaxForm from './TaxForm';
 import TaxGroupForm from './TaxGroupForm';
 import ActionMenu, { ActionItem } from './ActionMenu';
+import EmailGateway from './EmailGateway';
 
 interface AdministrationModuleProps {
   users: User[];
@@ -36,13 +37,16 @@ interface AdministrationModuleProps {
   setVouchers: React.Dispatch<React.SetStateAction<Voucher[]>>;
   unitMeasures: string[];
   setUnitMeasures: React.Dispatch<React.SetStateAction<string[]>>;
+  companies?: Company[];
+  setCompanies?: React.Dispatch<React.SetStateAction<Company[]>>;
+  isFYLocked?: boolean;
 }
 
 const AdministrationModule: React.FC<AdministrationModuleProps> = ({ 
   users, setUsers, roles, setRoles, auditLogs, addAuditLog, activeCompany, currentFY, 
   activeSubAction, setActiveSubAction, setCurrentFY, ledgers, setLedgers, items, setItems,
   taxes, setTaxes, taxGroups, setTaxGroups, vouchers, setVouchers,
-  unitMeasures, setUnitMeasures
+  unitMeasures, setUnitMeasures, companies = [], setCompanies, isFYLocked
 }) => {
   const [accountGroups, setAccountGroups] = useState<AccountGroup[]>([
     { id: 'ag1', name: 'Bank Accounts', nature: 'Assets', isSystem: true },
@@ -254,6 +258,8 @@ const AdministrationModule: React.FC<AdministrationModuleProps> = ({
                   <ItemForm 
                     initialData={editingRecord as Item} 
                     unitMeasures={unitMeasures} 
+                    taxGroups={taxGroups}
+                    taxes={taxes}
                     onQuickUnitAdd={(u) => setUnitMeasures(prev => Array.from(new Set([...prev, u])))}
                     onCancel={() => setIsModalOpen(false)} 
                     onSubmit={(data) => { if (editingId) setItems(prev => prev.map(i => i.id === editingId ? { ...data, id: editingId } : i)); else setItems(prev => [...prev, { ...data, id: `i-${Date.now()}` }]); setIsModalOpen(false); }} 
@@ -331,12 +337,47 @@ const AdministrationModule: React.FC<AdministrationModuleProps> = ({
         {activeSubAction === AdminSubMenu.MASTERS ? <MastersManagementView /> : 
          activeSubAction === AdminSubMenu.USERS ? <UsersModule users={users} setUsers={setUsers} roles={roles} setRoles={setRoles} auditLogs={auditLogs} addAuditLog={addAuditLog} /> :
          activeSubAction === AdminSubMenu.BACKUP ? <BackupModule /> :
-         activeSubAction === AdminSubMenu.IMPORT_EXPORT ? <ImportExportModule vouchers={vouchers} setVouchers={setVouchers} items={items} setItems={setItems} ledgers={ledgers} setLedgers={setLedgers} /> :
+         activeSubAction === AdminSubMenu.IMPORT_EXPORT ? <ImportExportModule vouchers={vouchers} setVouchers={setVouchers} items={items} setItems={setItems} ledgers={ledgers} setLedgers={setLedgers} companies={companies} setCompanies={setCompanies} /> :
          activeSubAction === AdminSubMenu.YEAR_CHANGE ? <YearChangeModule activeCompany={activeCompany} currentFY={currentFY} setCurrentFY={setCurrentFY} onClose={() => setActiveSubAction(null)} /> :
-         <div className="bg-white rounded-3xl p-10 border border-slate-200 animate-in fade-in h-full">
-            <h2 className="text-2xl font-black italic uppercase tracking-tighter mb-2 text-slate-800">Admin Control</h2>
-            <p className="text-xs text-slate-400 max-w-md leading-relaxed">Central nexus for organizational metadata and statutory configurations.</p>
-            <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
+         activeSubAction === AdminSubMenu.COMMUNICATION ? <EmailGateway vouchers={vouchers} ledgers={ledgers} activeCompany={activeCompany} forceTab="CONFIG" /> :
+         <div className="bg-white rounded-3xl p-10 border border-slate-200 animate-in fade-in h-full space-y-10">
+            <div>
+              <h2 className="text-2xl font-black italic uppercase tracking-tighter mb-2 text-slate-800">Admin Control</h2>
+              <p className="text-xs text-slate-400 max-w-md leading-relaxed">Central nexus for organizational metadata and statutory configurations.</p>
+            </div>
+
+            {/* Period Governance Widget */}
+            <div className="bg-slate-900 rounded-[2.5rem] p-10 text-white relative overflow-hidden shadow-2xl border-l-8 border-rose-600">
+               <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-10">
+                  <div className="space-y-4">
+                     <div className="inline-block px-3 py-1 bg-rose-600/30 rounded-lg text-[9px] font-black uppercase tracking-[0.3em] border border-rose-600/30">Period Governance</div>
+                     <h3 className="text-3xl font-black italic uppercase tracking-tighter">Financial Session</h3>
+                     <div className="flex items-center space-x-6">
+                        <div className="flex flex-col">
+                           <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Active Period</span>
+                           <span className="text-xl font-black text-white italic">{currentFY}</span>
+                        </div>
+                        <div className="w-px h-10 bg-white/10"></div>
+                        <div className="flex flex-col">
+                           <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Integrity Status</span>
+                           <span className={`text-sm font-black uppercase tracking-widest ${isFYLocked ? 'text-rose-500' : 'text-emerald-500'}`}>
+                             {isFYLocked ? 'Locked (Audit Mode)' : 'Open (Operational)'}
+                           </span>
+                        </div>
+                     </div>
+                  </div>
+                  <button 
+                    onClick={() => setActiveSubAction(AdminSubMenu.YEAR_CHANGE)}
+                    className="px-10 py-5 bg-white text-slate-900 rounded-[1.5rem] font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-rose-600 hover:text-white transition-all transform active:scale-95 border-b-4 border-slate-950 flex items-center space-x-4"
+                  >
+                    <span>Change Working Year</span>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                  </button>
+               </div>
+               <div className="absolute top-0 right-0 w-80 h-80 bg-rose-600 rounded-full blur-[120px] opacity-10 -mr-40 -mt-40 pointer-events-none"></div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col items-center text-center">
                     <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-xl shadow-sm mb-4">🔐</div>
                     <h5 className="text-xs font-black uppercase text-slate-800">IAM Policy</h5>

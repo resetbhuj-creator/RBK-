@@ -72,22 +72,22 @@ const YearChangeModule: React.FC<YearChangeModuleProps> = ({
     setShowSuccess(false);
     setShiftLogs([]);
     
-    addLog(`Initiating context shift to ${target}...`);
-    addLog(`Acquiring system lock for domain "${activeCompany.name}"...`);
+    addLog(`INITIATING CONTEXT SHIFT: TARGET=${target}`);
+    addLog(`ACQUIRING SYSTEM LOCK: DOMAIN="${activeCompany.name}"`);
     
-    setTimeout(() => addLog(`Reloading ledger partitions for ${target}...`), 200);
-    setTimeout(() => addLog(`Verifying snapshot integrity... Status: ${targetMeta?.status}`), 400);
-    setTimeout(() => addLog(`Context successfully remapped. Preparing UI state...`), 600);
+    setTimeout(() => addLog(`RELOADING LEDGER PARTITIONS: SHARD_ID=${target.replace(/\s/g, '_')}`), 200);
+    setTimeout(() => addLog(`VERIFYING SNAPSHOT INTEGRITY: STATUS=${targetMeta?.status.toUpperCase()}`), 400);
+    setTimeout(() => addLog(`MAPPING OPENING BALANCES: AUTO_PROOF=SUCCESS`), 600);
+    setTimeout(() => addLog(`REMAP COMPLETE: UI STATE SYNCHRONIZED`), 800);
     
     setTimeout(() => {
       setCurrentFY(target, targetMeta?.status === 'Locked');
       setIsUpdating(false);
       setShowSuccess(true);
-      addLog(`SWITCH COMPLETE.`);
       
       // Auto-hide success message after 3 seconds
       setTimeout(() => setShowSuccess(false), 3000);
-    }, 900);
+    }, 1200);
   };
 
   const toggleYearLock = (year: string) => {
@@ -189,6 +189,7 @@ const YearChangeModule: React.FC<YearChangeModuleProps> = ({
                 if (!meta) return null;
                 const isActive = currentFY === year;
                 const isSelected = selectedYear === year;
+                const isLocked = meta.status === 'Locked';
                 
                 return (
                   <div
@@ -217,6 +218,9 @@ const YearChangeModule: React.FC<YearChangeModuleProps> = ({
                                 <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></div>
                                 <span className="text-[9px] font-black uppercase tracking-widest">ACTIVE</span>
                               </div>
+                            )}
+                            {isLocked && !isActive && (
+                               <div className="px-3 py-1 bg-slate-900 text-white rounded-lg text-[9px] font-black uppercase tracking-widest">LOCKED</div>
                             )}
                           </div>
                           <div className="flex items-center space-x-6">

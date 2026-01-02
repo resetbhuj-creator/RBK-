@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Voucher, Item, Ledger } from '../types';
+import { Voucher, Item, Ledger, Company } from '../types';
+import * as XLSX from 'xlsx';
 
 interface TransferJob {
   id: string;
@@ -20,6 +21,8 @@ interface ImportExportModuleProps {
   setItems?: React.Dispatch<React.SetStateAction<Item[]>>;
   ledgers?: Ledger[];
   setLedgers?: React.Dispatch<React.SetStateAction<Ledger[]>>;
+  companies?: Company[];
+  setCompanies?: React.Dispatch<React.SetStateAction<Company[]>>;
   forcedEntity?: string;
   initialTab?: 'IMPORT' | 'EXPORT';
   initialFormat?: string;
@@ -33,9 +36,11 @@ const ImportExportModule: React.FC<ImportExportModuleProps> = ({
   setItems,
   ledgers = [],
   setLedgers,
+  companies = [],
+  setCompanies,
   forcedEntity, 
   initialTab = 'IMPORT', 
-  initialFormat = 'XML',
+  initialFormat = 'XLSX',
   onClose 
 }) => {
   const [activeTab, setActiveTab] = useState<'IMPORT' | 'EXPORT'>(initialTab);
@@ -46,7 +51,7 @@ const ImportExportModule: React.FC<ImportExportModuleProps> = ({
   const [progress, setProgress] = useState(0);
   const [logs, setLogs] = useState<string[]>([]);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
-  const [fileContent, setFileContent] = useState<string | null>(null);
+  const [fileContent, setFileContent] = useState<any | null>(null);
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const consoleEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -55,20 +60,34 @@ const ImportExportModule: React.FC<ImportExportModuleProps> = ({
   const [csvDelimiter, setCsvDelimiter] = useState(',');
 
   const [jobs, setJobs] = useState<TransferJob[]>([
-    { id: 'JOB-901', type: 'EXPORT', entity: 'Sales Vouchers', timestamp: '2023-11-23 10:15 AM', status: 'Completed', records: 1240, format: 'XML' },
+    { id: 'JOB-901', type: 'EXPORT', entity: 'Sales Vouchers', timestamp: '2023-11-23 10:15 AM', status: 'Completed', records: 1240, format: 'XLSX' },
     { id: 'JOB-902', type: 'IMPORT', entity: 'Accounting Vouchers', timestamp: '2023-11-25 09:30 AM', status: 'Completed', records: 850, format: 'CSV' },
   ]);
 
   const ENTITIES = [
+    'Companies',
     'Accounting Vouchers',
     'Inventory Vouchers',
     'Ledgers', 
     'Inventory Items'
   ];
   
-  const FORMATS = ['XML', 'CSV'];
+  const FORMATS = ['XLSX', 'CSV', 'XML'];
 
   const ENTITY_SCHEMAS: Record<string, { source: string; target: string; type: string; required?: boolean }[]> = {
+    'Companies': [
+      { source: 'name', target: 'CompanyName', type: 'String', required: true },
+      { source: 'country', target: 'Country', type: 'String', required: true },
+      { source: 'state', target: 'State', type: 'String', required: true },
+      { source: 'currency', target: 'Currency', type: 'String', required: true },
+      { source: 'taxLaw', target: 'TaxRegime', type: 'String' },
+      { source: 'taxId', target: 'TaxID', type: 'String' },
+      { source: 'address', target: 'Address', type: 'String' },
+      { source: 'email', target: 'OfficialEmail', type: 'String', required: true },
+      { source: 'website', target: 'Website', type: 'String' },
+      { source: 'fyStartDate', target: 'FYStartDate', type: 'Date', required: true },
+      { source: 'dataPath', target: 'PersistencePath', type: 'String', required: true }
+    ],
     'Accounting Vouchers': [
       { source: 'id', target: 'VoucherNo', type: 'String', required: true },
       { source: 'date', target: 'Date', type: 'Date', required: true },
@@ -121,39 +140,60 @@ const ImportExportModule: React.FC<ImportExportModuleProps> = ({
     setSelectedFile(file.name);
     addLog(`System Probe: File "${file.name}" linked. Initializing ${targetFormat} validation sequence...`);
     
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const content = event.target?.result as string;
-      setFileContent(content);
-      
-      try {
-        if (targetFormat === 'CSV') {
-          const firstLine = content.split('\n')[0];
-          const headers = firstLine.split(csvDelimiter).map(h => h.trim().replace(/^"|"$/g, ''));
+    if (targetFormat === 'XLSX') {
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
+        if (data.length > 0) {
+          const headers = data[0].map(h => String(h));
           setDetectedHeaders(headers);
           autoMapHeaders(headers);
-        } else if (targetFormat === 'XML') {
-          const parser = new DOMParser();
-          const xmlDoc = parser.parseFromString(content, "text/xml");
-          if (xmlDoc.getElementsByTagName("parsererror").length > 0) throw new Error("Invalid XML Structure");
-          
-          const firstNode = xmlDoc.documentElement.firstElementChild;
-          if (firstNode) {
-            const headers = Array.from(firstNode.children).map(c => c.tagName);
+          setFileContent(XLSX.utils.sheet_to_json(ws));
+          setCurrentStage('MAP');
+        } else {
+          addLog("CRITICAL ERROR: Empty spreadsheet. Aborting.");
+        }
+      };
+      reader.readAsBinaryString(file);
+    } else {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const content = event.target?.result as string;
+        setFileContent(content);
+        
+        try {
+          if (targetFormat === 'CSV') {
+            const firstLine = content.split('\n')[0];
+            const headers = firstLine.split(csvDelimiter).map(h => h.trim().replace(/^"|"$/g, ''));
             setDetectedHeaders(headers);
             autoMapHeaders(headers);
-          } else {
-            throw new Error("Empty XML Data Root");
+          } else if (targetFormat === 'XML') {
+            const parser = new DOMParser();
+            const xmlDoc = parser.parseFromString(content, "text/xml");
+            if (xmlDoc.getElementsByTagName("parsererror").length > 0) throw new Error("Invalid XML Structure");
+            
+            const firstNode = xmlDoc.documentElement.firstElementChild;
+            if (firstNode) {
+              const headers = Array.from(firstNode.children).map(c => c.tagName);
+              setDetectedHeaders(headers);
+              autoMapHeaders(headers);
+            } else {
+              throw new Error("Empty XML Data Root");
+            }
           }
+          setCurrentStage('MAP');
+        } catch (err: any) {
+          addLog(`CRITICAL ERROR: ${err.message}. Aborting sequence.`);
+          alert(`Failed to parse ${targetFormat} structure: ${err.message}`);
+          resetStage();
         }
-        setCurrentStage('MAP');
-      } catch (err: any) {
-        addLog(`CRITICAL ERROR: ${err.message}. Aborting sequence.`);
-        alert(`Failed to parse ${targetFormat} structure: ${err.message}`);
-        resetStage();
-      }
-    };
-    reader.readAsText(file);
+      };
+      reader.readAsText(file);
+    }
   };
 
   const autoMapHeaders = (headers: string[]) => {
@@ -208,6 +248,29 @@ const ImportExportModule: React.FC<ImportExportModuleProps> = ({
     });
   };
 
+  const parseMappedData = (data: any[]): any[] => {
+    const schema = ENTITY_SCHEMAS[selectedEntity];
+    return data.map(row => {
+      const obj: any = {};
+      schema.forEach(s => {
+        const sourceHeader = mapping[s.target];
+        let val = row[sourceHeader];
+        if (s.type === 'Float') val = parseFloat(val) || 0;
+        obj[s.source] = val;
+      });
+      
+      // Auto-logic for entities
+      if (selectedEntity === 'Companies') {
+        const startYear = new Date(obj.fyStartDate || Date.now()).getFullYear();
+        obj.years = [`${startYear} - ${startYear + 1}`];
+        obj.id = `C-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
+        obj.logo = obj.name?.charAt(0) || 'N';
+      }
+      
+      return obj;
+    });
+  };
+
   const downloadTemplate = () => {
     const schema = ENTITY_SCHEMAS[selectedEntity] || ENTITY_SCHEMAS['Accounting Vouchers'];
     let content = '';
@@ -218,6 +281,13 @@ const ImportExportModule: React.FC<ImportExportModuleProps> = ({
       content = schema.map(s => s.target).join(csvDelimiter);
       mimeType = 'text/csv';
       fileName += '.csv';
+    } else if (targetFormat === 'XLSX') {
+      const ws = XLSX.utils.json_to_sheet([schema.reduce((acc, s) => ({ ...acc, [s.target]: 'VALUE' }), {})]);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Template");
+      XLSX.writeFile(wb, `${fileName}.xlsx`);
+      addLog(`Excel Template Dispatched: ${fileName}.xlsx`);
+      return;
     } else {
       const rootName = selectedEntity.replace(/\s/g, '') + 'Root';
       const itemName = selectedEntity.replace(/\s/g, '').slice(0, -1) || 'Record';
@@ -255,9 +325,18 @@ const ImportExportModule: React.FC<ImportExportModuleProps> = ({
         clearInterval(interval);
         
         if (activeTab === 'IMPORT' && fileContent) {
-          const parsed = targetFormat === 'CSV' ? [] : parseXML(fileContent);
+          let parsed: any[] = [];
+          if (targetFormat === 'XLSX') {
+            parsed = parseMappedData(fileContent);
+          } else if (targetFormat === 'XML') {
+            parsed = parseXML(fileContent);
+          } else {
+            // Placeholder for CSV parsing
+            parsed = [];
+          }
           
-          if (selectedEntity === 'Inventory Items' && setItems) setItems(prev => [...parsed, ...prev]);
+          if (selectedEntity === 'Companies' && setCompanies) setCompanies(prev => [...parsed, ...prev]);
+          else if (selectedEntity === 'Inventory Items' && setItems) setItems(prev => [...parsed, ...prev]);
           else if (selectedEntity === 'Ledgers' && setLedgers) setLedgers(prev => [...parsed, ...prev]);
           else if (setVouchers) setVouchers(prev => [...parsed, ...prev]);
 
@@ -273,13 +352,24 @@ const ImportExportModule: React.FC<ImportExportModuleProps> = ({
 
   const finalizeJob = () => {
     let dataSource: any[] = [];
-    if (selectedEntity === 'Inventory Items') dataSource = items;
+    if (selectedEntity === 'Companies') dataSource = companies;
+    else if (selectedEntity === 'Inventory Items') dataSource = items;
     else if (selectedEntity === 'Ledgers') dataSource = ledgers;
     else dataSource = vouchers;
 
     addLog(`SEQUENCE SUCCESSFUL: Operation finalized.`);
     if (activeTab === 'EXPORT') {
-      const content = targetFormat === 'XML' ? generateXML(dataSource) : 'CSV_CONTENT_PLACEHOLDER';
+      let content = '';
+      if (targetFormat === 'XML') content = generateXML(dataSource);
+      else if (targetFormat === 'XLSX') {
+        const ws = XLSX.utils.json_to_sheet(dataSource);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Export");
+        XLSX.writeFile(wb, `nexus_export_${selectedEntity.toLowerCase().replace(/\s/g, '_')}_${Date.now()}.xlsx`);
+        addLog(`Binary XLSX transmitted to local storage.`);
+        return;
+      }
+      
       const blob = new Blob([content], { type: targetFormat === 'XML' ? 'text/xml' : 'text/csv' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -319,7 +409,7 @@ const ImportExportModule: React.FC<ImportExportModuleProps> = ({
       <div className="bg-slate-950 rounded-[3rem] p-10 text-white relative overflow-hidden shadow-2xl border-b-8 border-indigo-600/30">
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-8">
           <div className="flex items-center space-x-6">
-            <div className="w-20 h-20 bg-indigo-600 rounded-[2rem] flex items-center justify-center shadow-2xl border-4 border-indigo-400/30 group">
+            <div className="w-20 h-20 bg-indigo-600 rounded-[2rem] flex items-center justify-center shadow-2xl border-4 border-indigo-400/20 group">
               <svg className="w-10 h-10 text-white group-hover:rotate-12 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>
             </div>
             <div>
@@ -369,7 +459,7 @@ const ImportExportModule: React.FC<ImportExportModuleProps> = ({
               </div>
 
               <div onClick={() => activeTab === 'IMPORT' ? fileInputRef.current?.click() : startOperation()} className="border-4 border-dashed rounded-[3rem] p-24 text-center group transition-all cursor-pointer border-slate-100 hover:border-indigo-200 hover:bg-indigo-50/20">
-                <input type="file" ref={fileInputRef} className="hidden" accept={targetFormat === 'CSV' ? '.csv' : '.xml'} onChange={handleFileChange} />
+                <input type="file" ref={fileInputRef} className="hidden" accept={targetFormat === 'CSV' ? '.csv' : (targetFormat === 'XML' ? '.xml' : '.xlsx,.xls')} onChange={handleFileChange} />
                 <div className="w-24 h-24 bg-white rounded-[2rem] flex items-center justify-center mx-auto mb-8 text-slate-200 group-hover:scale-110 group-hover:text-indigo-600 transition-all shadow-sm border border-slate-50">
                    <span className="text-4xl">{activeTab === 'IMPORT' ? '📥' : '📤'}</span>
                 </div>
@@ -467,7 +557,7 @@ const ImportExportModule: React.FC<ImportExportModuleProps> = ({
              <div className="relative z-10">
                 <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-indigo-300 mb-6">Security Compliance</h4>
                 <p className="text-xs leading-relaxed font-medium text-indigo-100/70 mb-10">
-                  Nexus enforces <span className="text-white font-black underline decoration-emerald-500 underline-offset-4">Statutory Schema Matching</span>. XML objects must align with the organizational blueprint before ledger commitment.
+                  Nexus enforces <span className="text-white font-black underline decoration-emerald-500 underline-offset-4">Statutory Schema Matching</span>. XML and XLSX objects must align with the organizational blueprint before ledger commitment.
                 </p>
                 <div className="flex items-center space-x-4">
                    <div className="px-4 py-2 bg-white/10 rounded-xl border border-white/10 text-[9px] font-black uppercase">AES-256 Enabled</div>

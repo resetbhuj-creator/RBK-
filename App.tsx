@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MainMenuType, Role, User, AuditLog, AdminSubMenu, TransactionSubMenu, DisplaySubMenu, CommunicationSubMenu, HouseKeepingSubMenu, Ledger, Item, Voucher, Tax, TaxGroup } from './types';
+import { MainMenuType, Role, User, AuditLog, AdminSubMenu, TransactionSubMenu, DisplaySubMenu, CommunicationSubMenu, HouseKeepingSubMenu, Ledger, Item, Voucher, Tax, TaxGroup, Company } from './types';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import Dashboard from './components/Dashboard';
@@ -34,7 +34,9 @@ const INITIAL_COMPANIES = [
     taxId: '27AAAAA0000A1Z5', 
     address: 'Nexus Tower, BKC, Mumbai - 400051',
     dataPath: 'C:\\NexusERP\\Data\\Company001',
-    businessType: 'Private Limited Company'
+    businessType: 'Private Limited Company',
+    fyStartDate: '2023-04-01',
+    booksBeginDate: '2023-04-01'
   }
 ];
 
@@ -80,7 +82,7 @@ const App: React.FC = () => {
   const [viewingVoucherId, setViewingVoucherId] = useState<string | null>(null);
 
   // Persistence State
-  const [companies, setCompanies] = useState(() => JSON.parse(localStorage.getItem('nexus_erp_companies') || JSON.stringify(INITIAL_COMPANIES)));
+  const [companies, setCompanies] = useState<Company[]>(() => JSON.parse(localStorage.getItem('nexus_erp_companies') || JSON.stringify(INITIAL_COMPANIES)));
   const [users, setUsers] = useState<User[]>(() => JSON.parse(localStorage.getItem('nexus_erp_users') || JSON.stringify(INITIAL_USERS)));
   const [roles, setRoles] = useState<Role[]>(() => JSON.parse(localStorage.getItem('nexus_erp_roles') || JSON.stringify(INITIAL_ROLES)));
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>(() => JSON.parse(localStorage.getItem('nexus_erp_audit_logs') || JSON.stringify(INITIAL_AUDIT_LOGS)));
@@ -113,8 +115,13 @@ const App: React.FC = () => {
   const activeCompany = companies.find((c: any) => c.id === currentCompanyId) || { name: 'None Selected' };
   const voucherToView = viewingVoucherId ? vouchers.find(v => v.id === viewingVoucherId) : null;
 
-  const addAuditLog = (log: Omit<AuditLog, 'id' | 'timestamp' | 'actor'>) => {
-    const newLog: AuditLog = { ...log, id: `TXN-${Math.random().toString(36).substr(2, 9).toUpperCase()}`, timestamp: new Date().toISOString(), actor: 'System Admin' };
+  const addAuditLog = (log: Omit<AuditLog, 'id' | 'timestamp' | 'actor'> & { actor?: string }) => {
+    const newLog: AuditLog = { 
+      ...log, 
+      id: `TXN-${Math.random().toString(36).substr(2, 9).toUpperCase()}`, 
+      timestamp: new Date().toISOString(), 
+      actor: log.actor || 'Vance Alexander' // Super Admin from sidebar
+    };
     setAuditLogs(prev => [newLog, ...prev]);
   };
 
@@ -132,6 +139,7 @@ const App: React.FC = () => {
               setCurrentFY(fy);
               if (locked !== undefined) setIsFYLocked(locked);
             }}
+            companies={companies} setCompanies={setCompanies}
             ledgers={ledgers} setLedgers={setLedgers} items={items} setItems={setItems}
             taxes={taxes} setTaxes={setTaxes} taxGroups={taxGroups} setTaxGroups={setTaxGroups}
             vouchers={vouchers} setVouchers={setVouchers}

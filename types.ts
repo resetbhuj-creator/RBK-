@@ -25,7 +25,8 @@ export enum AdminSubMenu {
   USERS = 'Users',
   BACKUP = 'Backup',
   IMPORT_EXPORT = 'Import / Export',
-  YEAR_CHANGE = 'Year Change'
+  YEAR_CHANGE = 'Year Change',
+  COMMUNICATION = 'Communication'
 }
 
 export enum TransactionSubMenu {
@@ -180,6 +181,7 @@ export interface Item {
   salePrice: number;
   hsnCode: string;
   gstRate: number; // Combined rate (IGST)
+  taxGroupId?: string;
 }
 
 export interface MenuItem {
