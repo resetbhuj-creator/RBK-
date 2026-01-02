@@ -31,12 +31,26 @@ const INITIAL_COMPANIES = [
     logo: 'N', 
     taxId: '27AAAAA0000A1Z5', 
     address: 'Nexus Tower, BKC, Mumbai - 400051',
-    dataPath: 'C:\\NexusERP\\Data\\Company001'
+    dataPath: 'C:\\NexusERP\\Data\\Company001',
+    businessType: 'Private Limited Company',
+    currencyConfig: {
+      symbol: '₹',
+      code: 'INR',
+      decimalPlaces: 2,
+      showSymbolAsPrefix: true,
+      useIndianGrouping: true
+    }
   }
 ];
 
 const INITIAL_USERS: User[] = [
   { id: 'u1', name: 'System Admin', email: 'admin@nexus.com', role: 'Super Admin', status: 'Active', lastLogin: '2 mins ago', permissions: { company: 'all', administration: 'all', transaction: 'all', display: 'all' } }
+];
+
+const INITIAL_AUDIT_LOGS: AuditLog[] = [
+  { id: 'log-1', actor: 'System Admin', action: 'CREATE', entityType: 'SYSTEM', entityName: 'Nexus Core', details: 'System initialization successful. Multi-region master mapping complete.', timestamp: new Date(Date.now() - 3600000).toISOString() },
+  { id: 'log-2', actor: 'System Admin', action: 'STATUS_CHANGE', entityType: 'USER', entityName: 'System Admin', details: 'LIFECYCLE SHIFT: Account integrity status changed from Suspended to Active.', timestamp: new Date(Date.now() - 1800000).toISOString() },
+  { id: 'log-3', actor: 'System Admin', action: 'UPDATE', entityType: 'ROLE', entityName: 'Accountant', details: 'MODIFICATION TRACE: [PERM:TRANSACTION] read → write | [PERM:DISPLAY] none → all', timestamp: new Date(Date.now() - 600000).toISOString() }
 ];
 
 const INITIAL_LEDGERS: Ledger[] = [
@@ -80,7 +94,7 @@ const App: React.FC = () => {
   const [companies, setCompanies] = useState(() => JSON.parse(localStorage.getItem('nexus_erp_companies') || JSON.stringify(INITIAL_COMPANIES)));
   const [users, setUsers] = useState<User[]>(() => JSON.parse(localStorage.getItem('nexus_erp_users') || JSON.stringify(INITIAL_USERS)));
   const [roles, setRoles] = useState<Role[]>(() => JSON.parse(localStorage.getItem('nexus_erp_roles') || JSON.stringify(INITIAL_ROLES)));
-  const [auditLogs, setAuditLogs] = useState<AuditLog[]>(() => JSON.parse(localStorage.getItem('nexus_erp_audit_logs') || '[]'));
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>(() => JSON.parse(localStorage.getItem('nexus_erp_audit_logs') || JSON.stringify(INITIAL_AUDIT_LOGS)));
   
   // Master Data State
   const [ledgers, setLedgers] = useState<Ledger[]>(() => JSON.parse(localStorage.getItem('nexus_erp_ledgers') || JSON.stringify(INITIAL_LEDGERS)));
@@ -111,7 +125,7 @@ const App: React.FC = () => {
   const activeCompany = companies.find((c: any) => c.id === currentCompanyId) || { name: 'None Selected' };
 
   const addAuditLog = (log: Omit<AuditLog, 'id' | 'timestamp' | 'actor'>) => {
-    const newLog: AuditLog = { ...log, id: `log-${Date.now()}`, timestamp: new Date().toISOString(), actor: 'System Admin' };
+    const newLog: AuditLog = { ...log, id: `TXN-${Math.random().toString(36).substr(2, 9).toUpperCase()}`, timestamp: new Date().toISOString(), actor: 'System Admin' };
     setAuditLogs(prev => [newLog, ...prev]);
   };
 
@@ -120,7 +134,7 @@ const App: React.FC = () => {
       case MainMenuType.DASHBOARD:
         return <Dashboard activeCompany={activeCompany} />;
       case MainMenuType.COMPANY:
-        return <CompanyModule companies={companies} setCompanies={setCompanies} currentCompanyId={currentCompanyId} setCurrentCompanyId={setCurrentCompanyId} currentFY={currentFY} setCurrentFY={setCurrentFY} />;
+        return <CompanyModule companies={companies} setCompanies={setCompanies} currentCompanyId={currentCompanyId} setCurrentCompanyId={setCurrentCompanyId} currentFY={currentFY} setCurrentFY={setCurrentFY} addAuditLog={addAuditLog} />;
       case MainMenuType.ADMINISTRATION:
         return (
           <AdministrationModule 
@@ -128,10 +142,11 @@ const App: React.FC = () => {
             activeCompany={activeCompany} currentFY={currentFY} activeSubAction={activeAdminSubMenu} setActiveSubAction={setActiveAdminSubMenu} setCurrentFY={(fy, locked) => {
               setCurrentFY(fy);
               if (locked !== undefined) setIsFYLocked(locked);
-              addAuditLog({ action: 'UPDATE', entityType: 'SYSTEM', entityName: 'Accounting Context', details: `Financial context switched to period: ${fy}` });
+              addAuditLog({ action: 'UPDATE', entityType: 'SYSTEM', entityName: 'Accounting Context', details: `PERIOD SHIFT: Context remapped to ${fy}. Lock state: ${locked ? 'ENGAGED' : 'DISENGAGED'}.` });
             }}
             ledgers={ledgers} setLedgers={setLedgers} items={items} setItems={setItems}
             taxes={taxes} setTaxes={setTaxes} taxGroups={taxGroups} setTaxGroups={setTaxGroups}
+            vouchers={vouchers} setVouchers={setVouchers}
           />
         );
       case MainMenuType.TRANSACTION:
@@ -175,8 +190,8 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
-      {isSidebarOpen && <div className="fixed inset-0 bg-slate-900/50 z-40 md:hidden backdrop-blur-sm" onClick={() => setIsSidebarOpen(false)} />}
+    <div className="flex h-screen bg-slate-50 overflow-hidden">
+      {isSidebarOpen && <div className="fixed inset-0 bg-slate-900/60 z-40 md:hidden backdrop-blur-sm transition-all duration-300" onClick={() => setIsSidebarOpen(false)} />}
       <Sidebar 
         activeMenu={activeMenu} 
         setActiveMenu={(menu) => { setActiveMenu(menu); setActiveAdminSubMenu(null); setActiveTransactionSubMenu(null); setActiveDisplaySubMenu(null); setActiveCommSubMenu(null); setActiveHouseKeepingSubMenu(null); }} 
@@ -187,10 +202,12 @@ const App: React.FC = () => {
         activeHouseKeepingSubMenu={activeHouseKeepingSubMenu} setActiveHouseKeepingSubMenu={setActiveHouseKeepingSubMenu}
         isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} activeCompany={activeCompany} 
       />
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 h-screen">
         <Header onMenuToggle={() => setIsSidebarOpen(!isSidebarOpen)} title={activeMenu} activeCompanyName={activeCompany.name} currentFY={currentFY} isFYLocked={isFYLocked} />
-        <main className="flex-1 overflow-y-auto p-4 md:p-8">
-          <div className="max-w-7xl mx-auto">{renderContent()}</div>
+        <main className="flex-1 overflow-y-auto overflow-x-hidden p-3 md:p-6 bg-slate-50/50 custom-scrollbar scroll-smooth">
+          <div className="max-w-[1600px] mx-auto animate-in fade-in duration-500">
+            {renderContent()}
+          </div>
         </main>
       </div>
     </div>

@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts';
 
@@ -19,7 +18,6 @@ interface DashboardProps {
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ activeCompany }) => {
-  // Extract currency symbol if available (e.g., from "USD ($)" -> "$")
   const getCurrencySymbol = () => {
     if (!activeCompany?.currency) return '$';
     const match = activeCompany.currency.match(/\(([^)]+)\)/);
@@ -29,47 +27,47 @@ const Dashboard: React.FC<DashboardProps> = ({ activeCompany }) => {
   const symbol = getCurrencySymbol();
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-4 animate-in fade-in duration-300">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800">Welcome Back, Admin</h2>
-          <p className="text-slate-500">Currently viewing analytics for <span className="font-semibold text-indigo-600">{activeCompany?.name || 'No Company Selected'}</span></p>
+          <h2 className="text-xl font-black text-slate-800 tracking-tight italic uppercase">Operational Intel</h2>
+          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Active Node: <span className="text-indigo-600">{activeCompany?.name || '---'}</span></p>
         </div>
         <div className="hidden sm:block text-right">
-          <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Accounting Period</div>
-          <div className="text-sm font-bold text-slate-700">{activeCompany?.years?.[activeCompany.years.length - 1] || 'N/A'}</div>
+          <div className="text-[8px] font-black text-slate-300 uppercase tracking-[0.2em]">Working Period</div>
+          <div className="text-xs font-black text-slate-600">{activeCompany?.years?.[activeCompany.years.length - 1] || 'N/A'}</div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Total Revenue', value: `${symbol}128,430`, trend: '+12.5%', color: 'text-emerald-600', bg: 'bg-emerald-50' },
-          { label: 'Pending Transactions', value: '43', trend: '-2.4%', color: 'text-amber-600', bg: 'bg-amber-50' },
-          { label: 'Active Users', value: '1,240', trend: '+5.1%', color: 'text-blue-600', bg: 'bg-blue-50' },
-          { label: 'Efficiency Rate', value: '94.2%', trend: '+0.8%', color: 'text-indigo-600', bg: 'bg-indigo-50' }
+          { label: 'Revenue (7D)', value: `${symbol}128,430`, trend: '+12.5%', color: 'text-emerald-500', bg: 'bg-emerald-50' },
+          { label: 'Unposted Queue', value: '43', trend: '-2.4%', color: 'text-amber-500', bg: 'bg-amber-50' },
+          { label: 'Active Personnel', value: '1,240', trend: '+5.1%', color: 'text-blue-500', bg: 'bg-blue-50' },
+          { label: 'Procurement Gap', value: '94.2%', trend: '+0.8%', color: 'text-indigo-500', bg: 'bg-indigo-50' }
         ].map((stat, i) => (
-          <div key={i} className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
-            <div className="flex justify-between items-start">
-              <span className="text-slate-500 text-sm font-medium">{stat.label}</span>
-              <span className={`text-xs font-bold px-2 py-1 rounded-full ${stat.bg} ${stat.color}`}>
+          <div key={i} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm transition-all hover:shadow-md hover:border-indigo-100">
+            <div className="flex justify-between items-start mb-2">
+              <span className="text-slate-400 text-[9px] font-black uppercase tracking-widest">{stat.label}</span>
+              <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-md ${stat.bg} ${stat.color}`}>
                 {stat.trend}
               </span>
             </div>
-            <div className="mt-4 text-3xl font-bold text-slate-900">{stat.value}</div>
+            <div className="text-xl font-black text-slate-800 italic tracking-tighter tabular-nums">{stat.value}</div>
           </div>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="text-lg font-semibold text-slate-800">Financial Performance</h3>
-            <select className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1 text-sm outline-none focus:ring-2 focus:ring-indigo-500">
-              <option>Last 7 Days</option>
-              <option>Last 30 Days</option>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col h-[300px]">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest">Growth Velocity</h3>
+            <select className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-[9px] font-black uppercase outline-none focus:ring-2 focus:ring-indigo-500/20">
+              <option>Cycle: 7D</option>
+              <option>Cycle: 30D</option>
             </select>
           </div>
-          <div className="h-80 w-full">
+          <div className="flex-1 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={data}>
                 <defs>
@@ -79,21 +77,21 @@ const Dashboard: React.FC<DashboardProps> = ({ activeCompany }) => {
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
-                <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 9, fontWeight: 900}} />
+                <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 9, fontWeight: 900}} />
                 <Tooltip 
-                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                  formatter={(value: any) => [`${symbol}${value}`, 'Revenue']}
+                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontSize: '11px' }}
+                  formatter={(value: any) => [`${symbol}${value}`, 'Vol']}
                 />
-                <Area type="monotone" dataKey="revenue" stroke="#6366f1" strokeWidth={3} fillOpacity={1} fill="url(#colorRev)" />
+                <Area type="monotone" dataKey="revenue" stroke="#6366f1" strokeWidth={2.5} fillOpacity={1} fill="url(#colorRev)" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-          <h3 className="text-lg font-semibold text-slate-800 mb-6">Transaction Types</h3>
-          <div className="h-64 w-full">
+        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col h-[300px]">
+          <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest mb-4">Channel Partition</h3>
+          <div className="flex-1 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={data.slice(0, 4)}>
                 <Bar dataKey="revenue" radius={[4, 4, 0, 0]}>
@@ -101,50 +99,45 @@ const Dashboard: React.FC<DashboardProps> = ({ activeCompany }) => {
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Bar>
-                <XAxis dataKey="name" axisLine={false} tickLine={false} />
-                <Tooltip cursor={{fill: '#f8fafc'}} formatter={(value: any) => [`${symbol}${value}`, 'Volume']} />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 9}} />
+                <Tooltip cursor={{fill: '#f8fafc'}} formatter={(value: any) => [value, 'Vol']} />
               </BarChart>
             </ResponsiveContainer>
           </div>
-          <div className="mt-6 space-y-3">
-            {['Sales', 'Services', 'Consulting', 'Other'].map((label, i) => (
-              <div key={i} className="flex items-center justify-between text-sm">
-                <div className="flex items-center space-x-2">
-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[i] }}></div>
-                  <span className="text-slate-600">{label}</span>
-                </div>
-                <span className="font-semibold text-slate-800">{20 + i * 15}%</span>
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            {['Sales', 'Service', 'Other', 'Misc'].map((label, i) => (
+              <div key={i} className="flex items-center space-x-2 text-[9px] font-bold uppercase text-slate-400">
+                <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: COLORS[i] }}></div>
+                <span className="truncate">{label}</span>
               </div>
             ))}
           </div>
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
-          <h3 className="text-lg font-semibold text-slate-800">Recent Transactions</h3>
-          <button className="text-indigo-600 text-sm font-medium hover:underline">View All</button>
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[300px]">
+        <div className="px-6 py-3 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
+          <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest">Verification Registry</h3>
+          <button className="text-indigo-600 text-[10px] font-black uppercase hover:underline underline-offset-4">Full Log</button>
         </div>
-        <div className="overflow-x-auto">
+        <div className="overflow-auto custom-scrollbar flex-1">
           <table className="w-full text-left">
-            <thead className="bg-slate-50 text-slate-500 uppercase text-xs font-bold">
+            <thead className="bg-white/50 text-slate-400 uppercase text-[8px] font-black sticky top-0 border-b border-slate-100">
               <tr>
-                <th className="px-6 py-3">Transaction ID</th>
-                <th className="px-6 py-3">Entity</th>
-                <th className="px-6 py-3">Date</th>
-                <th className="px-6 py-3">Amount</th>
-                <th className="px-6 py-3">Status</th>
+                <th className="px-6 py-2.5">Txn Hash</th>
+                <th className="px-6 py-2.5">Domain</th>
+                <th className="px-6 py-2.5">Value</th>
+                <th className="px-6 py-2.5">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
-              {[1, 2, 3, 4, 5].map((item) => (
-                <tr key={item} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-6 py-4 font-mono text-sm text-slate-600">TXN-0982{item}</td>
-                  <td className="px-6 py-4 font-medium text-slate-800">{activeCompany?.name || 'Unknown'}</td>
-                  <td className="px-6 py-4 text-slate-600">Oct 24, 2023</td>
-                  <td className="px-6 py-4 font-semibold text-slate-900">{symbol}2,400.00</td>
-                  <td className="px-6 py-4">
-                    <span className="px-2 py-1 bg-emerald-50 text-emerald-600 text-xs font-bold rounded-full">Completed</span>
+            <tbody className="divide-y divide-slate-50">
+              {[1, 2, 3, 4, 5, 6, 7].map((item) => (
+                <tr key={item} className="hover:bg-slate-50/80 transition-colors">
+                  <td className="px-6 py-3 font-mono text-[10px] text-slate-500 font-black tracking-tighter">#TXN-0982{item}</td>
+                  <td className="px-6 py-3 font-black text-slate-700 text-[10px] truncate max-w-[120px] italic uppercase">{activeCompany?.name || '---'}</td>
+                  <td className="px-6 py-3 font-black text-slate-900 text-xs tabular-nums tracking-tighter">${(2400 * item).toLocaleString()}</td>
+                  <td className="px-6 py-3">
+                    <span className="px-2 py-0.5 bg-emerald-50 text-emerald-600 text-[8px] font-black rounded uppercase border border-emerald-100 shadow-sm">Verified</span>
                   </td>
                 </tr>
               ))}

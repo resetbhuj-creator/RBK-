@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { COMPANY_SUB_MENUS } from '../constants';
-import { CompanySubMenu, Company } from '../types';
+import { CompanySubMenu, Company, AuditLog } from '../types';
 import CreateCompanyForm from './CreateCompanyForm';
 import EditCompanyForm from './EditCompanyForm';
 import OpenCompanyForm from './OpenCompanyForm';
@@ -16,6 +16,7 @@ interface CompanyModuleProps {
   setCurrentCompanyId: (id: string) => void;
   currentFY: string;
   setCurrentFY: (fy: string) => void;
+  addAuditLog?: (log: Omit<AuditLog, 'id' | 'timestamp' | 'actor'>) => void;
 }
 
 const CompanyModule: React.FC<CompanyModuleProps> = ({ 
@@ -24,7 +25,8 @@ const CompanyModule: React.FC<CompanyModuleProps> = ({
   currentCompanyId, 
   setCurrentCompanyId, 
   currentFY, 
-  setCurrentFY 
+  setCurrentFY,
+  addAuditLog
 }) => {
   const [activeSubAction, setActiveSubAction] = useState<CompanySubMenu | null>(null);
 
@@ -61,6 +63,16 @@ const CompanyModule: React.FC<CompanyModuleProps> = ({
     setCompanies(prev => [...prev, newCompany]);
     setCurrentCompanyId(newCompany.id);
     setCurrentFY(fyString);
+    
+    if (addAuditLog) {
+      addAuditLog({
+        action: 'CREATE',
+        entityType: 'COMPANY',
+        entityName: data.name,
+        details: `INITIALIZATION: New corporate node created for ${data.name}.`
+      });
+    }
+
     alert(`Company "${data.name}" created successfully.\nAccounting Year Starts: ${data.fyStartDate}`);
     setActiveSubAction(null);
   };
@@ -69,6 +81,16 @@ const CompanyModule: React.FC<CompanyModuleProps> = ({
     setCompanies(prev => prev.map(c => 
       c.id === currentCompanyId ? { ...c, ...data } : c
     ));
+
+    if (addAuditLog) {
+      addAuditLog({
+        action: 'UPDATE',
+        entityType: 'COMPANY',
+        entityName: data.name,
+        details: `RECONFIGURATION: Modified statutory profile and financial formatting preferences.`
+      });
+    }
+
     alert(`Company "${data.name}" updated successfully.`);
     setActiveSubAction(null);
   };
@@ -91,6 +113,16 @@ const CompanyModule: React.FC<CompanyModuleProps> = ({
     setCompanies(prev => [...prev, restoredCompany]);
     setCurrentCompanyId(restoredCompany.id);
     setCurrentFY('2023 - 2024');
+
+    if (addAuditLog) {
+      addAuditLog({
+        action: 'UPDATE',
+        entityType: 'COMPANY',
+        entityName: data.name,
+        details: `RECOVERY SEQUENCE: Successfully restored corporate data from external vault.`
+      });
+    }
+
     alert(`System Recovery Successful: ${data.name} is now the active context.`);
     setActiveSubAction(null);
   };
@@ -114,6 +146,16 @@ const CompanyModule: React.FC<CompanyModuleProps> = ({
       c.id === currentCompanyId ? { ...c, years: [...(c.years || []), yearString] } : c
     ));
     setCurrentFY(yearString);
+
+    if (addAuditLog) {
+      addAuditLog({
+        action: 'UPDATE',
+        entityType: 'COMPANY',
+        entityName: activeCompany.name,
+        details: `PERIOD PROVISIONING: Added new financial year ${yearString}.`
+      });
+    }
+
     alert(`New Financial Year "${yearString}" added successfully.`);
     setActiveSubAction(null);
   };
@@ -128,6 +170,16 @@ const CompanyModule: React.FC<CompanyModuleProps> = ({
     ));
     
     setCurrentFY(period);
+
+    if (addAuditLog) {
+      addAuditLog({
+        action: 'UPDATE',
+        entityType: 'COMPANY',
+        entityName: activeCompany.name,
+        details: `ARCHIVAL SPLIT: Current data archived. New session initiated for ${period}.`
+      });
+    }
+
     alert(`Financial Year Split Successful!\nNew Period Active: ${period}`);
     setActiveSubAction(null);
   };
@@ -136,6 +188,16 @@ const CompanyModule: React.FC<CompanyModuleProps> = ({
     if (data.scope === 'COMPLETE') {
       const remainingCompanies = companies.filter(c => c.id !== data.companyId);
       setCompanies(remainingCompanies);
+      
+      if (addAuditLog) {
+        addAuditLog({
+          action: 'DELETE',
+          entityType: 'COMPANY',
+          entityName: data.companyName,
+          details: `PURGE SEQUENCE: Complete corporate node and all associated years removed from registry.`
+        });
+      }
+
       if (data.companyId === currentCompanyId) {
         if (remainingCompanies.length > 0) {
           setCurrentCompanyId(remainingCompanies[0].id);
@@ -150,6 +212,15 @@ const CompanyModule: React.FC<CompanyModuleProps> = ({
       setCompanies(prev => prev.map(c => 
         c.id === data.companyId ? { ...c, years: c.years.filter((y: string) => y !== data.year) } : c
       ));
+
+      if (addAuditLog) {
+        addAuditLog({
+          action: 'DELETE',
+          entityType: 'COMPANY',
+          entityName: activeCompany.name,
+          details: `SELECTIVE PURGE: Financial year ${data.year} removed from company history.`
+        });
+      }
     }
     setActiveSubAction(null);
   };
