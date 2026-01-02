@@ -125,12 +125,19 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
 
   const totals = useMemo(() => {
     const itemsSubTotal = vchItems.reduce((acc, i) => acc + i.amount, 0);
+    const taxTotal = vchItems.reduce((acc, i) => acc + (i.taxAmount || 0), 0);
+    
+    // Net Value after items and their taxes, but before financial adjustments
+    const netAfterTax = itemsSubTotal + taxTotal;
+
     const adjustmentsTotal = adjustments.reduce((acc, a) => {
       return a.type === 'Add' ? acc + a.amount : acc - a.amount;
     }, 0);
-    const taxTotal = vchItems.reduce((acc, i) => acc + (i.taxAmount || 0), 0);
-    const grandTotal = itemsSubTotal + adjustmentsTotal + taxTotal;
-    return { subTotal: itemsSubTotal, adjustmentsTotal, taxTotal, grandTotal };
+
+    // Final Grand Total includes post-tax adjustments
+    const grandTotal = netAfterTax + adjustmentsTotal;
+
+    return { subTotal: itemsSubTotal, taxTotal, netAfterTax, adjustmentsTotal, grandTotal };
   }, [vchItems, adjustments]);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -280,7 +287,7 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
         <div className="space-y-4">
            <div className="flex items-center space-x-3 text-slate-400">
               <div className="w-1.5 h-6 bg-slate-200 rounded-full"></div>
-              <h4 className="text-[10px] font-black uppercase tracking-[0.3em]">II. Financial Add / Less</h4>
+              <h4 className="text-[10px] font-black uppercase tracking-[0.3em]">II. Financial Add / Less (Post-Tax)</h4>
            </div>
            <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
               <div className="space-y-4">
@@ -328,7 +335,7 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
                             </tr>
                           ))}
                           {adjustments.length === 0 && (
-                            <tr><td colSpan={4} className="py-12 text-center text-[10px] font-black text-slate-300 uppercase tracking-widest italic">Zero global adjustments</td></tr>
+                            <tr><td colSpan={4} className="py-12 text-center text-[10px] font-black text-slate-300 uppercase tracking-widest italic">Zero post-tax adjustments</td></tr>
                           )}
                        </tbody>
                     </table>
@@ -348,7 +355,7 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
                  </div>
                  <div className="mt-8 p-6 bg-white rounded-3xl border border-slate-100 flex items-start space-x-4">
                     <div className="w-10 h-10 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 shadow-inner">💡</div>
-                    <p className="text-[10px] text-slate-400 font-medium leading-relaxed italic">"Financial adjustments allow you to account for overhead costs or rebates without affecting master stock valuation logic."</p>
+                    <p className="text-[10px] text-slate-400 font-medium leading-relaxed italic">"Financial adjustments here are applied to the total payable amount AFTER statutory tax calculations are finalized."</p>
                  </div>
               </div>
            </div>
@@ -366,27 +373,32 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
               <div className="bg-slate-900 rounded-[3rem] p-12 text-white space-y-5 shadow-2xl relative overflow-hidden border-t-8 border-indigo-600">
                  <div className="relative z-10 flex justify-between items-center text-[11px] font-black uppercase text-slate-500 tracking-widest">
                     <span>Taxable Base</span>
-                    <span className="text-white tabular-nums">${totals.subTotal.toLocaleString()}</span>
-                 </div>
-                 
-                 <div className="relative z-10 flex justify-between items-center text-[11px] font-black uppercase tracking-widest">
-                    <span className="text-indigo-400">Add / Less Sum</span>
-                    <span className={`tabular-nums ${totals.adjustmentsTotal >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                      {totals.adjustmentsTotal >= 0 ? '+' : '-'}${Math.abs(totals.adjustmentsTotal).toLocaleString()}
-                    </span>
+                    <span className="text-white tabular-nums">${totals.subTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                  </div>
 
                  <div className="relative z-10 flex justify-between items-center text-[11px] font-black uppercase text-indigo-400 tracking-widest">
                     <span>Statutory GST Total</span>
-                    <span className="text-indigo-200 tabular-nums">${totals.taxTotal.toLocaleString()}</span>
+                    <span className="text-indigo-200 tabular-nums">${totals.taxTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                 </div>
+                 
+                 <div className="relative z-10 pt-4 border-t border-slate-800 flex justify-between items-center text-[11px] font-black uppercase text-slate-500 tracking-widest">
+                    <span>Net Value (After Tax)</span>
+                    <span className="text-white tabular-nums">${totals.netAfterTax.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                 </div>
+
+                 <div className="relative z-10 flex justify-between items-center text-[11px] font-black uppercase tracking-widest">
+                    <span className="text-amber-400">Financial Add / Less</span>
+                    <span className={`tabular-nums ${totals.adjustmentsTotal >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      {totals.adjustmentsTotal >= 0 ? '+' : '-'}${Math.abs(totals.adjustmentsTotal).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </span>
                  </div>
                  
                  <div className="relative z-10 pt-10 border-t border-slate-800 flex justify-between items-end">
                     <div className="flex flex-col">
                        <span className="text-[10px] font-black uppercase italic text-indigo-500 tracking-[0.4em] mb-1">Grand Total</span>
-                       <span className="text-[8px] font-bold text-slate-600 uppercase tracking-widest">Reconciliation Verified ✓</span>
+                       <span className="text-[8px] font-bold text-slate-600 uppercase tracking-widest">Final Settlement ✓</span>
                     </div>
-                    <span className="text-5xl font-black tracking-tighter italic tabular-nums text-white">${totals.grandTotal.toLocaleString()}</span>
+                    <span className="text-5xl font-black tracking-tighter italic tabular-nums text-white">${totals.grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                  </div>
                  <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-600 rounded-full blur-[150px] opacity-10 -mr-40 -mt-40 pointer-events-none"></div>
               </div>

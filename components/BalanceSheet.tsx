@@ -7,31 +7,15 @@ interface BalanceSheetProps {
   vouchers: Voucher[];
 }
 
-interface ReportRowProps {
-  label: string;
-  value: number;
-  isBold?: boolean;
-  actions?: ActionItem[];
-}
-
-const ReportRow: React.FC<ReportRowProps> = ({ label, value, isBold = false, actions }) => (
-  <div className={`flex justify-between items-center py-3 border-b border-slate-50 group ${isBold ? 'font-black text-slate-900 bg-slate-50/50 px-4 rounded-lg' : 'text-slate-600 px-4 hover:bg-slate-50 transition-colors'}`}>
-    <div className="flex items-center space-x-3">
-      <span className="text-xs uppercase tracking-tight">{label}</span>
-      {actions && !isBold && (
-        <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-          <ActionMenu actions={actions} label="Drill" />
-        </div>
-      )}
-    </div>
-    <span className="text-sm tabular-nums font-mono">${value.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-  </div>
-);
-
 const BalanceSheet: React.FC<BalanceSheetProps> = ({ ledgers, vouchers }) => {
   const data = useMemo(() => {
-    const assets: any[] = [];
-    const liabilities: any[] = [];
+    const categories = {
+      fixedAssets: [] as any[],
+      currentAssets: [] as any[],
+      equity: [] as any[],
+      longTermLiabilities: [] as any[],
+      currentLiabilities: [] as any[]
+    };
     
     ledgers.forEach(l => {
       let balance = l.openingBalance;
@@ -42,105 +26,105 @@ const BalanceSheet: React.FC<BalanceSheetProps> = ({ ledgers, vouchers }) => {
       });
 
       const entry = { id: l.id, name: l.name, balance };
-      if (['Assets', 'Bank Accounts', 'Cash-in-hand', 'Sundry Debtors'].some(n => l.group.includes(n))) {
-        assets.push(entry);
+      const group = l.group.toLowerCase();
+
+      if (group.includes('fixed') || group.includes('investment')) {
+        categories.fixedAssets.push(entry);
+      } else if (group.includes('bank') || group.includes('cash') || group.includes('debtor') || group.includes('current assets')) {
+        categories.currentAssets.push(entry);
+      } else if (group.includes('capital') || group.includes('reserve') || group.includes('equity')) {
+        categories.equity.push(entry);
+      } else if (group.includes('loan') || group.includes('secured')) {
+        categories.longTermLiabilities.push(entry);
       } else {
-        liabilities.push(entry);
+        categories.currentLiabilities.push(entry);
       }
     });
 
-    return { 
-      assets, 
-      liabilities, 
-      totalAssets: assets.reduce((acc, a) => acc + a.balance, 0), 
-      totalLiab: liabilities.reduce((acc, l) => acc + l.balance, 0) 
+    const sum = (arr: any[]) => arr.reduce((acc, x) => acc + x.balance, 0);
+
+    return {
+      ...categories,
+      totalFixed: sum(categories.fixedAssets),
+      totalCurrentA: sum(categories.currentAssets),
+      totalEquity: sum(categories.equity),
+      totalLongLiab: sum(categories.longTermLiabilities),
+      totalCurrentLiab: sum(categories.currentLiabilities)
     };
   }, [ledgers, vouchers]);
 
-  const getLedgerActions = (id: string, name: string): ActionItem[] => [
-    { 
-      label: 'View Detailed Ledger', 
-      icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
-      onClick: () => alert(`Opening ledger drill-down for: ${name}`),
-      variant: 'primary'
-    },
-    { 
-      label: 'Extract Audit Schedule', 
-      icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
-      onClick: () => alert(`Generating CSV schedule for auditors...`)
-    },
-    { 
-      label: 'Compare Period Variance', 
-      icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>,
-      onClick: () => alert(`Analyzing variance against previous FY...`)
-    },
-    { 
-      label: 'Dispatch to Stakeholders', 
-      icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>,
-      onClick: () => alert(`Mailing statement breakdown to registered stakeholders.`)
-    }
-  ];
+  const totalAssets = data.totalFixed + data.totalCurrentA;
+  const totalLiabEquity = data.totalEquity + data.totalLongLiab + data.totalCurrentLiab;
+
+  const ReportRow = ({ label, value, isHeader = false, isTotal = false }: any) => (
+    <div className={`flex justify-between items-center py-2 px-4 ${isHeader ? 'bg-slate-50 font-black text-[10px] uppercase text-slate-500 tracking-widest' : 'text-xs text-slate-700'} ${isTotal ? 'border-t-2 border-slate-900 mt-2 font-black text-slate-900 bg-indigo-50/30' : 'border-b border-slate-50 hover:bg-slate-50/50'}`}>
+      <span className={isHeader ? 'mt-2 mb-1' : ''}>{label}</span>
+      <span className="font-mono tabular-nums">${value.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+    </div>
+  );
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="bg-white rounded-[3rem] border border-slate-200 shadow-2xl overflow-hidden max-w-5xl mx-auto">
-        <div className="bg-indigo-600 px-12 py-10 text-white flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
-          <div>
-            <h3 className="text-3xl font-black italic uppercase tracking-tighter">Balance Sheet</h3>
-            <p className="text-[10px] font-black uppercase tracking-[0.3em] opacity-80 mt-2">Statement of Financial Position • Consolidated</p>
-          </div>
-          <div className="flex space-x-3">
-             <button className="px-6 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-[10px] font-black uppercase tracking-widest border border-white/20 transition-all">Historical View</button>
-             <button className="px-6 py-2 bg-white text-indigo-600 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-xl transition-all hover:bg-indigo-50">Export Master PDF</button>
-          </div>
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-6xl mx-auto">
+      <div className="bg-white rounded-[3rem] border border-slate-200 shadow-2xl overflow-hidden">
+        {/* Statutory Header */}
+        <div className="bg-indigo-950 p-12 text-white border-b-8 border-indigo-600">
+           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+              <div className="space-y-2">
+                 <h3 className="text-3xl font-black italic uppercase tracking-tighter">Statement of Financial Position</h3>
+                 <p className="text-[10px] font-black uppercase tracking-[0.4em] text-indigo-400">Balance Sheet • Consolidated Audit View</p>
+              </div>
+              <div className="text-right">
+                 <div className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Reporting Period</div>
+                 <div className="text-xl font-black italic">As on {new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+                 <p className="text-[9px] text-slate-500 font-bold uppercase mt-1 italic">All amounts in USD ($)</p>
+              </div>
+           </div>
         </div>
 
         <div className="p-12">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16">
-            <section className="space-y-6">
-              <h4 className="text-[11px] font-black uppercase text-indigo-600 tracking-[0.2em] border-b-2 border-indigo-100 pb-2 flex justify-between items-center">
-                <span>I. Liabilities & Equity</span>
-                <span className="text-[9px] text-slate-400 font-bold">SOURCE: LEDGER MASTER</span>
-              </h4>
-              <div className="space-y-1">
-                {data.liabilities.map((l, i) => (
-                  <ReportRow key={i} label={l.name} value={l.balance} actions={getLedgerActions(l.id, l.name)} />
-                ))}
-                <div className="pt-6">
-                  <ReportRow label="Total Equity & Liabilities" value={data.totalLiab} isBold />
-                </div>
-              </div>
+            {/* Equities & Liabilities */}
+            <section className="space-y-2">
+              <h4 className="text-[11px] font-black uppercase text-indigo-600 tracking-[0.2em] border-b-2 border-indigo-100 pb-2 mb-4">I. EQUITY AND LIABILITIES</h4>
+              
+              <ReportRow label="Shareholders' Funds" isHeader value={data.totalEquity} />
+              {data.equity.map((l, i) => <ReportRow key={i} label={l.name} value={l.balance} />)}
+              
+              <ReportRow label="Non-Current Liabilities" isHeader value={data.totalLongLiab} />
+              {data.longTermLiabilities.map((l, i) => <ReportRow key={i} label={l.name} value={l.balance} />)}
+              
+              <ReportRow label="Current Liabilities" isHeader value={data.totalCurrentLiab} />
+              {data.currentLiabilities.map((l, i) => <ReportRow key={i} label={l.name} value={l.balance} />)}
+              
+              <ReportRow label="Total Equity & Liabilities" value={totalLiabEquity} isTotal />
             </section>
 
-            <section className="space-y-6">
-              <h4 className="text-[11px] font-black uppercase text-indigo-600 tracking-[0.2em] border-b-2 border-indigo-100 pb-2 flex justify-between items-center">
-                <span>II. Assets</span>
-                <span className="text-[9px] text-slate-400 font-bold">MARKET VALUATION</span>
-              </h4>
-              <div className="space-y-1">
-                {data.assets.map((a, i) => (
-                  <ReportRow key={i} label={a.name} value={a.balance} actions={getLedgerActions(a.id, a.name)} />
-                ))}
-                <div className="pt-6">
-                  <ReportRow label="Total Business Assets" value={data.totalAssets} isBold />
-                </div>
+            {/* Assets */}
+            <section className="space-y-2">
+              <h4 className="text-[11px] font-black uppercase text-indigo-600 tracking-[0.2em] border-b-2 border-indigo-100 pb-2 mb-4">II. ASSETS</h4>
+              
+              <ReportRow label="Non-Current Assets" isHeader value={data.totalFixed} />
+              {data.fixedAssets.map((l, i) => <ReportRow key={i} label={l.name} value={l.balance} />)}
+              
+              <ReportRow label="Current Assets" isHeader value={data.totalCurrentA} />
+              {data.currentAssets.map((l, i) => <ReportRow key={i} label={l.name} value={l.balance} />)}
+              
+              <div className="pt-2">
+                <ReportRow label="Total Assets" value={totalAssets} isTotal />
               </div>
             </section>
           </div>
 
-          <div className="mt-16 p-8 bg-slate-900 rounded-[2.5rem] text-white flex flex-col md:flex-row items-center justify-between shadow-2xl border-4 border-slate-800 relative overflow-hidden">
-             <div className="flex items-center space-x-6 relative z-10">
-                <div className="w-16 h-16 rounded-2xl bg-indigo-600 flex items-center justify-center text-3xl shadow-lg transform -rotate-3 transition-transform hover:rotate-0">⚖️</div>
-                <div>
-                   <h5 className="text-[10px] font-black uppercase text-indigo-400 tracking-[0.3em]">Fundamental Proofing</h5>
-                   <p className="text-sm font-black italic">Differential: ${Math.abs(data.totalAssets - data.totalLiab).toLocaleString()}</p>
-                </div>
+          {/* Validation Footer */}
+          <div className="mt-16 p-8 bg-slate-50 rounded-[2.5rem] border-2 border-dashed border-slate-200 flex flex-col md:flex-row items-center justify-between">
+             <div className="flex items-center space-x-4">
+                <div className={`w-3 h-3 rounded-full ${Math.abs(totalAssets - totalLiabEquity) < 1 ? 'bg-emerald-500 shadow-[0_0_8px_#10b981]' : 'bg-rose-500 shadow-[0_0_8px_#f43f5e] animate-pulse'}`}></div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Integrity Check: {Math.abs(totalAssets - totalLiabEquity) < 1 ? 'Balanced' : 'Variance Detected'}</span>
              </div>
-             <div className="text-right mt-6 md:mt-0 relative z-10">
-                <div className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-1">Corporate Net Worth</div>
-                <div className="text-4xl font-black italic text-indigo-400 tracking-tighter tabular-nums">${data.totalAssets.toLocaleString()}</div>
+             <div className="flex space-x-6 mt-4 md:mt-0">
+                <button className="text-[10px] font-black text-indigo-600 uppercase hover:underline decoration-indigo-200 underline-offset-4">Schedule Audit</button>
+                <button className="text-[10px] font-black text-indigo-600 uppercase hover:underline decoration-indigo-200 underline-offset-4">Export Schedule III</button>
              </div>
-             <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-600 rounded-full blur-[100px] opacity-10 -mr-32 -mt-32"></div>
           </div>
         </div>
       </div>
