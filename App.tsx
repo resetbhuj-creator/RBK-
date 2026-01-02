@@ -159,8 +159,9 @@ const App: React.FC = () => {
       case MainMenuType.DISPLAY:
         return (
           <DisplayModule 
+            /* Fixed typo: setActiveDisplaySubAction -> setActiveDisplaySubMenu */
             activeCompany={activeCompany} activeSubAction={activeDisplaySubMenu} setActiveSubAction={setActiveDisplaySubMenu}
-            ledgers={ledgers} vouchers={vouchers} items={items}
+            ledgers={ledgers} vouchers={vouchers} items={items} taxes={taxes} taxGroups={taxGroups}
           />
         );
       case MainMenuType.COMMUNICATION:

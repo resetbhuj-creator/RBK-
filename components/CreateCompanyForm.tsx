@@ -271,11 +271,29 @@ const CreateCompanyForm: React.FC<CreateCompanyFormProps> = ({ onCancel, onSubmi
            </div>
         </section>
 
-        {/* Section 4: Fiscal Period (Existing) */}
+        {/* Section 4: Corporate Branding */}
         <section className="space-y-8">
            <div className="flex items-center space-x-4">
               <div className="w-1 h-8 bg-indigo-600 rounded-full"></div>
-              <h4 className="text-xs font-black uppercase text-slate-800 tracking-[0.2em]">IV. Working Session & Persistence</h4>
+              <h4 className="text-xs font-black uppercase text-slate-800 tracking-[0.2em]">IV. Corporate Branding</h4>
+           </div>
+
+           <div className="bg-slate-50 p-10 rounded-[2.5rem] border border-slate-200">
+              <LogoUpload 
+                value={formData.logo} 
+                onChange={(val) => setFormData(prev => ({...prev, logo: val}))} 
+                onClear={() => setFormData(prev => ({...prev, logo: ''}))}
+                error={errors.logo}
+              />
+              <p className="mt-4 text-[10px] text-slate-400 font-medium italic text-center">"This logo will appear on all statutory invoices, reports, and emails."</p>
+           </div>
+        </section>
+
+        {/* Section 5: Fiscal Period */}
+        <section className="space-y-8">
+           <div className="flex items-center space-x-4">
+              <div className="w-1 h-8 bg-indigo-600 rounded-full"></div>
+              <h4 className="text-xs font-black uppercase text-slate-800 tracking-[0.2em]">V. Working Session & Persistence</h4>
            </div>
 
            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-slate-50 p-10 rounded-[2.5rem] border border-slate-200">

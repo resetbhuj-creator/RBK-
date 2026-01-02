@@ -49,21 +49,21 @@ const ItemForm: React.FC<ItemFormProps> = ({ initialData, onCancel, onSubmit }) 
     }
   }, [initialData]);
 
-  const validate = () => {
+  const validate = (currentData = formData) => {
     const newErrors: Record<string, string> = {};
-    if (!formData.name.trim()) newErrors.name = 'Item name is required';
-    if (!formData.category) newErrors.category = 'Product category is required';
-    if (!formData.unit) newErrors.unit = 'Unit of Measure is mandatory';
-    if (formData.salePrice < 0) newErrors.salePrice = 'Sale price cannot be negative';
-    if (formData.gstRate < 0 || formData.gstRate > 100) newErrors.gstRate = 'Invalid tax rate (0-100%)';
+    if (!currentData.name.trim()) newErrors.name = 'Item name is required';
+    if (!currentData.category) newErrors.category = 'Product category is required';
+    if (!currentData.unit) newErrors.unit = 'Unit of Measure is mandatory';
+    if (currentData.salePrice < 0) newErrors.salePrice = 'Sale price cannot be negative';
+    if (currentData.gstRate < 0 || currentData.gstRate > 100) newErrors.gstRate = 'Invalid tax rate (0-100%)';
     
-    const hsn = formData.hsnCode.trim();
+    const hsn = currentData.hsnCode.trim();
     if (!hsn) {
       newErrors.hsnCode = 'HSN/SAC code is mandatory for statutory compliance';
     } else if (!/^\d+$/.test(hsn)) {
       newErrors.hsnCode = 'Code must contain only numerical digits';
     } else if (hsn.length < 2 || hsn.length > 8) {
-      newErrors.hsnCode = 'Code length must be between 2 and 8 digits';
+      newErrors.hsnCode = 'Code must be between 2 and 8 digits (standard statutory range)';
     }
     
     setErrors(newErrors);
@@ -93,6 +93,7 @@ const ItemForm: React.FC<ItemFormProps> = ({ initialData, onCancel, onSubmit }) 
 
   const hsnLength = formData.hsnCode.length;
   const isSacCode = formData.hsnCode.startsWith('99');
+  const isHsnValidLength = hsnLength >= 2 && hsnLength <= 8;
 
   const priceMetrics = useMemo(() => {
     const rate = formData.gstRate;
@@ -171,17 +172,40 @@ const ItemForm: React.FC<ItemFormProps> = ({ initialData, onCancel, onSubmit }) 
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-1 flex justify-between">
-              <span>{isSacCode ? 'SAC (Services)' : 'HSN (Goods)'} Code</span>
-            </label>
-            <input 
-              inputMode="numeric"
-              value={formData.hsnCode} 
-              onChange={e => setFormData({...formData, hsnCode: e.target.value.replace(/\D/g, '').substring(0, 8)})} 
-              onBlur={() => handleBlur('hsnCode')}
-              placeholder="2 to 8 digits" 
-              className={inputClass('hsnCode') + " font-mono font-bold tracking-widest"}
-            />
+            <div className="flex justify-between items-center mb-1">
+              <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-1">
+                {isSacCode ? 'SAC (Services)' : 'HSN (Goods)'} Code
+              </label>
+              <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${isHsnValidLength ? 'bg-indigo-50 text-indigo-600' : hsnLength > 0 ? 'bg-rose-50 text-rose-500' : 'text-slate-300'}`}>
+                {hsnLength} / 8 Digits
+              </span>
+            </div>
+            <div className="relative group">
+              <input 
+                inputMode="numeric"
+                value={formData.hsnCode} 
+                onChange={e => {
+                  const val = e.target.value.replace(/\D/g, '').substring(0, 8);
+                  setFormData({...formData, hsnCode: val});
+                  if (touched.hsnCode) validate({...formData, hsnCode: val});
+                }} 
+                onBlur={() => handleBlur('hsnCode')}
+                placeholder="2 to 8 digits (e.g. 8471)" 
+                className={inputClass('hsnCode') + " font-mono font-bold tracking-widest"}
+              />
+              <div className="absolute right-3 top-3 opacity-0 group-focus-within:opacity-100 transition-opacity">
+                {isHsnValidLength ? (
+                   <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                ) : hsnLength > 0 && (
+                   <svg className="w-4 h-4 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
+                )}
+              </div>
+            </div>
+            {touched.hsnCode && errors.hsnCode ? (
+              <p className="text-[10px] text-rose-500 font-bold mt-1 ml-1">{errors.hsnCode}</p>
+            ) : (
+              <p className="text-[9px] text-slate-400 font-medium italic mt-1 ml-1">Common formats: 4, 6, or 8 digits. SAC starts with 99.</p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -211,7 +235,7 @@ const ItemForm: React.FC<ItemFormProps> = ({ initialData, onCancel, onSubmit }) 
           </div>
         </div>
 
-        {/* Improved GST Rate Implementation */}
+        {/* GST Rate Implementation */}
         <div className="bg-slate-900 rounded-[2.5rem] p-10 text-white relative overflow-hidden shadow-2xl border-b-8 border-indigo-600">
            <div className="relative z-10 space-y-8">
               <div className="flex items-center justify-between">
@@ -274,7 +298,7 @@ const ItemForm: React.FC<ItemFormProps> = ({ initialData, onCancel, onSubmit }) 
         </div>
 
         <div className="pt-8 border-t border-slate-100 flex justify-end space-x-4">
-          <button type="button" onClick={onCancel} className="px-10 py-4 rounded-2xl text-slate-500 font-black text-[10px] uppercase tracking-widest hover:bg-slate-50 transition-all">Discard</button>
+          <button type="button" onClick={onCancel} className="px-10 py-4 rounded-2xl text-slate-400 font-black text-[10px] uppercase tracking-widest hover:bg-slate-50 transition-all">Discard</button>
           <button type="submit" className="px-14 py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-2xl shadow-slate-200 hover:bg-indigo-600 transition-all transform active:scale-95">
             {initialData ? 'Update Master' : 'Initialize Identity'}
           </button>

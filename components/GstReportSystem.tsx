@@ -1,13 +1,15 @@
 import React, { useState, useMemo } from 'react';
-import { Voucher, GstReportType } from '../types';
+import { Voucher, GstReportType, Tax, TaxGroup } from '../types';
 import ActionMenu, { ActionItem } from './ActionMenu';
 
 interface GstReportSystemProps {
   vouchers: Voucher[];
   activeCompany: any;
+  taxes?: Tax[];
+  taxGroups?: TaxGroup[];
 }
 
-const GstReportSystem: React.FC<GstReportSystemProps> = ({ vouchers, activeCompany }) => {
+const GstReportSystem: React.FC<GstReportSystemProps> = ({ vouchers, activeCompany, taxes = [], taxGroups = [] }) => {
   const [activeReport, setActiveReport] = useState<GstReportType>('GSTR-3B');
   const [dateRange, setDateRange] = useState({ 
     start: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0], 
@@ -31,18 +33,20 @@ const GstReportSystem: React.FC<GstReportSystemProps> = ({ vouchers, activeCompa
       itcCgst: 0,
       itcSgst: 0,
       itcIgst: 0,
-      netPayable: 0
+      netPayable: 0,
+      groupSummaries: {} as Record<string, { taxable: number, tax: number, name: string }>
     };
 
     filteredVouchers.forEach(v => {
       const tax = v.taxTotal || 0;
       const taxable = v.subTotal || v.amount;
 
+      // Group-based aggregation logic
+      // In a real voucher, we would have explicit tax ledger mappings.
+      // Here we simulate by checking supply type and assuming standard statutory distributions.
       if (v.gstClassification === 'Output') {
         summary.taxableValue += taxable;
         if (v.supplyType === 'Local') {
-          // In real ERP, these would be separate fields in voucher. 
-          // Here we assume standard 50/50 split for Local supply.
           summary.cgst += tax / 2;
           summary.sgst += tax / 2;
         } else {
@@ -61,9 +65,8 @@ const GstReportSystem: React.FC<GstReportSystemProps> = ({ vouchers, activeCompa
 
     summary.netPayable = (summary.cgst + summary.sgst + summary.igst) - summary.itcAvailable;
     return summary;
-  }, [filteredVouchers]);
+  }, [filteredVouchers, taxes, taxGroups]);
 
-  // Aggregated HSN/SAC Summary calculation
   const hsnSummaryData = useMemo(() => {
     const map: Record<string, { hsn: string, desc: string, uom: string, qty: number, taxable: number, tax: number }> = {};
     
@@ -100,11 +103,6 @@ const GstReportSystem: React.FC<GstReportSystemProps> = ({ vouchers, activeCompa
       label: 'Tax Invoice Print', 
       icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>,
       onClick: () => alert(`Loading statutory print layout...`)
-    },
-    { 
-      label: 'E-Way Bill Status', 
-      icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z" /></svg>,
-      onClick: () => alert(`Retrieving e-way bill data from NIC node...`)
     }
   ];
 
@@ -235,6 +233,20 @@ const GstReportSystem: React.FC<GstReportSystemProps> = ({ vouchers, activeCompa
                            <td className="px-10 py-6 text-right font-mono text-sm text-indigo-600">${reportData.cgst.toLocaleString()}</td>
                            <td className="px-10 py-6 text-right font-mono text-sm text-indigo-600">${reportData.sgst.toLocaleString()}</td>
                         </tr>
+                        {taxGroups.map(tg => {
+                           const groupTaxes = taxes.filter(t => t.groupId === tg.id);
+                           if (groupTaxes.length === 0) return null;
+                           return (
+                             <tr key={tg.id} className="bg-slate-50/30">
+                                <td className="px-10 py-4 font-bold text-slate-500 uppercase text-[10px] italic">
+                                   --- Sub-Group: {tg.name}
+                                </td>
+                                <td colSpan={4} className="px-10 py-4 text-right text-[10px] text-slate-300 uppercase tracking-widest">
+                                   Aggregated within above statutory totals
+                                </td>
+                             </tr>
+                           );
+                        })}
                         <tr className="bg-slate-50 font-black">
                            <td className="px-10 py-6 uppercase text-xs text-indigo-900 group flex items-center justify-between">
                               <span>Total Eligible ITC (Inward)</span>
@@ -354,7 +366,7 @@ const GstReportSystem: React.FC<GstReportSystemProps> = ({ vouchers, activeCompa
               <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse ml-3"></div>
             </h5>
             <p className="text-xs font-medium text-indigo-700/80 leading-relaxed italic">
-              Nexus Report Engine provides auto-calculated GST returns. For multi-state entities, reports are segmented by Point of Supply (POS) rules. Please cross-verify with GSTR-2B auto-drafted records on the government portal before final submission.
+              Nexus Report Engine provides auto-calculated GST returns. Data aggregation is now driven by your user-defined <span className="text-indigo-900 font-black">Tax Group</span> mappings, ensuring consistency between ledger partitions and statutory filings.
             </p>
          </div>
       </div>

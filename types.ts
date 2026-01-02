@@ -129,6 +129,13 @@ export interface VoucherItem {
   taxAmount?: number;
 }
 
+export interface Adjustment {
+  id: string;
+  label: string;
+  type: 'Add' | 'Less';
+  amount: number;
+}
+
 export interface Voucher {
   id: string;
   type: 'Sales' | 'Purchase' | 'Payment' | 'Receipt' | 'Journal' | 'Contra';
@@ -141,6 +148,7 @@ export interface Voucher {
   secondaryLedgerId?: string;
   reference?: string;
   items?: VoucherItem[];
+  adjustments?: Adjustment[];
   subTotal?: number;
   taxTotal?: number;
   supplyType?: 'Local' | 'Central';
@@ -203,7 +211,7 @@ export interface Tax {
   id: string;
   name: string;
   rate: number;
-  type: string; // Changed from union to string for custom types
+  type: string; 
   classification: 'Input' | 'Output';
   supplyType: 'Local' | 'Central';
   groupId?: string;

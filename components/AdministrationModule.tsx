@@ -147,31 +147,45 @@ const AdministrationModule: React.FC<AdministrationModuleProps> = ({
                     <th className="px-6 py-3">Identity / Designation</th>
                     <th className="px-6 py-3">Classification</th>
                     {activeTab === 'TAX_CONFIGS' && <th className="px-6 py-3">Rate</th>}
+                    {activeTab === 'TAX_GROUPS' && <th className="px-6 py-3 text-center">Components</th>}
                     <th className="px-6 py-3 text-right">Actions</th>
                  </tr>
                </thead>
                <tbody className="divide-y divide-slate-50">
-                 {filteredData.map(row => (
-                   <tr key={row.id} className="hover:bg-indigo-50/20 transition-colors group">
-                     <td className="px-6 py-3.5">
-                        <div className="font-black text-slate-800 italic uppercase tracking-tight text-xs">{row.name}</div>
-                        {row.hsnCode && <div className="text-[8px] font-bold text-slate-300 uppercase mt-0.5">HSN: {row.hsnCode}</div>}
-                     </td>
-                     <td className="px-6 py-3.5">
-                        <span className="px-2 py-0.5 bg-indigo-50 text-indigo-500 rounded text-[9px] font-black uppercase tracking-tighter border border-indigo-100">
-                            {row.group || row.category || row.nature || row.type || 'Consolidated'}
-                        </span>
-                     </td>
-                     {activeTab === 'TAX_CONFIGS' && (
-                        <td className="px-6 py-3.5">
-                           <span className="text-xs font-black text-slate-900">{row.rate}%</span>
-                        </td>
-                     )}
-                     <td className="px-6 py-3.5 text-right">
-                        <ActionMenu actions={getRowActions(row)} />
-                     </td>
-                   </tr>
-                 ))}
+                 {filteredData.map(row => {
+                   const componentCount = activeTab === 'TAX_GROUPS' ? taxes.filter(t => t.groupId === row.id).length : 0;
+                   const associatedGroupName = activeTab === 'TAX_CONFIGS' ? taxGroups.find(tg => tg.id === row.groupId)?.name : null;
+
+                   return (
+                     <tr key={row.id} className="hover:bg-indigo-50/20 transition-colors group">
+                       <td className="px-6 py-3.5">
+                          <div className="font-black text-slate-800 italic uppercase tracking-tight text-xs">{row.name}</div>
+                          {row.hsnCode && <div className="text-[8px] font-bold text-slate-300 uppercase mt-0.5">HSN: {row.hsnCode}</div>}
+                          {associatedGroupName && <div className="text-[8px] font-black text-indigo-400 uppercase mt-0.5 italic">Group: {associatedGroupName}</div>}
+                       </td>
+                       <td className="px-6 py-3.5">
+                          <span className="px-2 py-0.5 bg-indigo-50 text-indigo-500 rounded text-[9px] font-black uppercase tracking-tighter border border-indigo-100">
+                              {row.group || row.category || row.nature || row.type || 'Consolidated'}
+                          </span>
+                       </td>
+                       {activeTab === 'TAX_CONFIGS' && (
+                          <td className="px-6 py-3.5">
+                             <span className="text-xs font-black text-slate-900">{row.rate}%</span>
+                          </td>
+                       )}
+                       {activeTab === 'TAX_GROUPS' && (
+                          <td className="px-6 py-3.5 text-center">
+                             <span className={`px-2 py-1 rounded-lg text-[10px] font-black shadow-sm ${componentCount > 0 ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-400'}`}>
+                                {componentCount} Ledgers
+                             </span>
+                          </td>
+                       )}
+                       <td className="px-6 py-3.5 text-right">
+                          <ActionMenu actions={getRowActions(row)} />
+                       </td>
+                     </tr>
+                   );
+                 })}
                </tbody>
              </table>
           </div>
@@ -193,7 +207,7 @@ const AdministrationModule: React.FC<AdministrationModuleProps> = ({
                   <TaxForm initialData={editingRecord as Tax} taxGroups={taxGroups} onCancel={() => setIsModalOpen(false)} onSubmit={(data) => { if (editingId) setTaxes(prev => prev.map(t => t.id === editingId ? { ...data, id: editingId } : t)); else setTaxes(prev => [...prev, { ...data, id: `t-${Date.now()}` }]); setIsModalOpen(false); }} />
                )}
                {activeTab === 'TAX_GROUPS' && (
-                   <TaxGroupForm initialData={editingRecord as TaxGroup} onCancel={() => setIsModalOpen(false)} onSubmit={(data) => { if (editingId) setTaxGroups(prev => prev.map(tg => tg.id === editingId ? { ...data, id: editingId } : tg)); else setTaxGroups(prev => [...prev, { ...data, id: `tg-${Date.now()}` }]); setIsModalOpen(false); }} />
+                   <TaxGroupForm initialData={editingRecord as TaxGroup} taxes={taxes} onCancel={() => setIsModalOpen(false)} onSubmit={(data) => { if (editingId) setTaxGroups(prev => prev.map(tg => tg.id === editingId ? { ...data, id: editingId } : tg)); else setTaxGroups(prev => [...prev, { ...data, id: `tg-${Date.now()}` }]); setIsModalOpen(false); }} />
                )}
              </div>
           </div>

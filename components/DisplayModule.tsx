@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { DisplaySubMenu, Ledger, Voucher, Item } from '../types';
+import { DisplaySubMenu, Ledger, Voucher, Item, Tax, TaxGroup } from '../types';
 import { DISPLAY_SUB_MENUS } from '../constants';
 import BalanceSheet from './BalanceSheet';
 import ProfitAndLoss from './ProfitAndLoss';
@@ -15,10 +15,12 @@ interface DisplayModuleProps {
   ledgers: Ledger[];
   vouchers: Voucher[];
   items: Item[];
+  taxes: Tax[];
+  taxGroups: TaxGroup[];
 }
 
 const DisplayModule: React.FC<DisplayModuleProps> = ({ 
-  activeCompany, activeSubAction, setActiveSubAction, ledgers, vouchers, items 
+  activeCompany, activeSubAction, setActiveSubAction, ledgers, vouchers, items, taxes, taxGroups 
 }) => {
 
   const renderContent = () => {
@@ -34,7 +36,7 @@ const DisplayModule: React.FC<DisplayModuleProps> = ({
       case DisplaySubMenu.INVENTORY_SUMMARY:
         return <InventorySummary items={items} vouchers={vouchers} />;
       case DisplaySubMenu.GST_REPORTS:
-        return <GstReportSystem vouchers={vouchers} activeCompany={activeCompany} />;
+        return <GstReportSystem vouchers={vouchers} activeCompany={activeCompany} taxes={taxes} taxGroups={taxGroups} />;
       default:
         return <DisplayDashboard />;
     }
