@@ -34,12 +34,15 @@ interface AdministrationModuleProps {
   setTaxGroups: React.Dispatch<React.SetStateAction<TaxGroup[]>>;
   vouchers: Voucher[];
   setVouchers: React.Dispatch<React.SetStateAction<Voucher[]>>;
+  unitMeasures: string[];
+  setUnitMeasures: React.Dispatch<React.SetStateAction<string[]>>;
 }
 
 const AdministrationModule: React.FC<AdministrationModuleProps> = ({ 
   users, setUsers, roles, setRoles, auditLogs, addAuditLog, activeCompany, currentFY, 
   activeSubAction, setActiveSubAction, setCurrentFY, ledgers, setLedgers, items, setItems,
-  taxes, setTaxes, taxGroups, setTaxGroups, vouchers, setVouchers
+  taxes, setTaxes, taxGroups, setTaxGroups, vouchers, setVouchers,
+  unitMeasures, setUnitMeasures
 }) => {
   const [accountGroups, setAccountGroups] = useState<AccountGroup[]>([
     { id: 'ag1', name: 'Bank Accounts', nature: 'Assets', isSystem: true },
@@ -53,6 +56,7 @@ const AdministrationModule: React.FC<AdministrationModuleProps> = ({
     const [activeTab, setActiveTab] = useState<'LEDGERS' | 'GROUPS' | 'ITEMS' | 'TAX_CONFIGS' | 'TAX_GROUPS'>('LEDGERS');
     const [searchTerm, setSearchTerm] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
 
     const filteredData = useMemo(() => {
@@ -63,7 +67,12 @@ const AdministrationModule: React.FC<AdministrationModuleProps> = ({
       else if (activeTab === 'TAX_CONFIGS') data = taxes;
       else if (activeTab === 'TAX_GROUPS') data = taxGroups;
       
-      return data.filter(x => x.name?.toLowerCase().includes(searchTerm.toLowerCase()));
+      const term = searchTerm.toLowerCase();
+      return data.filter(x => {
+        const nameMatch = x.name?.toLowerCase().includes(term);
+        const descMatch = activeTab === 'TAX_GROUPS' && x.description?.toLowerCase().includes(term);
+        return nameMatch || descMatch;
+      });
     }, [activeTab, ledgers, items, accountGroups, taxes, taxGroups, searchTerm]);
 
     const editingRecord = useMemo(() => {
@@ -72,40 +81,65 @@ const AdministrationModule: React.FC<AdministrationModuleProps> = ({
         if (activeTab === 'TAX_GROUPS') return taxGroups.find(tg => tg.id === editingId);
         if (activeTab === 'LEDGERS') return ledgers.find(l => l.id === editingId);
         if (activeTab === 'ITEMS') return items.find(i => i.id === editingId);
+        if (activeTab === 'GROUPS') return accountGroups.find(ag => ag.id === editingId);
         return undefined;
-    }, [editingId, activeTab, taxes, taxGroups, ledgers, items]);
+    }, [editingId, activeTab, taxes, taxGroups, ledgers, items, accountGroups]);
 
     const getRowActions = (row: any): ActionItem[] => {
-      return [
+      const actions: ActionItem[] = [
         { 
           label: 'Edit', 
           icon: <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>,
           onClick: () => { setEditingId(row.id); setIsModalOpen(true); },
           variant: 'primary'
-        },
-        { 
+        }
+      ];
+
+      if (!row.isSystem) {
+        actions.push({ 
           label: 'Delete', 
           icon: <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>,
           onClick: () => { 
-            if(confirm(`Purge record for ${row.name}?`)) {
+            const msg = activeTab === 'TAX_GROUPS' 
+              ? `Purge tax group "${row.name}"? This will detach all linked statutory ledgers.`
+              : `Confirm permanent purge of master record: ${row.name}?`;
+
+            if(confirm(msg)) {
                 if (activeTab === 'TAX_CONFIGS') setTaxes(prev => prev.filter(t => t.id !== row.id));
                 else if (activeTab === 'TAX_GROUPS') setTaxGroups(prev => prev.filter(tg => tg.id !== row.id));
                 else if (activeTab === 'LEDGERS') setLedgers(prev => prev.filter(l => l.id !== row.id));
                 else if (activeTab === 'ITEMS') setItems(prev => prev.filter(i => i.id !== row.id));
+                else if (activeTab === 'GROUPS') setAccountGroups(prev => prev.filter(ag => ag.id !== row.id));
             }
           },
           variant: 'danger'
-        }
-      ];
+        });
+      }
+
+      return actions;
     };
 
     return (
       <div className="space-y-4 animate-in fade-in duration-300">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <h2 className="text-xl font-black uppercase italic text-slate-800 tracking-tight">Master Registries</h2>
-          <button onClick={() => { setEditingId(null); setIsModalOpen(true); }} className="px-5 py-2 bg-indigo-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:bg-indigo-700 transition-all">
-            Add {activeTab.split('_')[0].slice(0, -1)}
-          </button>
+          <div className="flex items-center space-x-3">
+            {activeTab === 'ITEMS' && (
+              <button 
+                onClick={() => setIsImportModalOpen(true)} 
+                className="px-5 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-sm hover:bg-slate-50 transition-all flex items-center space-x-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                <span>Bulk Import</span>
+              </button>
+            )}
+            <button 
+              onClick={() => { setEditingId(null); setIsModalOpen(true); }} 
+              className="px-5 py-2 bg-indigo-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:bg-indigo-700 transition-all"
+            >
+              Add {activeTab === 'ITEMS' ? 'Catalogue' : activeTab.split('_')[0].slice(0, -1)}
+            </button>
+          </div>
         </div>
 
         <div className="flex space-x-1 border-b border-slate-200 overflow-x-auto no-scrollbar py-1">
@@ -131,7 +165,7 @@ const AdministrationModule: React.FC<AdministrationModuleProps> = ({
             <div className="relative flex-1 max-w-xs">
                 <input 
                   type="text" 
-                  placeholder={`Search ${activeTab.toLowerCase()}...`} 
+                  placeholder={`Search ${activeTab.replace('_', ' ').toLowerCase()}...`} 
                   value={searchTerm} 
                   onChange={(e) => setSearchTerm(e.target.value)} 
                   className="w-full pl-8 pr-4 py-1.5 rounded-lg border border-slate-200 text-[11px] font-bold shadow-inner outline-none focus:ring-2 focus:ring-indigo-500/20" 
@@ -146,6 +180,7 @@ const AdministrationModule: React.FC<AdministrationModuleProps> = ({
                  <tr>
                     <th className="px-6 py-3">Identity / Designation</th>
                     <th className="px-6 py-3">Classification</th>
+                    {activeTab === 'ITEMS' && <th className="px-6 py-3 text-center">Unit</th>}
                     {activeTab === 'TAX_CONFIGS' && <th className="px-6 py-3">Rate</th>}
                     {activeTab === 'TAX_GROUPS' && <th className="px-6 py-3 text-center">Components</th>}
                     <th className="px-6 py-3 text-right">Actions</th>
@@ -159,15 +194,30 @@ const AdministrationModule: React.FC<AdministrationModuleProps> = ({
                    return (
                      <tr key={row.id} className="hover:bg-indigo-50/20 transition-colors group">
                        <td className="px-6 py-3.5">
-                          <div className="font-black text-slate-800 italic uppercase tracking-tight text-xs">{row.name}</div>
+                          <div className="font-black text-slate-800 italic uppercase tracking-tight text-xs flex items-center">
+                            {row.name}
+                            {row.isSystem && (
+                              <svg className="w-2.5 h-2.5 ml-2 text-slate-300" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" /></svg>
+                            )}
+                          </div>
                           {row.hsnCode && <div className="text-[8px] font-bold text-slate-300 uppercase mt-0.5">HSN: {row.hsnCode}</div>}
                           {associatedGroupName && <div className="text-[8px] font-black text-indigo-400 uppercase mt-0.5 italic">Group: {associatedGroupName}</div>}
+                          {activeTab === 'TAX_GROUPS' && row.description && (
+                            <div className="text-[9px] text-slate-400 font-medium italic mt-1 max-w-xs truncate" title={row.description}>
+                              {row.description}
+                            </div>
+                          )}
                        </td>
                        <td className="px-6 py-3.5">
                           <span className="px-2 py-0.5 bg-indigo-50 text-indigo-500 rounded text-[9px] font-black uppercase tracking-tighter border border-indigo-100">
                               {row.group || row.category || row.nature || row.type || 'Consolidated'}
                           </span>
                        </td>
+                       {activeTab === 'ITEMS' && (
+                          <td className="px-6 py-3.5 text-center">
+                             <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-[8px] font-black uppercase tracking-widest border border-slate-200">{row.unit}</span>
+                          </td>
+                       )}
                        {activeTab === 'TAX_CONFIGS' && (
                           <td className="px-6 py-3.5">
                              <span className="text-xs font-black text-slate-900">{row.rate}%</span>
@@ -181,7 +231,7 @@ const AdministrationModule: React.FC<AdministrationModuleProps> = ({
                           </td>
                        )}
                        <td className="px-6 py-3.5 text-right">
-                          <ActionMenu actions={getRowActions(row)} />
+                          <ActionMenu actions={getRowActions(row)} label={row.isSystem ? 'LOCKED' : 'ACTION'} />
                        </td>
                      </tr>
                    );
@@ -198,10 +248,16 @@ const AdministrationModule: React.FC<AdministrationModuleProps> = ({
                   <LedgerForm initialData={editingRecord as Ledger} accountGroups={accountGroups} onCancel={() => setIsModalOpen(false)} onSubmit={(data) => { if (editingId) setLedgers(prev => prev.map(l => l.id === editingId ? { ...data, id: editingId } : l)); else setLedgers(prev => [...prev, { ...data, id: `l-${Date.now()}` }]); setIsModalOpen(false); }} />
                )}
                {activeTab === 'GROUPS' && (
-                  <GroupForm initialData={editingRecord as AccountGroup} onCancel={() => setIsModalOpen(false)} onSubmit={(data) => { setAccountGroups(prev => [...prev, { ...data, id: `ag-${Date.now()}` }]); setIsModalOpen(false); }} />
+                  <GroupForm initialData={editingRecord as AccountGroup} onCancel={() => setIsModalOpen(false)} onSubmit={(data) => { if (editingId) setAccountGroups(prev => prev.map(ag => ag.id === editingId ? { ...data, id: editingId } : ag)); else setAccountGroups(prev => [...prev, { ...data, id: `ag-${Date.now()}` }]); setIsModalOpen(false); }} />
                )}
                {activeTab === 'ITEMS' && (
-                  <ItemForm initialData={editingRecord as Item} onCancel={() => setIsModalOpen(false)} onSubmit={(data) => { if (editingId) setItems(prev => prev.map(i => i.id === editingId ? { ...data, id: editingId } : i)); else setItems(prev => [...prev, { ...data, id: `i-${Date.now()}` }]); setIsModalOpen(false); }} />
+                  <ItemForm 
+                    initialData={editingRecord as Item} 
+                    unitMeasures={unitMeasures} 
+                    onQuickUnitAdd={(u) => setUnitMeasures(prev => Array.from(new Set([...prev, u])))}
+                    onCancel={() => setIsModalOpen(false)} 
+                    onSubmit={(data) => { if (editingId) setItems(prev => prev.map(i => i.id === editingId ? { ...data, id: editingId } : i)); else setItems(prev => [...prev, { ...data, id: `i-${Date.now()}` }]); setIsModalOpen(false); }} 
+                  />
                )}
                {activeTab === 'TAX_CONFIGS' && (
                   <TaxForm initialData={editingRecord as Tax} taxGroups={taxGroups} onCancel={() => setIsModalOpen(false)} onSubmit={(data) => { if (editingId) setTaxes(prev => prev.map(t => t.id === editingId ? { ...data, id: editingId } : t)); else setTaxes(prev => [...prev, { ...data, id: `t-${Date.now()}` }]); setIsModalOpen(false); }} />
@@ -210,6 +266,30 @@ const AdministrationModule: React.FC<AdministrationModuleProps> = ({
                    <TaxGroupForm initialData={editingRecord as TaxGroup} taxes={taxes} onCancel={() => setIsModalOpen(false)} onSubmit={(data) => { if (editingId) setTaxGroups(prev => prev.map(tg => tg.id === editingId ? { ...data, id: editingId } : tg)); else setTaxGroups(prev => [...prev, { ...data, id: `tg-${Date.now()}` }]); setIsModalOpen(false); }} />
                )}
              </div>
+          </div>
+        )}
+
+        {isImportModalOpen && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-300 overflow-y-auto custom-scrollbar">
+            <div className="w-full max-w-6xl my-10">
+              <div className="bg-white rounded-[4rem] shadow-2xl relative overflow-hidden">
+                <div className="absolute top-6 right-10 z-50">
+                  <button 
+                    onClick={() => setIsImportModalOpen(false)}
+                    className="p-3 bg-white/10 hover:bg-rose-500 text-white rounded-full transition-all border border-white/20"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
+                  </button>
+                </div>
+                <ImportExportModule 
+                  items={items} 
+                  setItems={setItems} 
+                  forcedEntity="Inventory Items" 
+                  initialFormat="CSV" 
+                  onClose={() => setIsImportModalOpen(false)} 
+                />
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -251,7 +331,7 @@ const AdministrationModule: React.FC<AdministrationModuleProps> = ({
         {activeSubAction === AdminSubMenu.MASTERS ? <MastersManagementView /> : 
          activeSubAction === AdminSubMenu.USERS ? <UsersModule users={users} setUsers={setUsers} roles={roles} setRoles={setRoles} auditLogs={auditLogs} addAuditLog={addAuditLog} /> :
          activeSubAction === AdminSubMenu.BACKUP ? <BackupModule /> :
-         activeSubAction === AdminSubMenu.IMPORT_EXPORT ? <ImportExportModule vouchers={vouchers} setVouchers={setVouchers} /> :
+         activeSubAction === AdminSubMenu.IMPORT_EXPORT ? <ImportExportModule vouchers={vouchers} setVouchers={setVouchers} items={items} setItems={setItems} ledgers={ledgers} setLedgers={setLedgers} /> :
          activeSubAction === AdminSubMenu.YEAR_CHANGE ? <YearChangeModule activeCompany={activeCompany} currentFY={currentFY} setCurrentFY={setCurrentFY} onClose={() => setActiveSubAction(null)} /> :
          <div className="bg-white rounded-3xl p-10 border border-slate-200 animate-in fade-in h-full">
             <h2 className="text-2xl font-black italic uppercase tracking-tighter mb-2 text-slate-800">Admin Control</h2>

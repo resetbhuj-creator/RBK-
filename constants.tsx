@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { MainMenuType, MenuItem, SubMenuItem, CompanySubMenu, AdminSubMenu, TransactionSubMenu, DisplaySubMenu, CommunicationSubMenu, HouseKeepingSubMenu } from './types';
 
@@ -372,17 +371,6 @@ export const TAX_TYPES = [
   'CGST',
   'SGST',
   'IGST',
-  'UTGST',
-  'GST (Unified)',
-  'VAT',
-  'Sales Tax',
-  'Service Tax',
-  'Cess',
-  'Excise Duty',
-  'Customs Duty',
-  'TDS (Tax Deducted at Source)',
-  'TCS (Tax Collected at Source)',
-  'LBT',
   'Other'
 ];
 

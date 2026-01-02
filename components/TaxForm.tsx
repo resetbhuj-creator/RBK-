@@ -26,6 +26,7 @@ const TaxForm: React.FC<TaxFormProps> = ({ initialData, taxGroups, onCancel, onS
   useEffect(() => {
     if (initialData) {
       setFormData({ ...initialData });
+      // Intelligent mapping for custom or legacy types
       if (!TAX_TYPES.includes(initialData.type)) {
         setCustomTypeName(initialData.type);
         setFormData(prev => ({ ...prev, type: 'Other' }));
@@ -37,7 +38,7 @@ const TaxForm: React.FC<TaxFormProps> = ({ initialData, taxGroups, onCancel, onS
     const newErrors: Record<string, string> = {};
     if (!formData.name.trim()) newErrors.name = 'Tax ledger name is required';
     if (formData.rate < 0) newErrors.rate = 'Rate cannot be negative';
-    if (formData.type === 'Other' && !customTypeName.trim()) newErrors.type = 'Custom tax name is required';
+    if (formData.type === 'Other' && !customTypeName.trim()) newErrors.type = 'Custom tax identifier is required';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -52,7 +53,7 @@ const TaxForm: React.FC<TaxFormProps> = ({ initialData, taxGroups, onCancel, onS
     if (validate()) {
       const finalData = {
         ...formData,
-        type: formData.type === 'Other' ? customTypeName : formData.type
+        type: formData.type === 'Other' ? customTypeName.trim() : formData.type
       };
       onSubmit(finalData);
     }
@@ -87,7 +88,7 @@ const TaxForm: React.FC<TaxFormProps> = ({ initialData, taxGroups, onCancel, onS
 
       <form onSubmit={handleSubmit} className="p-10 space-y-10">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-          {/* Classification: Input vs Output */}
+          {/* Classification */}
           <div className="space-y-2">
             <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Statutory Classification</label>
             <div className="flex p-1 bg-slate-100 rounded-2xl border border-slate-200">
@@ -104,7 +105,7 @@ const TaxForm: React.FC<TaxFormProps> = ({ initialData, taxGroups, onCancel, onS
             </div>
           </div>
 
-          {/* Supply Type: Local vs Central */}
+          {/* Supply Type */}
           <div className="space-y-2">
             <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Operating Jurisdiction</label>
             <div className="flex p-1 bg-slate-100 rounded-2xl border border-slate-200">
@@ -151,13 +152,13 @@ const TaxForm: React.FC<TaxFormProps> = ({ initialData, taxGroups, onCancel, onS
 
             {formData.type === 'Other' && (
               <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
-                <label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest ml-1">Custom Component Identity</label>
+                <label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest ml-1">Custom Tax Identifier</label>
                 <input 
                   value={customTypeName} 
                   onChange={e => setCustomTypeName(e.target.value)} 
                   onBlur={() => handleBlur('type')}
-                  placeholder="e.g. LBT, Octroi, surcharge"
-                  className={inputClass('type')} 
+                  placeholder="e.g. VAT, Cess, LBT"
+                  className={inputClass('type') + " border-indigo-200 ring-2 ring-indigo-50"} 
                 />
                 {touched.type && errors.type && <p className="text-[10px] text-rose-500 font-black mt-1 ml-1">{errors.type}</p>}
               </div>
@@ -193,7 +194,6 @@ const TaxForm: React.FC<TaxFormProps> = ({ initialData, taxGroups, onCancel, onS
                 <option key={tg.id} value={tg.id}>{tg.name}</option>
               ))}
             </select>
-            <p className="text-[9px] text-slate-400 ml-1 font-medium italic">Grouping allows consolidated visibility in GSTR-1 and GSTR-3B summaries.</p>
           </div>
         </div>
 
@@ -203,10 +203,10 @@ const TaxForm: React.FC<TaxFormProps> = ({ initialData, taxGroups, onCancel, onS
                 <div className="space-y-2">
                   <h4 className="text-[10px] font-black uppercase tracking-[0.4em] text-indigo-400">Statutory Proofing Rule</h4>
                   <div className="text-3xl font-black text-white italic tracking-tighter">{gstMath.formula}</div>
-                  <p className="text-[10px] text-slate-500 font-medium">Auto-derived from component rate. System will balance this during invoice generation.</p>
+                  <p className="text-[10px] text-slate-500 font-medium">Auto-derived components for regulatory compliance.</p>
                 </div>
                 <div className="hidden lg:block text-right">
-                   <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Effective IGST Implied</div>
+                   <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Implied IGST</div>
                    <div className="text-4xl font-black text-indigo-500">{gstMath.igst}%</div>
                 </div>
              </div>

@@ -1,4 +1,5 @@
 import React from 'react';
+import { Voucher } from '../types';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts';
 
 const data = [
@@ -15,16 +16,12 @@ const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f43f5e'];
 
 interface DashboardProps {
   activeCompany?: any;
+  vouchers: Voucher[];
+  onViewVoucher: (id: string) => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ activeCompany }) => {
-  const getCurrencySymbol = () => {
-    if (!activeCompany?.currency) return '$';
-    const match = activeCompany.currency.match(/\(([^)]+)\)/);
-    return match ? match[1] : activeCompany.currency.substring(0, 3);
-  };
-
-  const symbol = getCurrencySymbol();
+const Dashboard: React.FC<DashboardProps> = ({ activeCompany, vouchers, onViewVoucher }) => {
+  const symbol = activeCompany?.currencyConfig?.symbol || '$';
 
   return (
     <div className="space-y-4 animate-in fade-in duration-300">
@@ -62,10 +59,6 @@ const Dashboard: React.FC<DashboardProps> = ({ activeCompany }) => {
         <div className="lg:col-span-2 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col h-[300px]">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest">Growth Velocity</h3>
-            <select className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-[9px] font-black uppercase outline-none focus:ring-2 focus:ring-indigo-500/20">
-              <option>Cycle: 7D</option>
-              <option>Cycle: 30D</option>
-            </select>
           </div>
           <div className="flex-1 w-full">
             <ResponsiveContainer width="100%" height="100%">
@@ -118,24 +111,27 @@ const Dashboard: React.FC<DashboardProps> = ({ activeCompany }) => {
       <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[300px]">
         <div className="px-6 py-3 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
           <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest">Verification Registry</h3>
-          <button className="text-indigo-600 text-[10px] font-black uppercase hover:underline underline-offset-4">Full Log</button>
         </div>
         <div className="overflow-auto custom-scrollbar flex-1">
           <table className="w-full text-left">
             <thead className="bg-white/50 text-slate-400 uppercase text-[8px] font-black sticky top-0 border-b border-slate-100">
               <tr>
                 <th className="px-6 py-2.5">Txn Hash</th>
-                <th className="px-6 py-2.5">Domain</th>
+                <th className="px-6 py-2.5">Party Node</th>
                 <th className="px-6 py-2.5">Value</th>
                 <th className="px-6 py-2.5">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {[1, 2, 3, 4, 5, 6, 7].map((item) => (
-                <tr key={item} className="hover:bg-slate-50/80 transition-colors">
-                  <td className="px-6 py-3 font-mono text-[10px] text-slate-500 font-black tracking-tighter">#TXN-0982{item}</td>
-                  <td className="px-6 py-3 font-black text-slate-700 text-[10px] truncate max-w-[120px] italic uppercase">{activeCompany?.name || '---'}</td>
-                  <td className="px-6 py-3 font-black text-slate-900 text-xs tabular-nums tracking-tighter">${(2400 * item).toLocaleString()}</td>
+              {vouchers.slice(0, 10).map((v) => (
+                <tr 
+                  key={v.id} 
+                  onClick={() => onViewVoucher(v.id)}
+                  className="hover:bg-indigo-50/80 transition-colors cursor-pointer group"
+                >
+                  <td className="px-6 py-3 font-mono text-[10px] text-indigo-600 font-black tracking-tighter group-hover:underline">#{v.id}</td>
+                  <td className="px-6 py-3 font-black text-slate-700 text-[10px] truncate max-w-[120px] italic uppercase">{v.party}</td>
+                  <td className="px-6 py-3 font-black text-slate-900 text-xs tabular-nums tracking-tighter">{symbol}{v.amount.toLocaleString()}</td>
                   <td className="px-6 py-3">
                     <span className="px-2 py-0.5 bg-emerald-50 text-emerald-600 text-[8px] font-black rounded uppercase border border-emerald-100 shadow-sm">Verified</span>
                   </td>

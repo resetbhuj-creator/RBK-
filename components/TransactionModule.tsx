@@ -8,6 +8,7 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 
 interface TransactionModuleProps {
   activeCompany: any;
+  currentFY: string;
   isReadOnly?: boolean;
   activeSubAction: TransactionSubMenu | null;
   setActiveSubAction: (sub: TransactionSubMenu | null) => void;
@@ -15,16 +16,49 @@ interface TransactionModuleProps {
   items: Item[];
   vouchers: Voucher[];
   setVouchers: React.Dispatch<React.SetStateAction<Voucher[]>>;
+  onViewVoucher: (id: string) => void;
 }
 
 const TransactionModule: React.FC<TransactionModuleProps> = ({ 
-  activeCompany, isReadOnly, activeSubAction, setActiveSubAction, ledgers, items, vouchers, setVouchers 
+  activeCompany, currentFY, isReadOnly, activeSubAction, setActiveSubAction, ledgers, items, vouchers, setVouchers, onViewVoucher 
 }) => {
+
+  const generateVoucherId = (type: string) => {
+    const prefixMap: Record<string, string> = {
+      'Sales': 'SL',
+      'Purchase': 'PR',
+      'Payment': 'PY',
+      'Receipt': 'RC',
+      'Contra': 'CN',
+      'Journal': 'JR'
+    };
+    const prefix = prefixMap[type] || 'VCH';
+    
+    // Extract short year format from currentFY (e.g., "2023 - 2024" -> "23-24")
+    const yearPart = currentFY.split(' - ').map(y => y.trim().slice(-2)).join('-');
+    
+    // Filter existing vouchers of this type to find the next sequence
+    // We look for patterns like PREFIX/YY-YY/NUMBER
+    const relevantVouchers = vouchers.filter(v => v.type === type);
+    
+    let maxNum = 0;
+    relevantVouchers.forEach(v => {
+      // Regex to find the numeric part at the end of the ID
+      const match = v.id.match(/\d+$/);
+      if (match) {
+        const num = parseInt(match[0]);
+        if (num > maxNum) maxNum = num;
+      }
+    });
+
+    const nextNum = (maxNum + 1).toString().padStart(4, '0');
+    return `${prefix}/${yearPart}/${nextNum}`;
+  };
 
   const handlePostVoucher = (data: Omit<Voucher, 'id' | 'status'>) => {
     const newVch: Voucher = {
       ...data,
-      id: `V-${1000 + vouchers.length + 1}`,
+      id: generateVoucherId(data.type),
       status: 'Posted'
     };
     setVouchers(prev => [newVch, ...prev]);
@@ -41,7 +75,7 @@ const TransactionModule: React.FC<TransactionModuleProps> = ({
       { day: 'Tue', sales: 3000, purchase: 1398 },
       { day: 'Wed', sales: 2000, purchase: 9800 },
       { day: 'Thu', sales: 2780, purchase: 3908 },
-      { day: 'Fri', sales: 1890, purchase: 4800 },
+      { day: 'Fri', sales: 1890, expenses: 4800 },
       { day: 'Sat', sales: 2390, purchase: 3800 },
       { day: 'Sun', sales: 3490, purchase: 4300 },
     ];
@@ -61,7 +95,7 @@ const TransactionModule: React.FC<TransactionModuleProps> = ({
       case TransactionSubMenu.INVENTORY_VOUCHERS:
         return <InventoryVoucherForm isReadOnly={isReadOnly} items={items} ledgers={ledgers} onSubmit={handlePostVoucher} onCancel={() => setActiveSubAction(null)} />;
       case TransactionSubMenu.DAY_BOOK:
-        return <DayBook vouchers={vouchers} onClone={handleCloneVoucher} />;
+        return <DayBook vouchers={vouchers} onClone={handleCloneVoucher} onViewVoucher={onViewVoucher} />;
       default:
         return <TransactionDashboard />;
     }
@@ -88,10 +122,6 @@ const TransactionModule: React.FC<TransactionModuleProps> = ({
             </div>
             <h3 className="text-sm font-black text-slate-800 mb-1 group-hover:text-indigo-600 transition-colors uppercase italic">{item.label}</h3>
             <p className="text-[11px] text-slate-400 font-medium leading-relaxed line-clamp-2">{item.description}</p>
-            <div className="mt-4 flex items-center text-indigo-600 font-black text-[9px] uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all translate-y-1 group-hover:translate-y-0">
-              <span>Enter Workspace</span>
-              <svg className="w-3 h-3 ml-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" /></svg>
-            </div>
           </button>
         ))}
       </div>
@@ -100,16 +130,6 @@ const TransactionModule: React.FC<TransactionModuleProps> = ({
          <div className="lg:col-span-2 bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
             <div className="flex items-center justify-between">
                <h3 className="text-[9px] font-black uppercase text-slate-400 tracking-[0.3em]">Volume Metrics (7D)</h3>
-               <div className="flex items-center space-x-4">
-                  <div className="flex items-center space-x-1.5">
-                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
-                     <span className="text-[8px] font-black uppercase text-slate-400">Sales</span>
-                  </div>
-                  <div className="flex items-center space-x-1.5">
-                     <div className="w-1.5 h-1.5 rounded-full bg-indigo-500"></div>
-                     <span className="text-[8px] font-black uppercase text-slate-400">Purchase</span>
-                  </div>
-               </div>
             </div>
             <div className="h-56 w-full">
               <ResponsiveContainer width="100%" height="100%">
@@ -119,16 +139,11 @@ const TransactionModule: React.FC<TransactionModuleProps> = ({
                       <stop offset="5%" stopColor="#10b981" stopOpacity={0.1}/>
                       <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
                     </linearGradient>
-                    <linearGradient id="colorPurch" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#6366f1" stopOpacity={0.1}/>
-                      <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
-                    </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                   <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 9, fontWeight: 900}} />
                   <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
                   <Area type="monotone" dataKey="sales" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#colorSales)" />
-                  <Area type="monotone" dataKey="purchase" stroke="#6366f1" strokeWidth={2} fillOpacity={1} fill="url(#colorPurch)" />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -138,38 +153,24 @@ const TransactionModule: React.FC<TransactionModuleProps> = ({
             <div className="bg-slate-900 rounded-3xl p-6 text-white relative overflow-hidden shadow-xl">
                <h3 className="text-[9px] font-black uppercase text-indigo-400 tracking-[0.2em] mb-6">Ledger Integrity</h3>
                <div className="space-y-6 relative z-10">
-                  <div>
-                    <div className="flex justify-between items-end mb-1.5">
-                       <span className="text-[8px] font-bold text-slate-500 uppercase tracking-tighter">Post Reconciliation</span>
-                       <span className="text-lg font-black text-emerald-400 italic">{Math.round((stats.posted / (stats.posted + stats.drafts || 1)) * 100)}%</span>
-                    </div>
-                    <div className="h-1 bg-white/5 rounded-full overflow-hidden">
-                       <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${(stats.posted / (stats.posted + stats.drafts || 1)) * 100}%` }}></div>
-                    </div>
-                  </div>
                   <div className="grid grid-cols-2 gap-3">
                      <div className="p-3 bg-white/5 rounded-xl border border-white/10">
                         <div className="text-[7px] font-black text-slate-500 uppercase mb-0.5 tracking-tighter">Posted</div>
                         <div className="text-lg font-black text-white">{stats.posted}</div>
                      </div>
-                     <div className="p-3 bg-white/5 rounded-xl border border-white/10">
-                        <div className="text-[7px] font-black text-slate-500 uppercase mb-0.5 tracking-tighter">Drafts</div>
-                        <div className="text-lg font-black text-amber-400">{stats.drafts}</div>
-                     </div>
                   </div>
                </div>
-               <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-600 rounded-full blur-[80px] opacity-10 -mr-16 -mt-16"></div>
             </div>
 
             <div className="bg-white rounded-3xl border border-slate-200 p-5 shadow-sm overflow-y-auto max-h-[160px] custom-scrollbar">
                <h3 className="text-[9px] font-black uppercase text-slate-400 tracking-[0.2em] mb-4">Latest Vouchers</h3>
                <div className="space-y-3">
                  {vouchers.slice(0, 3).map(v => (
-                   <div key={v.id} className="flex items-center justify-between border-b border-slate-50 pb-2.5">
+                   <div key={v.id} onClick={() => onViewVoucher(v.id)} className="flex items-center justify-between border-b border-slate-50 pb-2.5 cursor-pointer hover:bg-slate-50 transition-all rounded-lg p-1 group">
                      <div className="flex items-center space-x-2.5">
                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-[9px] font-black ${v.type === 'Sales' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>{v.type.charAt(0)}</div>
                        <div className="min-w-0">
-                         <div className="text-[10px] font-black text-slate-800 uppercase truncate max-w-[80px] leading-none">{v.party}</div>
+                         <div className="text-[10px] font-black text-slate-800 uppercase truncate max-w-[80px] leading-none group-hover:text-indigo-600">{v.party}</div>
                          <div className="text-[7px] font-bold text-slate-400 uppercase mt-1">{v.id}</div>
                        </div>
                      </div>

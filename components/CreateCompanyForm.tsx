@@ -17,12 +17,30 @@ const FIELD_GUIDE: Record<string, string> = {
   country: "Sets regional defaults for tax laws, date formats, and address requirements.",
   state: "Select your specific operating state or province to apply regional tax variations.",
   zip: "Postal/Zip code of your primary business location.",
-  currency: "The base currency for all financial reporting. Auto-populates based on country.",
+  currency: "The base currency for all financial reporting. Enter ISO code (USD) or symbol ($).",
   taxLaw: "The specific legal framework governing your tax obligations.",
   taxId: "Unique identifier assigned by your local tax authority (e.g., GSTIN, EIN, VAT).",
   fyStartDate: "The date your official financial accounting year begins. Standard is usually 1st of a month.",
   booksBeginDate: "The actual date you start entering transactions. Must be on or after the Accounting Year Start date.",
   dataPath: "The database namespace where this company's transactional data is persisted."
+};
+
+const ISO_CURRENCIES: Record<string, { symbol: string, name: string }> = {
+  'USD': { symbol: '$', name: 'US Dollar' },
+  'EUR': { symbol: '€', name: 'Euro' },
+  'GBP': { symbol: '£', name: 'British Pound' },
+  'INR': { symbol: '₹', name: 'Indian Rupee' },
+  'JPY': { symbol: '¥', name: 'Japanese Yen' },
+  'AUD': { symbol: '$', name: 'Australian Dollar' },
+  'CAD': { symbol: '$', name: 'Canadian Dollar' },
+  'CHF': { symbol: 'Fr', name: 'Swiss Franc' },
+  'CNY': { symbol: '¥', name: 'Chinese Yuan' },
+  'AED': { symbol: 'د.إ', name: 'UAE Dirham' },
+  'SGD': { symbol: '$', name: 'Singapore Dollar' },
+  'NZD': { symbol: '$', name: 'New Zealand Dollar' },
+  'MXN': { symbol: '$', name: 'Mexican Peso' },
+  'HKD': { symbol: '$', name: 'Hong Kong Dollar' },
+  'ZAR': { symbol: 'R', name: 'South African Rand' }
 };
 
 const INDIAN_STATE_CODES: Record<string, string> = {
@@ -122,9 +140,39 @@ const CreateCompanyForm: React.FC<CreateCompanyFormProps> = ({ onCancel, onSubmi
     return Object.keys(newErrors).length === 0;
   };
 
+  const formatCurrency = (val: string): string => {
+    const clean = val.trim().toUpperCase();
+    
+    // Check if it's a known ISO code
+    if (ISO_CURRENCIES[clean]) {
+      return `${clean} (${ISO_CURRENCIES[clean].symbol})`;
+    }
+    
+    // Check if it matches a symbol
+    const matchBySymbol = Object.entries(ISO_CURRENCIES).find(([_, data]) => data.symbol === val.trim());
+    if (matchBySymbol) {
+      return `${matchBySymbol[0]} (${matchBySymbol[1].symbol})`;
+    }
+
+    // Attempt to parse format like "USD ($)" and keep it if it looks valid
+    if (/^[A-Z]{3}\s\(.+\)$/.test(clean)) {
+      return clean;
+    }
+
+    return val; // Degrade gracefully to literal input
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleCurrencyBlur = () => {
+    setFormData(prev => ({
+      ...prev,
+      currency: formatCurrency(prev.currency)
+    }));
+    handleBlur('currency');
   };
 
   const handleBlur = (name: string) => {
@@ -253,8 +301,20 @@ const CreateCompanyForm: React.FC<CreateCompanyFormProps> = ({ onCancel, onSubmi
               <div className="relative z-10 grid grid-cols-1 md:grid-cols-3 gap-10">
                  <div className="space-y-2">
                     <label className="text-[9px] font-black uppercase text-indigo-400 tracking-widest ml-1">Master Currency</label>
-                    <input name="currency" value={formData.currency} onChange={handleChange} className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-sm font-black text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-inner" />
-                    <p className="text-[8px] font-bold text-slate-500 uppercase tracking-tighter ml-1">Base ledger currency for all journals.</p>
+                    <div className="relative group/currency">
+                      <input 
+                        name="currency" 
+                        value={formData.currency} 
+                        onChange={handleChange} 
+                        onBlur={handleCurrencyBlur}
+                        placeholder="USD, INR, £, etc."
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-sm font-black text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-inner placeholder-slate-600" 
+                      />
+                      <div className="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 group-focus-within/currency:opacity-100 transition-opacity">
+                         <span className="text-[8px] font-black uppercase text-slate-500">ISO Matcher Active</span>
+                      </div>
+                    </div>
+                    <p className="text-[8px] font-bold text-slate-500 uppercase tracking-tighter ml-1">Detected: <span className="text-indigo-400 italic">{formatCurrency(formData.currency)}</span></p>
                  </div>
                  <div className="space-y-2">
                     <label className="text-[9px] font-black uppercase text-indigo-400 tracking-widest ml-1">Statutory Tax Regime</label>

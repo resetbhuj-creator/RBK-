@@ -205,6 +205,7 @@ export interface TaxGroup {
   id: string;
   name: string;
   description?: string;
+  isSystem?: boolean;
 }
 
 export interface Tax {

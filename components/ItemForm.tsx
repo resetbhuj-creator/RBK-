@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Item } from '../types';
-import { UNIT_MEASURES } from '../constants';
 
 interface ItemFormProps {
   initialData?: Item;
+  unitMeasures: string[];
+  onQuickUnitAdd?: (unit: string) => void;
   onCancel: () => void;
   onSubmit: (data: Omit<Item, 'id'>) => void;
 }
@@ -21,7 +22,7 @@ const CATEGORIES = [
 
 const GST_SLABS = [0, 5, 12, 18, 28];
 
-const ItemForm: React.FC<ItemFormProps> = ({ initialData, onCancel, onSubmit }) => {
+const ItemForm: React.FC<ItemFormProps> = ({ initialData, unitMeasures, onQuickUnitAdd, onCancel, onSubmit }) => {
   const [formData, setFormData] = useState<Omit<Item, 'id'> & { isTaxInclusive: boolean }>({
     name: '',
     category: 'General',
@@ -32,6 +33,8 @@ const ItemForm: React.FC<ItemFormProps> = ({ initialData, onCancel, onSubmit }) 
     isTaxInclusive: false
   });
 
+  const [isQuickUnitOpen, setIsQuickUnitOpen] = useState(false);
+  const [newUnitName, setNewUnitName] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
@@ -59,11 +62,11 @@ const ItemForm: React.FC<ItemFormProps> = ({ initialData, onCancel, onSubmit }) 
     
     const hsn = currentData.hsnCode.trim();
     if (!hsn) {
-      newErrors.hsnCode = 'HSN/SAC code is mandatory for statutory compliance';
+      newErrors.hsnCode = 'HSN/SAC code is mandatory';
     } else if (!/^\d+$/.test(hsn)) {
-      newErrors.hsnCode = 'Code must contain only numerical digits';
+      newErrors.hsnCode = 'Only digits allowed';
     } else if (hsn.length < 2 || hsn.length > 8) {
-      newErrors.hsnCode = 'Code must be between 2 and 8 digits (standard statutory range)';
+      newErrors.hsnCode = 'Must be 2-8 digits';
     }
     
     setErrors(newErrors);
@@ -75,13 +78,23 @@ const ItemForm: React.FC<ItemFormProps> = ({ initialData, onCancel, onSubmit }) 
     validate();
   };
 
+  const handleQuickUnitAdd = () => {
+    const cleanUnit = newUnitName.trim();
+    if (!cleanUnit) return;
+    if (onQuickUnitAdd) {
+      onQuickUnitAdd(cleanUnit);
+      setFormData(prev => ({ ...prev, unit: cleanUnit }));
+      setNewUnitName('');
+      setIsQuickUnitOpen(false);
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const allFields = Object.keys(formData);
     const allTouched = allFields.reduce((acc, key) => ({ ...acc, [key]: true }), {});
     setTouched(allTouched);
     if (validate()) {
-      // Logic for calculating base price if inclusive
       const finalPrice = formData.isTaxInclusive 
         ? formData.salePrice / (1 + formData.gstRate / 100)
         : formData.salePrice;
@@ -93,7 +106,7 @@ const ItemForm: React.FC<ItemFormProps> = ({ initialData, onCancel, onSubmit }) 
 
   const hsnLength = formData.hsnCode.length;
   const isSacCode = formData.hsnCode.startsWith('99');
-  const isHsnValidLength = hsnLength >= 2 && hsnLength <= 8;
+  const isHsnValidLength = hsnLength >= 2 && hsnLength <= 8 && /^\d+$/.test(formData.hsnCode);
 
   const priceMetrics = useMemo(() => {
     const rate = formData.gstRate;
@@ -111,7 +124,7 @@ const ItemForm: React.FC<ItemFormProps> = ({ initialData, onCancel, onSubmit }) 
   }, [formData.salePrice, formData.gstRate, formData.isTaxInclusive]);
 
   const inputClass = (name: string) => `
-    w-full px-4 py-3 rounded-xl border outline-none transition-all text-sm pr-10
+    w-full px-4 py-3 rounded-xl border outline-none transition-all text-sm pr-10 font-bold
     ${touched[name] && errors[name] ? 'border-rose-500 focus:ring-2 focus:ring-rose-100 bg-rose-50/30' : 'border-slate-200 focus:ring-2 focus:ring-indigo-500 bg-white shadow-sm'}
   `;
 
@@ -159,16 +172,46 @@ const ItemForm: React.FC<ItemFormProps> = ({ initialData, onCancel, onSubmit }) 
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-1">Unit of Measure</label>
-            <select 
-              value={formData.unit} 
-              onChange={e => setFormData({...formData, unit: e.target.value})} 
-              onBlur={() => handleBlur('unit')}
-              className={inputClass('unit')}
-            >
-              <option value="" disabled>-- Select UoM --</option>
-              {UNIT_MEASURES.map(u => <option key={u} value={u}>{u}</option>)}
-            </select>
+            <div className="flex justify-between items-center mb-1">
+              <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-1">Unit of Measure</label>
+              <button 
+                type="button" 
+                onClick={() => setIsQuickUnitOpen(!isQuickUnitOpen)}
+                className="text-[9px] font-black text-indigo-600 uppercase hover:underline underline-offset-2 tracking-widest"
+              >
+                {isQuickUnitOpen ? 'Cancel' : '+ Quick Add'}
+              </button>
+            </div>
+            
+            {!isQuickUnitOpen ? (
+              <select 
+                value={formData.unit} 
+                onChange={e => setFormData({...formData, unit: e.target.value})} 
+                onBlur={() => handleBlur('unit')}
+                className={inputClass('unit')}
+              >
+                <option value="" disabled>-- Select UoM --</option>
+                {unitMeasures.map(u => <option key={u} value={u}>{u}</option>)}
+              </select>
+            ) : (
+              <div className="flex space-x-2 animate-in slide-in-from-top-1 duration-200">
+                <input 
+                  autoFocus
+                  value={newUnitName}
+                  onChange={e => setNewUnitName(e.target.value)}
+                  placeholder="e.g. Dozen"
+                  className="flex-1 px-4 py-3 rounded-xl border border-indigo-200 outline-none focus:ring-2 focus:ring-indigo-500 bg-indigo-50/10 text-sm font-bold shadow-inner"
+                />
+                <button 
+                  type="button"
+                  onClick={handleQuickUnitAdd}
+                  className="px-4 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase shadow-lg shadow-indigo-100"
+                >
+                  Add
+                </button>
+              </div>
+            )}
+            {touched.unit && errors.unit && <p className="text-[10px] text-rose-500 font-bold mt-1 ml-1">{errors.unit}</p>}
           </div>
 
           <div className="space-y-2">
@@ -204,7 +247,7 @@ const ItemForm: React.FC<ItemFormProps> = ({ initialData, onCancel, onSubmit }) 
             {touched.hsnCode && errors.hsnCode ? (
               <p className="text-[10px] text-rose-500 font-bold mt-1 ml-1">{errors.hsnCode}</p>
             ) : (
-              <p className="text-[9px] text-slate-400 font-medium italic mt-1 ml-1">Common formats: 4, 6, or 8 digits. SAC starts with 99.</p>
+              <p className="text-[9px] text-slate-400 font-medium italic mt-1 ml-1">Must be 2-8 numerical digits.</p>
             )}
           </div>
 
@@ -241,7 +284,7 @@ const ItemForm: React.FC<ItemFormProps> = ({ initialData, onCancel, onSubmit }) 
               <div className="flex items-center justify-between">
                  <div>
                     <h4 className="text-[11px] font-black uppercase tracking-[0.4em] text-indigo-400 mb-2">Statutory Tax Management</h4>
-                    <p className="text-[10px] text-slate-400 font-medium leading-relaxed max-w-xs">Define the applicable GST slab. System will dynamically derive base value and components during invoicing cycles.</p>
+                    <p className="text-[10px] text-slate-400 font-medium leading-relaxed max-w-xs">Define the applicable GST slab.</p>
                  </div>
                  <div className="text-right">
                     <div className="text-5xl font-black italic tracking-tighter text-indigo-500">{formData.gstRate}%</div>
