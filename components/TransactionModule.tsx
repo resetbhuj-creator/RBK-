@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { TransactionSubMenu, Voucher, Ledger, Item } from '../types';
 import { TRANSACTION_SUB_MENUS } from '../constants';
@@ -149,7 +150,8 @@ const TransactionModule: React.FC<TransactionModuleProps> = ({
         {TRANSACTION_SUB_MENUS.map((item) => (
           <button key={item.id} onClick={() => setActiveSubAction(item.id as TransactionSubMenu)} className="group relative bg-white p-10 rounded-[3rem] border border-slate-200 shadow-sm hover:shadow-2xl hover:border-indigo-200 transition-all duration-300 text-left overflow-hidden">
             <div className={`w-14 h-14 ${item.color} rounded-2xl flex items-center justify-center text-white mb-8 group-hover:scale-110 transition-transform shadow-xl`}>
-              {React.cloneElement(item.icon as React.ReactElement, { className: 'w-7 h-7' })}
+              {/* FIX: Use React.Element<any> to avoid className error during cloning */}
+              {React.cloneElement(item.icon as React.ReactElement<any>, { className: 'w-7 h-7' })}
             </div>
             <h3 className="text-xl font-black text-slate-800 mb-2 group-hover:text-indigo-600 transition-colors uppercase italic">{item.label}</h3>
             <p className="text-sm text-slate-400 font-medium leading-relaxed">{item.description}</p>

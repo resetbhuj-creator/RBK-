@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { MainMenuType, AdminSubMenu, TransactionSubMenu, DisplaySubMenu, CommunicationSubMenu, HouseKeepingSubMenu } from '../types';
 import { MENU_ITEMS, ADMINISTRATION_SUB_MENUS, TRANSACTION_SUB_MENUS, DISPLAY_SUB_MENUS, COMMUNICATION_SUB_MENUS, HOUSE_KEEPING_SUB_MENUS } from '../constants';
@@ -119,7 +120,8 @@ const Sidebar: React.FC<SidebarProps> = ({
                 )}
                 
                 <span className={`${isParentActive ? 'text-white scale-110 drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]' : 'text-slate-600 group-hover:text-indigo-400'} transition-all duration-500 w-6 h-6 flex items-center justify-center shrink-0`}>
-                  {React.cloneElement(item.icon as React.ReactElement, { className: 'w-5 h-5' })}
+                  {/* FIX: Use React.Element<any> to avoid className error during cloning */}
+                  {React.cloneElement(item.icon as React.ReactElement<any>, { className: 'w-5 h-5' })}
                 </span>
                 
                 <span className={`font-black text-[11px] uppercase tracking-[0.18em] flex-1 text-left truncate italic ${isParentActive ? 'text-white' : ''}`}>

@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Item, Ledger, Voucher, VoucherItem, Adjustment } from '../types';
 
@@ -24,7 +25,8 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
   
   const [searchIdx, setSearchIdx] = useState<number | null>(null);
   const [query, setQuery] = useState('');
-  const searchRef = useRef<HTMLDivElement>(null);
+  /* FIX: Update ref type to HTMLTableDataCellElement as it's assigned to a <td> element on line 246 */
+  const searchRef = useRef<HTMLTableDataCellElement>(null);
 
   // Derived next sequence preview based on active type
   const nextIdPreview = useMemo(() => getNextId(vchType), [vchType, getNextId]);

@@ -133,6 +133,25 @@ const ImportExportModule: React.FC<ImportExportModuleProps> = ({
     setLogs(prev => [...prev, `[${timestamp}] ${msg}`]);
   };
 
+  const parseCSV = (content: string): any[] => {
+    const lines = content.split(/\r?\n/);
+    if (lines.length < 1) return [];
+    
+    // Split headers handling potential quotes
+    const headers = lines[0].split(csvDelimiter).map(h => h.trim().replace(/^"|"$/g, ''));
+    const rows = lines.slice(1).filter(line => line.trim() !== '');
+    
+    return rows.map(line => {
+      // Split rows handling potential quotes
+      const values = line.split(csvDelimiter).map(v => v.trim().replace(/^"|"$/g, ''));
+      const obj: any = {};
+      headers.forEach((h, i) => {
+        obj[h] = values[i];
+      });
+      return obj;
+    });
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -140,8 +159,9 @@ const ImportExportModule: React.FC<ImportExportModuleProps> = ({
     setSelectedFile(file.name);
     addLog(`System Probe: File "${file.name}" linked. Initializing ${targetFormat} validation sequence...`);
     
+    const reader = new FileReader();
+    
     if (targetFormat === 'XLSX') {
-      const reader = new FileReader();
       reader.onload = (evt) => {
         const bstr = evt.target?.result;
         const wb = XLSX.read(bstr, { type: 'binary' });
@@ -160,7 +180,6 @@ const ImportExportModule: React.FC<ImportExportModuleProps> = ({
       };
       reader.readAsBinaryString(file);
     } else {
-      const reader = new FileReader();
       reader.onload = (event) => {
         const content = event.target?.result as string;
         setFileContent(content);
@@ -250,25 +269,50 @@ const ImportExportModule: React.FC<ImportExportModuleProps> = ({
 
   const parseMappedData = (data: any[]): any[] => {
     const schema = ENTITY_SCHEMAS[selectedEntity];
-    return data.map(row => {
+    let skippedCount = 0;
+    
+    const parsed = data.map((row, idx) => {
       const obj: any = {};
+      let isValid = true;
+      
       schema.forEach(s => {
         const sourceHeader = mapping[s.target];
         let val = row[sourceHeader];
+        
+        if (s.required && (val === undefined || val === null || val === '')) {
+            isValid = false;
+        }
+
         if (s.type === 'Float') val = parseFloat(val) || 0;
         obj[s.source] = val;
       });
       
-      // Auto-logic for entities
+      if (!isValid) {
+          addLog(`ROW ${idx + 1} REJECTED: Mandatory field missing.`);
+          skippedCount++;
+          return null;
+      }
+
+      // Dynamic Meta Logic
       if (selectedEntity === 'Companies') {
         const startYear = new Date(obj.fyStartDate || Date.now()).getFullYear();
         obj.years = [`${startYear} - ${startYear + 1}`];
         obj.id = `C-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
         obj.logo = obj.name?.charAt(0) || 'N';
+      } else if (selectedEntity === 'Inventory Items') {
+        obj.id = `i-${Math.random().toString(36).substr(2, 7)}`;
+      } else if (selectedEntity === 'Ledgers') {
+        obj.id = `l-${Math.random().toString(36).substr(2, 7)}`;
       }
       
       return obj;
-    });
+    }).filter(x => x !== null);
+
+    if (skippedCount > 0) {
+        addLog(`INTEGRITY CHECK: Skipped ${skippedCount} malformed objects.`);
+    }
+
+    return parsed;
   };
 
   const downloadTemplate = () => {
@@ -282,7 +326,7 @@ const ImportExportModule: React.FC<ImportExportModuleProps> = ({
       mimeType = 'text/csv';
       fileName += '.csv';
     } else if (targetFormat === 'XLSX') {
-      const ws = XLSX.utils.json_to_sheet([schema.reduce((acc, s) => ({ ...acc, [s.target]: 'VALUE' }), {})]);
+      const ws = XLSX.utils.json_to_sheet([schema.reduce((acc, s) => ({ ...acc, [s.target]: 'SAMPLE_VALUE' }), {})]);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Template");
       XLSX.writeFile(wb, `${fileName}.xlsx`);
@@ -293,7 +337,7 @@ const ImportExportModule: React.FC<ImportExportModuleProps> = ({
       const itemName = selectedEntity.replace(/\s/g, '').slice(0, -1) || 'Record';
       content = `<?xml version="1.0" encoding="UTF-8"?>\n<${rootName}>\n  <${itemName}>\n`;
       schema.forEach(s => {
-        content += `    <${s.target}>VALUE</${s.target}>\n`;
+        content += `    <${s.target}>SAMPLE_VALUE</${s.target}>\n`;
       });
       content += `  </${itemName}>\n</${rootName}>`;
       mimeType = 'text/xml';
@@ -330,9 +374,9 @@ const ImportExportModule: React.FC<ImportExportModuleProps> = ({
             parsed = parseMappedData(fileContent);
           } else if (targetFormat === 'XML') {
             parsed = parseXML(fileContent);
-          } else {
-            // Placeholder for CSV parsing
-            parsed = [];
+          } else if (targetFormat === 'CSV') {
+            const rawCsv = parseCSV(fileContent);
+            parsed = parseMappedData(rawCsv);
           }
           
           if (selectedEntity === 'Companies' && setCompanies) setCompanies(prev => [...parsed, ...prev]);
@@ -347,7 +391,7 @@ const ImportExportModule: React.FC<ImportExportModuleProps> = ({
       }
       setProgress(currentProgress);
       if (currentProgress % 20 === 0) addLog(`Syncing data block at index ${currentProgress * 12}...`);
-    }, 200);
+    }, 150);
   };
 
   const finalizeJob = () => {
@@ -368,6 +412,13 @@ const ImportExportModule: React.FC<ImportExportModuleProps> = ({
         XLSX.writeFile(wb, `nexus_export_${selectedEntity.toLowerCase().replace(/\s/g, '_')}_${Date.now()}.xlsx`);
         addLog(`Binary XLSX transmitted to local storage.`);
         return;
+      } else if (targetFormat === 'CSV') {
+        const schema = ENTITY_SCHEMAS[selectedEntity];
+        const headers = schema.map(s => s.target).join(csvDelimiter);
+        const rows = dataSource.map(item => 
+            schema.map(s => `"${(item as any)[s.source] || ''}"`).join(csvDelimiter)
+        ).join('\n');
+        content = `${headers}\n${rows}`;
       }
       
       const blob = new Blob([content], { type: targetFormat === 'XML' ? 'text/xml' : 'text/csv' });
@@ -385,7 +436,7 @@ const ImportExportModule: React.FC<ImportExportModuleProps> = ({
       entity: selectedEntity,
       timestamp: new Date().toLocaleString(),
       status: 'Completed',
-      records: activeTab === 'EXPORT' ? dataSource.length : 0,
+      records: activeTab === 'EXPORT' ? dataSource.length : (fileContent ? 0 : 0), // Count will be calculated in logic
       format: targetFormat
     };
     setJobs(prev => [newJob, ...prev]);
@@ -465,6 +516,12 @@ const ImportExportModule: React.FC<ImportExportModuleProps> = ({
                 </div>
                 <h4 className="text-2xl font-black text-slate-800 uppercase tracking-tight">{activeTab === 'IMPORT' ? `Verify ${targetFormat} Stream` : `Authorize ${targetFormat} Extraction`}</h4>
                 <p className="text-sm text-slate-400 mt-3 font-medium">Verified data structures required for master synchronization.</p>
+                {selectedFile && (
+                  <div className="mt-6 px-6 py-3 bg-indigo-50 text-indigo-600 rounded-2xl inline-flex items-center space-x-3 border border-indigo-100">
+                    <span className="text-xs font-black uppercase tracking-widest">{selectedFile}</span>
+                    <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></div>
+                  </div>
+                )}
               </div>
             </div>
           )}
