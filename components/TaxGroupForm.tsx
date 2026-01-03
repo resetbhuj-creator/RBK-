@@ -51,7 +51,7 @@ const TaxGroupForm: React.FC<TaxGroupFormProps> = ({ initialData, taxes = [], on
           <h3 className="text-xl font-black italic uppercase tracking-tight">{initialData ? 'Modify Tax Umbrella' : 'Provision Tax Group'}</h3>
           <p className="text-[10px] font-black uppercase tracking-[0.3em] text-indigo-400">Statutory Aggregator Node</p>
         </div>
-        <button onClick={onCancel} className="relative z-10 p-2 hover:bg-white/10 rounded-full text-slate-400 transition-colors">
+        <button onClick={onCancel} className="relative z-10 p-2 hover:bg-white/10 rounded-full transition-colors">
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
         </button>
         <div className="absolute top-0 right-0 w-48 h-48 bg-indigo-600 rounded-full blur-[80px] opacity-20 -mr-24 -mt-24"></div>

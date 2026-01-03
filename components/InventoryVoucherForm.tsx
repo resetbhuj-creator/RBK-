@@ -10,7 +10,7 @@ interface InventoryVoucherFormProps {
   getNextId: (type: string) => string;
 }
 
-type InvType = 'Sales' | 'Purchase' | 'Delivery Note' | 'Receipt Note' | 'Stock Journal' | 'Purchase Order';
+type InvType = 'Sales' | 'Purchase' | 'Purchase Order' | 'Delivery Note' | 'Receipt Note' | 'Stock Journal';
 
 const COMMON_ADJUSTMENTS = ['Freight Charges', 'Insurance', 'Labor', 'Packaging', 'Rounding Off'];
 
@@ -30,11 +30,13 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
 
   const nextIdPreview = useMemo(() => getNextId(vchType), [vchType, getNextId]);
 
+  // PO is treated as financial to allow rate/tax planning
   const isFinancial = vchType === 'Sales' || vchType === 'Purchase' || vchType === 'Purchase Order';
   const isAdjustment = vchType === 'Stock Journal';
 
   const filteredParties = useMemo(() => {
     if (isAdjustment) return [];
+    // PO and Purchase/Receipt go to Creditors; Sales/Delivery to Debtors
     const group = (vchType === 'Sales' || vchType === 'Delivery Note') ? 'Sundry Debtors' : 'Sundry Creditors';
     return ledgers.filter(l => l.group === group);
   }, [vchType, ledgers, isAdjustment]);
@@ -174,16 +176,16 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
     });
   };
 
-  const themeConfig = {
+  const themeConfig: Record<string, { color: string, label: string, icon: string }> = {
     'Sales': { color: 'emerald', label: 'Sales Invoice', icon: '📤' },
     'Purchase': { color: 'indigo', label: 'Purchase Bill', icon: '📥' },
+    'Purchase Order': { color: 'violet', label: 'Purchase Order', icon: '📝' },
     'Delivery Note': { color: 'amber', label: 'Delivery Note', icon: '🚚' },
     'Receipt Note': { color: 'sky', label: 'Receipt Note', icon: '📦' },
-    'Stock Journal': { color: 'slate', label: 'Stock Journal', icon: '⚖️' },
-    'Purchase Order': { color: 'violet', label: 'Purchase Order', icon: '📝' }
+    'Stock Journal': { color: 'slate', label: 'Stock Journal', icon: '⚖️' }
   };
 
-  const activeTheme = themeConfig[vchType];
+  const activeTheme = themeConfig[vchType] || themeConfig['Sales'];
 
   return (
     <div className="bg-white rounded-[3.5rem] border border-slate-200 shadow-2xl overflow-hidden max-w-7xl mx-auto animate-in zoom-in-95 duration-300">
@@ -433,7 +435,7 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
 
                 <div className="bg-white rounded-[3rem] p-10 border border-slate-200 shadow-sm relative overflow-hidden group/presets">
                    <h5 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 mb-8 flex items-center">
-                      <svg className="w-4 h-4 mr-3 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                      <svg className="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
                       Institutional Preset Blocks
                    </h5>
                    <div className="flex flex-wrap gap-4 relative z-10">
@@ -504,7 +506,7 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
               <button 
                 type="submit" 
                 disabled={isReadOnly || vchItems.length === 0 || (!partyId && !isAdjustment)} 
-                className={`w-full py-8 rounded-[2.5rem] font-black text-xs uppercase tracking-[0.4em] transition-all transform active:scale-95 shadow-2xl border-b-8 border-slate-950 ${isReadOnly ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none border-none' : 'bg-slate-900 text-white hover:bg-black group'}`}
+                className={`w-full py-8 rounded-[2.5rem] font-black text-xs uppercase tracking-[0.4em] shadow-2xl transition-all transform active:scale-95 shadow-2xl border-b-8 border-slate-950 ${isReadOnly ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none border-none' : 'bg-slate-900 text-white hover:bg-black group'}`}
               >
                  <span className="group-hover:scale-110 transition-transform block">Authorize Resource Transmission</span>
               </button>

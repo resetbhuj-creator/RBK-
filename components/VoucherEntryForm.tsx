@@ -108,7 +108,7 @@ const VoucherEntryForm: React.FC<VoucherEntryFormProps> = ({ isReadOnly, ledgers
             <div className="flex items-center space-x-5">
               <h3 className="text-4xl font-black uppercase italic tracking-tighter leading-none">{active.label} Node</h3>
               <div className="px-5 py-1.5 bg-black/20 rounded-xl border border-white/10 flex items-center space-x-3">
-                 <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
+                 <div className={`w-2 h-2 rounded-full bg-emerald-400 animate-pulse`}></div>
                  <span className="text-[11px] font-black uppercase tracking-widest text-emerald-400">Node Seq: {nextIdPreview}</span>
               </div>
             </div>

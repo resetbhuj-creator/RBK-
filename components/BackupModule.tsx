@@ -35,12 +35,13 @@ const BackupModule: React.FC = () => {
   const [backupName, setBackupName] = useState(`nexus_vault_${new Date().toISOString().split('T')[0]}`);
   const [useEncryption, setUseEncryption] = useState(true);
   
-  // Automatic Backup Config
+  // Automatic Backup Config State
   const [autoBackupEnabled, setAutoBackupEnabled] = useState(true);
-  const [autoFrequency, setAutoFrequency] = useState<Frequency>('DAILY');
-  const [autoTime, setAutoTime] = useState('02:00');
-  const [retentionCount, setRetentionCount] = useState(30);
-  const [autoDestination, setAutoDestination] = useState<'INTERNAL' | 'CLOUD'>('CLOUD');
+  const [autoFrequency, setAutoFrequency] = useState<Frequency>(() => (localStorage.getItem('auto_bk_freq') as Frequency) || 'DAILY');
+  const [autoTime, setAutoTime] = useState(() => localStorage.getItem('auto_bk_time') || '02:00');
+  const [retentionCount, setRetentionCount] = useState(() => parseInt(localStorage.getItem('auto_bk_retention') || '30'));
+  const [autoDestination, setAutoDestination] = useState<'INTERNAL' | 'CLOUD'>(() => (localStorage.getItem('auto_bk_dest') as 'INTERNAL' | 'CLOUD') || 'CLOUD');
+  const [isSavingPolicy, setIsSavingPolicy] = useState(false);
 
   const [includeDB, setIncludeDB] = useState(true);
   const [includeAssets, setIncludeAssets] = useState(false);
@@ -149,6 +150,19 @@ const BackupModule: React.FC = () => {
     }, 800);
   };
 
+  const saveAutoPolicy = () => {
+    setIsSavingPolicy(true);
+    localStorage.setItem('auto_bk_freq', autoFrequency);
+    localStorage.setItem('auto_bk_time', autoTime);
+    localStorage.setItem('auto_bk_retention', retentionCount.toString());
+    localStorage.setItem('auto_bk_dest', autoDestination);
+    
+    setTimeout(() => {
+      setIsSavingPolicy(false);
+      alert('Automation Policy committed to System Registry.');
+    }, 1000);
+  };
+
   const getNextRun = () => {
     if (!autoBackupEnabled) return 'Policy Disabled';
     const now = new Date();
@@ -177,7 +191,7 @@ const BackupModule: React.FC = () => {
               </svg>
             </div>
             <div>
-              <h2 className="text-3xl font-black tracking-tighter uppercase italic">Backup & Continuity</h2>
+              <h2 className="text-3xl font-black tracking-tighter uppercase italic">Vault Sovereignty</h2>
               <p className="text-sm text-slate-400 font-medium mt-1">Configure organizational data persistence and recovery strategy.</p>
             </div>
           </div>
@@ -189,7 +203,7 @@ const BackupModule: React.FC = () => {
                 onClick={() => setActiveView(view)}
                 className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeView === view ? 'bg-indigo-600 text-white shadow-xl' : 'text-slate-400 hover:text-white'}`}
               >
-                {view === 'SNAPSHOTS' ? 'Live Snapshots' : view === 'AUTOMATION' ? 'Automation Policy' : 'Vault Registry'}
+                {view === 'SNAPSHOTS' ? 'Snapshots' : view === 'AUTOMATION' ? 'Automatic Backups' : 'Registry'}
               </button>
             ))}
           </div>
@@ -233,8 +247,8 @@ const BackupModule: React.FC = () => {
             {activeView === 'SNAPSHOTS' && (
               <div className="bg-white rounded-[3rem] border border-slate-200 p-10 shadow-sm space-y-10 animate-in slide-in-from-left-4 duration-500">
                 <div>
-                  <h3 className="text-xl font-black text-slate-800 tracking-tight italic uppercase">Immediate Database Snapshot</h3>
-                  <p className="text-sm text-slate-400 font-medium">Trigger an on-demand archive of the current relational state.</p>
+                  <h3 className="text-xl font-black text-slate-800 tracking-tight italic uppercase leading-none">Manual Data Snapshot</h3>
+                  <p className="text-sm text-slate-400 font-medium mt-2">Trigger an immediate, on-demand archive of the current system state.</p>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -269,8 +283,8 @@ const BackupModule: React.FC = () => {
                 </div>
 
                 <div className="flex space-x-4 pt-4">
-                   <button onClick={() => startBackup('LOCAL')} className="flex-1 py-5 bg-slate-100 text-slate-600 rounded-[1.5rem] font-black text-xs uppercase tracking-widest hover:bg-slate-200 transition-all transform active:scale-95">Local Disk Dump</button>
-                   <button onClick={() => startBackup('CLOUD')} className="flex-[2] py-5 bg-indigo-600 text-white rounded-[1.5rem] font-black text-xs uppercase tracking-widest hover:bg-indigo-700 transition-all transform active:scale-95 shadow-2xl shadow-indigo-900/20">Authorize Cloud Mirroring</button>
+                   <button onClick={() => startBackup('LOCAL')} className="flex-1 py-5 bg-slate-100 text-slate-600 rounded-[1.5rem] font-black text-xs uppercase tracking-widest hover:bg-slate-200 transition-all transform active:scale-95">Disk Dump</button>
+                   <button onClick={() => startBackup('CLOUD')} className="flex-[2] py-5 bg-indigo-600 text-white rounded-[1.5rem] font-black text-xs uppercase tracking-widest hover:bg-indigo-700 transition-all transform active:scale-95 shadow-2xl shadow-indigo-900/20">Authorize Mirroring</button>
                 </div>
               </div>
             )}
@@ -279,11 +293,11 @@ const BackupModule: React.FC = () => {
               <div className="bg-white rounded-[3rem] border border-slate-200 p-12 shadow-sm space-y-12 animate-in zoom-in-95 duration-500">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-xl font-black text-slate-800 tracking-tight italic uppercase">Automated Backup Protocol</h3>
-                    <p className="text-sm text-slate-400 font-medium">Define recurring snapshot cycles and retention policies.</p>
+                    <h3 className="text-xl font-black text-slate-800 tracking-tight italic uppercase leading-none">Automatic Backups Configuration</h3>
+                    <p className="text-sm text-slate-400 font-medium mt-2">Manage recurring archival sequences and system health synchronization.</p>
                   </div>
                   <div className="flex items-center space-x-4">
-                     <span className={`text-[10px] font-black uppercase tracking-widest ${autoBackupEnabled ? 'text-emerald-600' : 'text-slate-300'}`}>{autoBackupEnabled ? 'ENGINE ACTIVE' : 'ENGINE DISABLED'}</span>
+                     <span className={`text-[10px] font-black uppercase tracking-widest ${autoBackupEnabled ? 'text-emerald-600' : 'text-slate-300'}`}>{autoBackupEnabled ? 'ENGINE ONLINE' : 'ENGINE OFFLINE'}</span>
                      <button onClick={() => setAutoBackupEnabled(!autoBackupEnabled)} className={`w-14 h-8 rounded-full relative transition-all shadow-md ${autoBackupEnabled ? 'bg-emerald-50' : 'bg-slate-200'}`}>
                         <div className={`absolute top-1 w-6 h-6 bg-white rounded-full transition-all shadow-sm ${autoBackupEnabled ? 'right-1' : 'left-1'}`}></div>
                      </button>
@@ -292,59 +306,72 @@ const BackupModule: React.FC = () => {
 
                 <div className={`space-y-12 transition-all duration-500 ${autoBackupEnabled ? 'opacity-100' : 'opacity-40 pointer-events-none grayscale blur-[2px]'}`}>
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-                      <div className="space-y-6">
+                      <div className="space-y-8">
                          <div className="space-y-2">
-                            <label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest ml-1">Frequency Protocol</label>
-                            <div className="grid grid-cols-3 gap-2 bg-slate-50 p-1.5 rounded-2xl border border-slate-100">
+                            <label className="text-[10px] font-black uppercase text-indigo-600 tracking-[0.2em] ml-1">Frequency Protocol</label>
+                            <div className="grid grid-cols-3 gap-2 bg-slate-50 p-1.5 rounded-2xl border border-slate-200 shadow-inner">
                                {(['DAILY', 'WEEKLY', 'MONTHLY'] as Frequency[]).map(f => (
                                  <button key={f} onClick={() => setAutoFrequency(f)} className={`py-4 text-[10px] font-black rounded-xl transition-all ${autoFrequency === f ? 'bg-white text-indigo-600 shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}>{f}</button>
                                ))}
                             </div>
                          </div>
                          <div className="space-y-2">
-                            <label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest ml-1">Precision Execution Window</label>
+                            <label className="text-[10px] font-black uppercase text-indigo-600 tracking-[0.2em] ml-1">Precision Execution Window</label>
                             <div className="relative group">
-                               <input type="time" value={autoTime} onChange={e => setAutoTime(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-5 text-lg font-black text-slate-800 outline-none focus:ring-4 focus:ring-indigo-500/10 shadow-inner" />
-                               <div className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-300 font-bold group-focus-within:text-indigo-600 transition-colors">EST</div>
+                               <input type="time" value={autoTime} onChange={e => setAutoTime(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-5 text-xl font-black text-slate-800 outline-none focus:ring-4 focus:ring-indigo-500/10 shadow-inner" />
+                               <div className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-300 font-bold group-focus-within:text-indigo-600 transition-colors uppercase tracking-widest text-[10px]">Active Node Local</div>
                             </div>
-                            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest ml-1 italic">Backups execute during low-latency windows.</p>
+                            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest ml-1 italic leading-relaxed">System performs differential delta at the specified moment to minimize latency.</p>
                          </div>
                       </div>
 
-                      <div className="space-y-6">
+                      <div className="space-y-8">
                          <div className="space-y-2">
                             <div className="flex justify-between items-center px-1">
-                               <label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest">Rotation Depth (Retention)</label>
-                               <span className="text-xs font-black text-indigo-900">{retentionCount} Snapshots</span>
+                               <label className="text-[10px] font-black uppercase text-indigo-600 tracking-[0.2em]">Rotation Depth (Retention)</label>
+                               <span className="text-xs font-black text-indigo-900 bg-indigo-50 px-2 py-0.5 rounded-lg border border-indigo-100">{retentionCount} Historical States</span>
                             </div>
-                            <input type="range" min="5" max="100" step="5" value={retentionCount} onChange={e => setRetentionCount(parseInt(e.target.value))} className="w-full h-2 bg-slate-100 rounded-full appearance-none cursor-pointer accent-indigo-600 border border-slate-200" />
-                            <div className="flex justify-between text-[8px] font-black text-slate-300 uppercase tracking-tighter"><span>5 MIN</span><span>100 MAX</span></div>
+                            <input type="range" min="5" max="100" step="5" value={retentionCount} onChange={e => setRetentionCount(parseInt(e.target.value))} className="w-full h-2 bg-slate-100 rounded-full appearance-none cursor-pointer accent-indigo-600 border border-slate-200 mt-4" />
+                            <div className="flex justify-between text-[8px] font-black text-slate-300 uppercase tracking-widest mt-2"><span>Min: 5</span><span>Max: 100</span></div>
                          </div>
                          <div className="space-y-2">
-                            <label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest ml-1">Destination Tier</label>
+                            <label className="text-[10px] font-black uppercase text-indigo-600 tracking-[0.2em] ml-1">Vault Destination</label>
                             <div className="grid grid-cols-2 gap-4">
-                               <button onClick={() => setAutoDestination('CLOUD')} className={`flex flex-col items-center justify-center p-6 rounded-3xl border-2 transition-all ${autoDestination === 'CLOUD' ? 'bg-indigo-50 border-indigo-600 shadow-xl' : 'bg-slate-50 border-slate-100 opacity-60'}`}>
-                                  <span className="text-2xl mb-2">☁️</span>
-                                  <span className="text-[10px] font-black uppercase">Cloud Cluster</span>
+                               <button onClick={() => setAutoDestination('CLOUD')} className={`flex flex-col items-center justify-center p-6 rounded-[2.5rem] border-2 transition-all ${autoDestination === 'CLOUD' ? 'bg-indigo-50 border-indigo-600 shadow-xl' : 'bg-slate-50 border-slate-100 opacity-60'}`}>
+                                  <span className="text-3xl mb-3">☁️</span>
+                                  <span className="text-[10px] font-black uppercase tracking-widest text-indigo-900">Cloud Mirror</span>
                                 </button>
-                               <button onClick={() => setAutoDestination('INTERNAL')} className={`flex flex-col items-center justify-center p-6 rounded-3xl border-2 transition-all ${autoDestination === 'INTERNAL' ? 'bg-indigo-50 border-indigo-600 shadow-xl' : 'bg-slate-50 border-slate-100 opacity-60'}`}>
-                                  <span className="text-2xl mb-2">💾</span>
-                                  <span className="text-[10px] font-black uppercase">Internal SAN</span>
+                               <button onClick={() => setAutoDestination('INTERNAL')} className={`flex flex-col items-center justify-center p-6 rounded-[2.5rem] border-2 transition-all ${autoDestination === 'INTERNAL' ? 'bg-indigo-50 border-indigo-600 shadow-xl' : 'bg-slate-50 border-slate-100 opacity-60'}`}>
+                                  <span className="text-3xl mb-3">💾</span>
+                                  <span className="text-[10px] font-black uppercase tracking-widest text-indigo-900">Local SAN</span>
                                </button>
                             </div>
                          </div>
                       </div>
                    </div>
 
-                   <div className="p-8 bg-slate-900 rounded-[2.5rem] border-4 border-slate-800 shadow-2xl relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-10">
+                   <div className="p-8 bg-slate-900 rounded-[3rem] border-4 border-slate-800 shadow-2xl relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-10">
                       <div className="relative z-10 flex items-center space-x-6">
-                         <div className="w-16 h-16 bg-emerald-500/20 rounded-2xl flex items-center justify-center text-3xl shadow-lg border border-emerald-500/30">🤖</div>
+                         <div className="w-16 h-16 bg-emerald-500/20 rounded-2xl flex items-center justify-center text-3xl shadow-lg border border-emerald-500/30 group">
+                            <div className="animate-pulse group-hover:scale-110 transition-transform">🤖</div>
+                         </div>
                          <div>
                             <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.4em] mb-1">Automation Intelligence</h4>
-                            <p className="text-sm font-black text-white italic">Next Sequence: <span className="text-emerald-400">{getNextRun()}</span></p>
+                            <p className="text-sm font-black text-white italic">Next Run Attempt: <span className="text-emerald-400 underline underline-offset-4 decoration-emerald-500/30">{getNextRun()}</span></p>
                          </div>
                       </div>
-                      <button onClick={() => startBackup('AUTO')} className="relative z-10 px-10 py-4 bg-white text-slate-900 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-xl hover:bg-emerald-400 hover:text-white transition-all transform active:scale-95">Manual Overide & Test</button>
+                      <div className="flex items-center space-x-4 relative z-10">
+                         <button 
+                            onClick={saveAutoPolicy}
+                            disabled={isSavingPolicy}
+                            className={`px-10 py-5 rounded-[1.5rem] font-black text-[10px] uppercase tracking-[0.3em] shadow-xl transition-all transform active:scale-95 border-b-4 border-slate-950 ${isSavingPolicy ? 'bg-slate-700 text-slate-500' : 'bg-white text-slate-900 hover:bg-emerald-500 hover:text-white'}`}
+                         >
+                            {isSavingPolicy ? 'Committing Policy...' : 'Save Configuration'}
+                         </button>
+                         <button onClick={() => startBackup('AUTO')} className="p-5 bg-white/5 border border-white/10 rounded-2xl text-white hover:bg-white/10 transition-all" title="Dry Run">
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                         </button>
+                      </div>
                       <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-600 rounded-full blur-[100px] opacity-10 -mr-32 -mt-32"></div>
                    </div>
                 </div>
@@ -356,79 +383,101 @@ const BackupModule: React.FC = () => {
                 <table className="w-full text-left">
                   <thead className="bg-slate-900 text-[10px] uppercase font-black tracking-widest text-slate-400">
                     <tr>
-                      <th className="px-10 py-6">Archive Identity</th>
-                      <th className="px-10 py-6">Status</th>
-                      <th className="px-10 py-6">Storage</th>
-                      <th className="px-10 py-6 text-right">Actions</th>
+                      <th className="px-10 py-7">Archive Identity</th>
+                      <th className="px-10 py-7">Execution Class</th>
+                      <th className="px-10 py-7">Binary Volume</th>
+                      <th className="px-10 py-7 text-right">Modular Ops</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
                     {backups.map(bk => (
                       <tr key={bk.id} className="hover:bg-slate-50/80 transition-colors group">
                         <td className="px-10 py-6">
-                           <div className="flex items-center space-x-4">
-                              <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-[10px] font-black shadow-inner border ${bk.type === 'Auto' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-indigo-50 text-indigo-600 border-indigo-100'}`}>{bk.type.charAt(0)}</div>
+                           <div className="flex items-center space-x-5">
+                              <div className={`w-12 h-12 rounded-[1.2rem] flex items-center justify-center text-[10px] font-black shadow-inner border transition-all group-hover:scale-105 ${bk.type === 'Auto' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-indigo-50 text-indigo-600 border-indigo-100'}`}>{bk.type.charAt(0)}</div>
                               <div>
-                                 <div className="text-xs font-black text-slate-800 uppercase tracking-tight">{bk.name}</div>
-                                 <div className="text-[8px] font-bold text-slate-400 uppercase mt-0.5">{bk.timestamp} • {bk.provider || 'Internal'}</div>
+                                 <div className="text-xs font-black text-slate-800 uppercase tracking-tight italic group-hover:text-indigo-600 transition-colors">{bk.name}</div>
+                                 <div className="text-[8px] font-bold text-slate-400 uppercase mt-1">{bk.timestamp} • SHA-256 Verified</div>
                               </div>
                            </div>
                         </td>
                         <td className="px-10 py-6">
-                           <span className="px-2.5 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-[8px] font-black uppercase tracking-widest border border-emerald-100">{bk.status}</span>
+                           <span className={`px-3 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest border ${bk.status === 'Verified' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>{bk.status}</span>
                         </td>
-                        <td className="px-10 py-6 font-mono text-[11px] font-black text-slate-800">{bk.size}</td>
+                        <td className="px-10 py-6 font-mono text-[11px] font-black text-slate-800 tabular-nums">{bk.size}</td>
                         <td className="px-10 py-6 text-right">
-                           <button onClick={() => alert('Initiating Restorative Protocol...')} className="p-3 bg-slate-100 text-slate-400 hover:bg-emerald-600 hover:text-white rounded-xl transition-all shadow-sm transform active:scale-90"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg></button>
+                           <button onClick={() => alert('Initiating Restorative Protocol...')} className="p-3.5 bg-slate-50 text-slate-400 hover:bg-emerald-600 hover:text-white rounded-xl transition-all shadow-sm transform active:scale-90 border border-slate-200"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg></button>
                         </td>
                       </tr>
                     ))}
+                    {backups.length === 0 && (
+                      <tr>
+                        <td colSpan={4} className="py-32 text-center">
+                           <div className="w-20 h-20 bg-slate-50 rounded-[2rem] flex items-center justify-center mx-auto mb-6 border-2 border-dashed border-slate-200">
+                              <svg className="w-10 h-10 text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" /></svg>
+                           </div>
+                           <p className="text-sm font-black uppercase text-slate-300 tracking-[0.4em] italic">Archive registry exhausted</p>
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
             )}
           </div>
 
-          <div className="space-y-6">
+          <div className="space-y-8">
             <div className="bg-slate-900 rounded-[2.5rem] p-10 text-white relative overflow-hidden shadow-2xl border-4 border-slate-800">
                <h3 className="text-[10px] font-black uppercase text-indigo-400 tracking-[0.3em] mb-10 flex items-center">
                  <div className="w-2 h-2 rounded-full bg-emerald-400 mr-3 animate-pulse shadow-[0_0_8px_#34d399]"></div>
-                 Resource Telemetry
+                 System Health Metrics
                </h3>
                <div className="space-y-8 relative z-10">
                   <div className="space-y-3">
-                     <div className="flex justify-between text-[10px] font-black uppercase text-slate-500 tracking-widest"><span>Cloud Allocation</span><span>34%</span></div>
-                     <div className="h-1.5 bg-white/5 rounded-full overflow-hidden border border-white/10 p-0.5 shadow-inner">
+                     <div className="flex justify-between text-[10px] font-black uppercase text-slate-500 tracking-widest"><span>Cloud Redundancy</span><span>34% Sync</span></div>
+                     <div className="h-2 bg-white/5 rounded-full overflow-hidden border border-white/10 p-0.5 shadow-inner">
                         <div className="h-full bg-indigo-500 w-[34%] rounded-full shadow-[0_0_12px_rgba(99,102,241,0.6)]"></div>
                      </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
-                     <div className="p-4 bg-white/5 rounded-2xl border border-white/10">
-                        <div className="text-[8px] font-black text-slate-500 uppercase mb-1">Total Shards</div>
-                        <div className="text-xl font-black">128</div>
+                     <div className="p-5 bg-white/5 rounded-[1.5rem] border border-white/10">
+                        <div className="text-[8px] font-black text-slate-500 uppercase mb-2">DB Shards</div>
+                        <div className="text-2xl font-black italic tracking-tighter tabular-nums">128</div>
                      </div>
-                     <div className="p-4 bg-white/5 rounded-2xl border border-white/10">
-                        <div className="text-[8px] font-black text-slate-500 uppercase mb-1">Data Integrity</div>
-                        <div className="text-xl font-black text-emerald-400 italic">100%</div>
+                     <div className="p-5 bg-white/5 rounded-[1.5rem] border border-white/10">
+                        <div className="text-[8px] font-black text-slate-500 uppercase mb-2">Block Integrity</div>
+                        <div className="text-2xl font-black text-emerald-400 italic tracking-tighter">100%</div>
                      </div>
                   </div>
                </div>
                <div className="absolute -bottom-10 -right-10 w-48 h-48 bg-indigo-600 rounded-full blur-[80px] opacity-10"></div>
             </div>
 
-            <div className="bg-white rounded-[2.5rem] border-2 border-slate-100 p-8 shadow-sm">
-               <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 mb-6">Security Compliance</h4>
-               <div className="space-y-6">
-                  <div className="flex items-center justify-between">
-                     <span className="text-[11px] font-bold text-slate-600">Hardware Encryption</span>
-                     <button onClick={() => setUseEncryption(!useEncryption)} className={`w-10 h-6 rounded-full relative transition-all ${useEncryption ? 'bg-indigo-600' : 'bg-slate-200'}`}>
+            <div className="bg-white rounded-[2.5rem] border-2 border-slate-100 p-10 shadow-sm space-y-8">
+               <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 border-b border-slate-50 pb-4">Security Baseline</h4>
+               <div className="space-y-8">
+                  <div className="flex items-center justify-between group">
+                     <div className="space-y-0.5">
+                        <span className="text-xs font-black text-slate-800 uppercase italic">Block-Level Encryption</span>
+                        <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tighter">FIPS 140-2 Validated</p>
+                     </div>
+                     <button onClick={() => setUseEncryption(!useEncryption)} className={`w-11 h-6 rounded-full relative transition-all shadow-md ${useEncryption ? 'bg-indigo-600 shadow-indigo-900/20' : 'bg-slate-200'}`}>
                         <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-all ${useEncryption ? 'right-1' : 'left-1'}`}></div>
                      </button>
                   </div>
-                  <div className="p-5 bg-indigo-50 rounded-2xl border border-indigo-100">
-                     <p className="text-[10px] text-indigo-700 font-medium leading-relaxed italic">Encryption active at block level. Private keys are managed within the organizational enclave.</p>
+                  <div className="p-6 bg-indigo-50 rounded-[2rem] border border-indigo-100 group hover:bg-white transition-colors">
+                     <p className="text-[10px] text-indigo-700 font-medium leading-relaxed italic">"Archive logic enforces isolated block persistence. Private keys are never transmitted over plain text channels."</p>
                   </div>
                </div>
+            </div>
+
+            <div className="bg-emerald-950 rounded-[2.5rem] p-10 text-white relative overflow-hidden shadow-2xl border-l-8 border-emerald-500">
+               <div className="relative z-10">
+                  <div className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center text-xl mb-6 border border-white/10 shadow-inner">🛡️</div>
+                  <h4 className="text-lg font-black uppercase italic tracking-tighter mb-4">DR Strategy Active</h4>
+                  <p className="text-xs leading-relaxed font-medium text-emerald-100/60">Your Disaster Recovery protocol is currently set to <span className="text-white font-bold underline decoration-emerald-500 underline-offset-4">ZERO DATA LOSS</span>. Automatic mirrors are active across availability zones.</p>
+               </div>
+               <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500 rounded-full blur-[80px] opacity-10"></div>
             </div>
           </div>
         </div>

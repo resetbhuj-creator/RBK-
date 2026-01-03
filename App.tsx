@@ -65,6 +65,20 @@ const INITIAL_ITEMS: Item[] = [
 ];
 
 const INITIAL_VOUCHERS: Voucher[] = [
+  { 
+    id: 'PO/23-24/0001', 
+    type: 'Purchase Order', 
+    date: '2023-12-05', 
+    party: 'Global Suppliers', 
+    amount: 28320, 
+    status: 'Posted', 
+    narration: 'Procurement of 10 units for development team expansion.', 
+    subTotal: 24000, 
+    taxTotal: 4320, 
+    items: [
+      { id: 'vi-po1', itemId: 'i1', name: 'MacBook Pro M3', hsn: '8471', qty: 10, unit: 'Nos', rate: 2400, amount: 24000, igstRate: 18, taxAmount: 4320 }
+    ] 
+  },
   { id: 'SL/23-24/0001', type: 'Sales', date: '2023-11-20', party: 'Acme Retailers', amount: 12500, status: 'Posted', narration: 'Bulk sale of laptops', subTotal: 10593.22, taxTotal: 1906.78, items: [{ id: 'vi1', itemId: 'i1', name: 'MacBook Pro M3', hsn: '8471', qty: 5, unit: 'Nos', rate: 2118.64, amount: 10593.22 }] },
   { id: 'PY/23-24/0001', type: 'Payment', date: '2023-12-01', party: 'Real Estate Holdings', amount: 2500, status: 'Posted', narration: 'Monthly office rent' }
 ];
@@ -112,12 +126,14 @@ const App: React.FC = () => {
     localStorage.setItem('nexus_erp_ledgers', JSON.stringify(ledgers));
     localStorage.setItem('nexus_erp_items', JSON.stringify(items));
     localStorage.setItem('nexus_erp_vouchers', JSON.stringify(vouchers));
+    localStorage.setItem('nexus_erp_taxes', JSON.stringify(taxes));
+    localStorage.setItem('nexus_erp_tax_groups', JSON.stringify(taxGroups));
     localStorage.setItem('nexus_erp_tasks', JSON.stringify(tasks));
     localStorage.setItem('nexus_erp_unit_measures', JSON.stringify(unitMeasures));
     localStorage.setItem('nexus_erp_current_company_id', currentCompanyId);
     localStorage.setItem('nexus_erp_current_fy', currentFY);
     localStorage.setItem('nexus_erp_fy_locked', isFYLocked.toString());
-  }, [companies, users, roles, auditLogs, ledgers, items, vouchers, tasks, unitMeasures, currentCompanyId, currentFY, isFYLocked]);
+  }, [companies, users, roles, auditLogs, ledgers, items, vouchers, taxes, taxGroups, tasks, unitMeasures, currentCompanyId, currentFY, isFYLocked]);
 
   const activeCompany = companies.find((c: any) => c.id === currentCompanyId) || { name: 'None Selected' };
   const voucherToView = viewingVoucherId ? vouchers.find(v => v.id === viewingVoucherId) : null;

@@ -140,7 +140,7 @@ const CreateCompanyForm: React.FC<CreateCompanyFormProps> = ({ onCancel, onSubmi
     return Object.keys(newErrors).length === 0;
   };
 
-  const formatCurrency = (val: string): string => {
+  const formatCurrencyValue = (val: string): string => {
     const clean = val.trim().toUpperCase();
     
     // Check if it's a known ISO code
@@ -164,13 +164,23 @@ const CreateCompanyForm: React.FC<CreateCompanyFormProps> = ({ onCancel, onSubmi
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
+    
+    if (name === 'currency') {
+      const clean = value.trim().toUpperCase();
+      // Auto-append if exactly matches a known ISO key as user types
+      if (clean.length === 3 && ISO_CURRENCIES[clean]) {
+        setFormData(prev => ({ ...prev, currency: `${clean} (${ISO_CURRENCIES[clean].symbol})` }));
+        return;
+      }
+    }
+
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleCurrencyBlur = () => {
     setFormData(prev => ({
       ...prev,
-      currency: formatCurrency(prev.currency)
+      currency: formatCurrencyValue(prev.currency)
     }));
     handleBlur('currency');
   };
@@ -304,17 +314,23 @@ const CreateCompanyForm: React.FC<CreateCompanyFormProps> = ({ onCancel, onSubmi
                     <div className="relative group/currency">
                       <input 
                         name="currency" 
+                        list="currency-suggestions"
                         value={formData.currency} 
                         onChange={handleChange} 
                         onBlur={handleCurrencyBlur}
                         placeholder="USD, INR, £, etc."
                         className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-sm font-black text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-inner placeholder-slate-600" 
                       />
+                      <datalist id="currency-suggestions">
+                        {Object.entries(ISO_CURRENCIES).map(([code, data]) => (
+                          <option key={code} value={`${code} (${data.symbol})`}>{data.name}</option>
+                        ))}
+                      </datalist>
                       <div className="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 group-focus-within/currency:opacity-100 transition-opacity">
                          <span className="text-[8px] font-black uppercase text-slate-500">ISO Matcher Active</span>
                       </div>
                     </div>
-                    <p className="text-[8px] font-bold text-slate-500 uppercase tracking-tighter ml-1">Detected: <span className="text-indigo-400 italic">{formatCurrency(formData.currency)}</span></p>
+                    <p className="text-[8px] font-bold text-slate-500 uppercase tracking-tighter ml-1">Detected: <span className="text-indigo-400 italic">{formatCurrencyValue(formData.currency)}</span></p>
                  </div>
                  <div className="space-y-2">
                     <label className="text-[9px] font-black uppercase text-indigo-400 tracking-widest ml-1">Statutory Tax Regime</label>

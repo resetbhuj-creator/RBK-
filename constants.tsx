@@ -232,7 +232,7 @@ export const TRANSACTION_SUB_MENUS: SubMenuItem[] = [
   {
     id: TransactionSubMenu.INVENTORY_VOUCHERS,
     label: 'Inventory Vouchers',
-    description: 'Manage Stock Movements, Deliveries, and Receipts.',
+    description: 'Execute Purchase Orders, Stock Movements, Deliveries, and Receipts.',
     color: 'bg-emerald-600',
     icon: (
       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -329,7 +329,6 @@ export const COMMUNICATION_SUB_MENUS: SubMenuItem[] = [
   }
 ];
 
-// Added missing HOUSE_KEEPING_SUB_MENUS export
 export const HOUSE_KEEPING_SUB_MENUS: SubMenuItem[] = [
   {
     id: HouseKeepingSubMenu.DATABASE_UTILITY,
@@ -394,7 +393,5 @@ export const UNIT_MEASURES = [
   'Mtrs', 
   'Set', 
   'SqFt', 
-  'Roll',
-  'Unit',
-  'Months'
+  'Roll'
 ];
