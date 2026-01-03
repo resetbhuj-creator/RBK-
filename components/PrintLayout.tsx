@@ -99,7 +99,7 @@ const PrintLayout: React.FC<PrintLayoutProps> = ({
            </div>
            <div className="text-right flex flex-col items-end">
               <div className={`${isCompact ? 'text-2xl' : 'text-4xl'} font-black italic uppercase tracking-tighter text-indigo-600 mb-6 underline decoration-indigo-200 underline-offset-8`}>
-                {isGst ? 'TAX INVOICE' : voucher.type === 'Sales' ? 'SALES INVOICE' : 'FINANCIAL VOUCHER'}
+                {voucher.type === 'Purchase Order' ? 'PURCHASE ORDER' : (isGst ? 'TAX INVOICE' : voucher.type === 'Sales' ? 'SALES INVOICE' : 'FINANCIAL VOUCHER')}
               </div>
               <div className={`space-y-2 bg-slate-50 ${isCompact ? 'p-2' : 'p-4'} rounded-2xl border border-slate-100`}>
                 <div className={`flex justify-between ${isCompact ? 'w-40 text-[10px]' : 'w-56 text-xs'} font-black border-b border-slate-200 pb-1`}>
@@ -118,7 +118,7 @@ const PrintLayout: React.FC<PrintLayoutProps> = ({
         <div className={`grid grid-cols-2 gap-12 ${sectionSpacing} relative z-10`}>
            <div className={`${isCompact ? 'p-4' : 'p-6'} bg-slate-50 rounded-[2rem] border border-slate-200`}>
               <div className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.3em] mb-2 border-b border-indigo-100 pb-2">
-                {voucher.type === 'Sales' ? 'Billed To' : 'From (Supplier)'}
+                {(voucher.type === 'Sales' || voucher.type === 'Delivery Note') ? 'Billed To' : 'Supplier Details'}
               </div>
               <div className={`${isCompact ? 'text-lg' : 'text-xl'} font-black text-slate-900 uppercase italic mb-1`}>
                 {voucher.party}

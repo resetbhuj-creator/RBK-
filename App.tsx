@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MainMenuType, Role, User, AuditLog, AdminSubMenu, TransactionSubMenu, DisplaySubMenu, CommunicationSubMenu, HouseKeepingSubMenu, Ledger, Item, Voucher, Tax, TaxGroup, Company } from './types';
+import { MainMenuType, Role, User, AuditLog, AdminSubMenu, TransactionSubMenu, DisplaySubMenu, CommunicationSubMenu, HouseKeepingSubMenu, Ledger, Item, Voucher, Tax, TaxGroup, Company, Task } from './types';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import Dashboard from './components/Dashboard';
@@ -69,6 +69,11 @@ const INITIAL_VOUCHERS: Voucher[] = [
   { id: 'PY/23-24/0001', type: 'Payment', date: '2023-12-01', party: 'Real Estate Holdings', amount: 2500, status: 'Posted', narration: 'Monthly office rent' }
 ];
 
+const INITIAL_TASKS: Task[] = [
+  { id: 'tsk-1', title: 'GST Filing GSTR-3B', description: 'Monthly statutory filing for Maharashtra node.', dueDate: new Date(Date.now() + 86400000 * 3).toISOString().split('T')[0], priority: 'High', status: 'Pending', createdAt: new Date().toISOString() },
+  { id: 'tsk-2', title: 'Reconcile HDFC Bank A/c', description: 'Review terminal 0012 statements for Q3.', dueDate: new Date(Date.now() + 86400000).toISOString().split('T')[0], priority: 'Medium', status: 'Pending', createdAt: new Date().toISOString() }
+];
+
 const App: React.FC = () => {
   const [activeMenu, setActiveMenu] = useState<MainMenuType>(MainMenuType.DASHBOARD);
   const [activeAdminSubMenu, setActiveAdminSubMenu] = useState<AdminSubMenu | null>(null);
@@ -91,6 +96,7 @@ const App: React.FC = () => {
   const [vouchers, setVouchers] = useState<Voucher[]>(() => JSON.parse(localStorage.getItem('nexus_erp_vouchers') || JSON.stringify(INITIAL_VOUCHERS)));
   const [taxes, setTaxes] = useState<Tax[]>(() => JSON.parse(localStorage.getItem('nexus_erp_taxes') || '[]'));
   const [taxGroups, setTaxGroups] = useState<TaxGroup[]>(() => JSON.parse(localStorage.getItem('nexus_erp_tax_groups') || '[]'));
+  const [tasks, setTasks] = useState<Task[]>(() => JSON.parse(localStorage.getItem('nexus_erp_tasks') || JSON.stringify(INITIAL_TASKS)));
   
   const [unitMeasures, setUnitMeasures] = useState<string[]>(() => JSON.parse(localStorage.getItem('nexus_erp_unit_measures') || JSON.stringify(DEFAULT_UNITS)));
 
@@ -106,11 +112,12 @@ const App: React.FC = () => {
     localStorage.setItem('nexus_erp_ledgers', JSON.stringify(ledgers));
     localStorage.setItem('nexus_erp_items', JSON.stringify(items));
     localStorage.setItem('nexus_erp_vouchers', JSON.stringify(vouchers));
+    localStorage.setItem('nexus_erp_tasks', JSON.stringify(tasks));
     localStorage.setItem('nexus_erp_unit_measures', JSON.stringify(unitMeasures));
     localStorage.setItem('nexus_erp_current_company_id', currentCompanyId);
     localStorage.setItem('nexus_erp_current_fy', currentFY);
     localStorage.setItem('nexus_erp_fy_locked', isFYLocked.toString());
-  }, [companies, users, roles, auditLogs, ledgers, items, vouchers, unitMeasures, currentCompanyId, currentFY, isFYLocked]);
+  }, [companies, users, roles, auditLogs, ledgers, items, vouchers, tasks, unitMeasures, currentCompanyId, currentFY, isFYLocked]);
 
   const activeCompany = companies.find((c: any) => c.id === currentCompanyId) || { name: 'None Selected' };
   const voucherToView = viewingVoucherId ? vouchers.find(v => v.id === viewingVoucherId) : null;
@@ -118,9 +125,9 @@ const App: React.FC = () => {
   const addAuditLog = (log: Omit<AuditLog, 'id' | 'timestamp' | 'actor'> & { actor?: string }) => {
     const newLog: AuditLog = { 
       ...log, 
-      id: `TXN-${Math.random().toString(36).substr(2, 9).toUpperCase()}`, 
+      id: `IAM-${Math.random().toString(36).substr(2, 6).toUpperCase()}`, 
       timestamp: new Date().toISOString(), 
-      actor: log.actor || 'Vance Alexander' // Super Admin from sidebar
+      actor: log.actor || 'Vance Alexander' // Defaulting to the Session Admin
     };
     setAuditLogs(prev => [newLog, ...prev]);
   };
@@ -128,7 +135,7 @@ const App: React.FC = () => {
   const renderContent = () => {
     switch (activeMenu) {
       case MainMenuType.DASHBOARD:
-        return <Dashboard activeCompany={activeCompany} vouchers={vouchers} onViewVoucher={setViewingVoucherId} />;
+        return <Dashboard activeCompany={activeCompany} vouchers={vouchers} onViewVoucher={setViewingVoucherId} tasks={tasks} setTasks={setTasks} />;
       case MainMenuType.COMPANY:
         return <CompanyModule companies={companies} setCompanies={setCompanies} currentCompanyId={currentCompanyId} setCurrentCompanyId={setCurrentCompanyId} currentFY={currentFY} setCurrentFY={setCurrentFY} addAuditLog={addAuditLog} />;
       case MainMenuType.ADMINISTRATION:
@@ -158,10 +165,11 @@ const App: React.FC = () => {
           <DisplayModule 
             activeCompany={activeCompany} activeSubAction={activeDisplaySubMenu} setActiveSubAction={setActiveDisplaySubMenu}
             ledgers={ledgers} vouchers={vouchers} items={items} taxes={taxes} taxGroups={taxGroups}
+            onViewVoucher={setViewingVoucherId}
           />
         );
       case MainMenuType.COMMUNICATION:
-        return <CommunicationModule activeCompany={activeCompany} activeSubAction={activeCommSubMenu} setActiveSubAction={setActiveCommSubMenu} vouchers={vouchers} ledgers={ledgers} />;
+        return <CommunicationModule activeCompany={activeCompany} activeSubAction={activeCommSubMenu} setActiveSubAction={setActiveCommSubMenu} vouchers={vouchers} ledgers={ledgers} onViewVoucher={setViewingVoucherId} />;
       case MainMenuType.HOUSE_KEEPING:
         return <HouseKeepingModule activeCompany={activeCompany} activeSubAction={activeHouseKeepingSubMenu} setActiveSubAction={setActiveHouseKeepingSubMenu} auditLogs={auditLogs} ledgers={ledgers} vouchers={vouchers} />;
       default:

@@ -17,10 +17,11 @@ interface DisplayModuleProps {
   items: Item[];
   taxes: Tax[];
   taxGroups: TaxGroup[];
+  onViewVoucher: (id: string) => void;
 }
 
 const DisplayModule: React.FC<DisplayModuleProps> = ({ 
-  activeCompany, activeSubAction, setActiveSubAction, ledgers, vouchers, items, taxes, taxGroups 
+  activeCompany, activeSubAction, setActiveSubAction, ledgers, vouchers, items, taxes, taxGroups, onViewVoucher 
 }) => {
 
   const renderContent = () => {
@@ -36,7 +37,7 @@ const DisplayModule: React.FC<DisplayModuleProps> = ({
       case DisplaySubMenu.INVENTORY_SUMMARY:
         return <InventorySummary items={items} vouchers={vouchers} />;
       case DisplaySubMenu.GST_REPORTS:
-        return <GstReportSystem vouchers={vouchers} activeCompany={activeCompany} taxes={taxes} taxGroups={taxGroups} />;
+        return <GstReportSystem vouchers={vouchers} activeCompany={activeCompany} taxes={taxes} taxGroups={taxGroups} onViewVoucher={onViewVoucher} />;
       default:
         return <DisplayDashboard />;
     }

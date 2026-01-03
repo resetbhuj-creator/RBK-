@@ -10,7 +10,7 @@ interface UserFormProps {
 
 const PERM_LEVELS = ['none', 'read', 'write', 'all'] as const;
 
-// Enhanced capability mapping for precise administrative context
+// Global definition of what each level represents across the platform
 const PERM_LEVEL_INFO = {
   none: { 
     label: 'RESTRICTED', 
@@ -20,80 +20,85 @@ const PERM_LEVEL_INFO = {
     border: 'border-slate-200',
     icon: '🔒',
     meterWidth: 'w-0',
+    risk: 'Low',
     longDesc: 'Complete isolation. The module is hidden from the interface and all API interactions are strictly blocked.',
-    globalCapabilities: ['No View', 'No Edit', 'No API Access']
+    capabilities: ['No View', 'No Edit', 'No API Access']
   },
   read: { 
     label: 'ANALYST', 
-    desc: 'View & Audit', 
+    desc: 'Audit & Review', 
     color: 'text-sky-600', 
     bg: 'bg-sky-50',
     border: 'border-sky-200',
     icon: '👁️',
     meterWidth: 'w-1/4',
-    longDesc: 'Passive access. Allows browsing records, generating reports, and viewing analytics.',
-    globalCapabilities: ['View Records', 'Run Reports', 'Audit Logs']
+    risk: 'Low',
+    longDesc: 'Passive access. Allows browsing records, generating reports, and viewing analytics without modification rights.',
+    capabilities: ['View Records', 'Run Reports', 'Audit Logs']
   },
   write: { 
     label: 'OPERATOR', 
-    desc: 'Create & Edit', 
+    desc: 'Create & Update', 
     color: 'text-indigo-600', 
     bg: 'bg-indigo-50',
     border: 'border-indigo-200',
     icon: '✏️',
     meterWidth: 'w-2/3',
-    longDesc: 'Standard transactional capability. Can create new records and update existing masters.',
-    globalCapabilities: ['Create Data', 'Edit Records', 'Sync Masters']
+    risk: 'Medium',
+    longDesc: 'Standard transactional capability. Can create new records and update existing master data.',
+    capabilities: ['Create Data', 'Edit Records', 'Sync Masters']
   },
   all: { 
-    label: 'ADMINISTRATOR', 
-    desc: 'Total Control', 
+    label: 'SOVEREIGN', 
+    desc: 'Full Authority', 
     color: 'text-emerald-600', 
     bg: 'bg-emerald-50',
     border: 'border-emerald-200',
     icon: '⭐',
     meterWidth: 'w-full',
-    longDesc: 'Sovereign authority. Full CRUD privileges including record purging and system shifts.',
-    globalCapabilities: ['Full CRUD', 'Purge Records', 'Config Access']
+    risk: 'High',
+    longDesc: 'Total control. Full CRUD privileges including record purging, system shifts, and sensitive configurations.',
+    capabilities: ['Full CRUD', 'Purge Records', 'Config Access']
   }
 };
 
+// Module-specific descriptions for what each level means in that context
 const MODULE_CONTEXTS = {
   company: {
-    label: "Company Domain",
+    label: "Corporate Domain",
     icon: <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>,
     coverage: "Governs corporate identity, financial years, localization, and branding.",
-    none: "Cannot see company settings.",
-    read: "Can view profile and FYs.",
-    write: "Can update address and details.",
-    all: "Can delete/split financial years."
+    none: "Cannot access company profile or period settings.",
+    read: "Can view company profile and financial year history.",
+    write: "Can update corporate address, logo, and contact data.",
+    all: "Can delete entities and split financial year cycles."
   },
   administration: {
-    label: "Infrastructure",
+    label: "Institutional Infrastructure",
     icon: <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>,
     coverage: "Controls ledgers, product catalogues, tax structures, and user registry.",
-    none: "No access to masters/users.",
-    read: "Can audit ledgers and taxes.",
-    write: "Can create items and accounts.",
-    all: "Full management and user IAM."
+    none: "No access to masters, users, or system backups.",
+    read: "Can audit existing account ledgers and tax slabs.",
+    write: "Can create new items, ledgers, and tax groups.",
+    all: "Full authority over IAM policies and system vaults."
   },
   transaction: {
-    label: "Transaction Core",
+    label: "Transactional Core",
     icon: <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>,
     coverage: "Manages daily financial vouchers, inventory movements, and postings.",
-    none: "Cannot enter or see vouchers.",
-    read: "Can view Day Book only.",
-    write: "Can enter and edit vouchers.",
-    all: "Can delete and void transactions."
+    none: "Transactional dashboard and voucher entry are hidden.",
+    read: "Can view the Day Book and transaction history only.",
+    write: "Can enter and post all voucher types in open periods.",
+    all: "Can void postings and modify historical vouchers."
   },
   display: {
-    label: "Display & Analytics",
+    label: "Intelligence & Display",
     icon: <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>,
-    coverage: "Provides authority over balance sheets, P&L, and audit reports.",
-    none: "No access to reports.",
-    read: "Can view standard reports.",
-    write: "Can export reports to CSV/PDF.",
-    all: "Can access sensitive audit trails."
+    coverage: "Provides authority over balance sheets, P&L, and statutory audit reports.",
+    none: "The reporting and analytics module is inaccessible.",
+    read: "Can generate and view standard financial statements.",
+    write: "Can export sensitive audit data to external formats.",
+    all: "Can access unmasked audit trails and raw logs."
   }
 };
 
@@ -163,6 +168,18 @@ const UserForm: React.FC<UserFormProps> = ({ initialData, availableRoles, onCanc
     }));
   };
 
+  const handleGlobalApply = (level: UserPermissions[keyof UserPermissions]) => {
+    setFormData(prev => ({
+      ...prev,
+      permissions: {
+        company: level,
+        administration: level,
+        transaction: level,
+        display: level
+      }
+    }));
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setTouched({ name: true, email: true });
@@ -175,44 +192,31 @@ const UserForm: React.FC<UserFormProps> = ({ initialData, availableRoles, onCanc
     const moduleCtx = MODULE_CONTEXTS[module];
 
     return (
-      <div className={`p-8 rounded-[3rem] border-2 transition-all group/row relative bg-white ${activeInfo.border} shadow-sm hover:shadow-md`}>
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-6">
+      <div className={`p-8 rounded-[3.5rem] border-2 transition-all group/row relative bg-white ${activeInfo.border} shadow-sm hover:shadow-xl`}>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
           <div className="flex items-center space-x-5">
-            <div className="w-14 h-14 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover/row:bg-slate-900 group-hover/row:text-white transition-all relative group/module-info border border-slate-100 shadow-sm">
+            <div className="w-14 h-14 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover/row:bg-slate-900 group-hover/row:text-white transition-all shadow-sm">
               {icon}
-              {/* Module Scope Tooltip */}
-              <div className="absolute bottom-full left-0 mb-4 w-72 p-5 bg-slate-900 text-white rounded-2xl shadow-2xl opacity-0 invisible group-hover/module-info:opacity-100 group-hover/module-info:visible transition-all z-50 pointer-events-none text-[11px] font-medium leading-relaxed normal-case">
-                <div className="flex items-center space-x-2 mb-3">
-                   <div className="w-2 h-2 rounded-full bg-indigo-500"></div>
-                   <span className="font-black text-indigo-400 uppercase tracking-widest text-[9px]">Module Scope Index</span>
-                </div>
-                {moduleCtx.coverage}
-                <div className="mt-4 pt-4 border-t border-white/10 space-y-2">
-                   {PERM_LEVELS.map(lv => (
-                     <div key={lv} className="flex justify-between items-center opacity-70">
-                        <span className="text-[8px] font-black uppercase text-indigo-300">{lv}</span>
-                        <span className="text-[10px] text-slate-400">{(moduleCtx as any)[lv]}</span>
-                     </div>
-                   ))}
-                </div>
-                <div className="absolute top-full left-6 w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[8px] border-t-slate-900"></div>
-              </div>
             </div>
             <div>
-              <h4 className="text-[12px] font-black uppercase tracking-[0.2em] text-slate-800">{label}</h4>
-              <div className="flex items-center space-x-3 mt-1.5">
-                 <span className={`text-[8px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full border ${activeInfo.bg} ${activeInfo.color} ${activeInfo.border}`}>
-                   {activeInfo.label}
-                 </span>
-                 <div className="w-24 h-1 bg-slate-100 rounded-full overflow-hidden">
-                    <div className={`h-full ${activeInfo.bg.replace('bg-', 'bg-')} ${activeInfo.meterWidth} transition-all duration-500`}></div>
-                 </div>
-              </div>
+              <h4 className="text-[14px] font-black uppercase tracking-[0.1em] text-slate-800 italic">{label}</h4>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1 opacity-70">Modular Scope Node</p>
             </div>
+          </div>
+          <div className="flex items-center space-x-4">
+             <div className="flex flex-col items-end">
+                <span className={`text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg border shadow-sm ${activeInfo.bg} ${activeInfo.color} ${activeInfo.border}`}>
+                  Authority: {activeInfo.label}
+                </span>
+                <span className="text-[8px] font-black text-slate-300 uppercase mt-1 tracking-tighter italic">Risk Index: {activeInfo.risk}</span>
+             </div>
+             <div className="w-24 h-1.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
+                <div className={`h-full ${activeInfo.color.replace('text', 'bg')} ${activeInfo.meterWidth} transition-all duration-700 shadow-[0_0_8px_currentColor]`}></div>
+             </div>
           </div>
         </div>
         
-        <div className="flex bg-slate-100 p-1.5 rounded-[1.8rem] border border-slate-200 shadow-inner">
+        <div className="grid grid-cols-4 gap-1.5 bg-slate-100 p-1.5 rounded-[1.8rem] border border-slate-200 shadow-inner">
           {PERM_LEVELS.map(level => {
             const info = PERM_LEVEL_INFO[level];
             const isActive = currentVal === level;
@@ -223,7 +227,7 @@ const UserForm: React.FC<UserFormProps> = ({ initialData, availableRoles, onCanc
                 key={level}
                 type="button"
                 onClick={() => handlePermChange(module, level)}
-                className={`flex-1 py-3.5 text-[10px] font-black uppercase tracking-widest rounded-2xl transition-all relative group/btn ${
+                className={`flex-1 py-4 text-[10px] font-black uppercase tracking-widest rounded-2xl transition-all relative group/btn ${
                   isActive 
                     ? 'bg-white text-indigo-600 shadow-xl border border-slate-100 transform -translate-y-0.5' 
                     : 'text-slate-400 hover:text-slate-700'
@@ -231,43 +235,57 @@ const UserForm: React.FC<UserFormProps> = ({ initialData, availableRoles, onCanc
               >
                 {level}
                 
-                {/* Level Detail Tooltip */}
-                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-5 w-64 p-5 bg-slate-900 text-white rounded-[1.5rem] shadow-2xl opacity-0 invisible group-hover/btn:opacity-100 group-hover/btn:visible transition-all z-50 pointer-events-none">
-                  <div className="flex items-center justify-between mb-3">
-                     <div className="flex items-center space-x-2">
-                        <span className="text-sm">{info.icon}</span>
-                        <span className="text-[9px] font-black uppercase tracking-[0.2em] text-indigo-400">{info.label}</span>
+                {/* Visual Level Tooltip - Explain Level + Module Impact */}
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-5 w-72 p-6 bg-slate-900 text-white rounded-[2rem] shadow-[0_20px_50px_-10px_rgba(0,0,0,0.5)] opacity-0 invisible group-hover/btn:opacity-100 group-hover/btn:visible transition-all z-50 pointer-events-none border border-white/10">
+                  <div className="flex items-center justify-between mb-4 border-b border-white/10 pb-3">
+                     <div className="flex items-center space-x-3">
+                        <span className="text-xl">{info.icon}</span>
+                        <div>
+                          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-400 block leading-none">{info.label} TIER</span>
+                          <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest mt-1 block">Policy Definition</span>
+                        </div>
                      </div>
+                     <span className={`text-[8px] font-black px-2 py-0.5 rounded border ${info.risk === 'High' ? 'bg-rose-500/20 text-rose-400 border-rose-500/30' : 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30'}`}>RISK: {info.risk}</span>
                   </div>
-                  <div className="text-[11px] font-black text-white italic mb-3 leading-tight">
+                  
+                  <div className="text-[12px] font-black text-white italic mb-4 leading-relaxed">
                     " {contextText} "
                   </div>
-                  <p className="text-[10px] font-medium leading-relaxed normal-case text-slate-400 mb-4 border-b border-white/10 pb-4">
+                  
+                  <p className="text-[10px] font-medium leading-relaxed normal-case text-slate-400 mb-5">
                     {info.longDesc}
                   </p>
+                  
                   <div className="flex flex-wrap gap-2">
-                     {info.globalCapabilities.map(cap => (
+                     {info.capabilities.map(cap => (
                         <span key={cap} className="px-2 py-1 bg-white/5 rounded-lg text-[8px] font-black uppercase tracking-tighter text-indigo-200/80 border border-white/5">
                           {cap}
                         </span>
                      ))}
                   </div>
-                  <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[10px] border-l-transparent border-r-[10px] border-r-transparent border-t-[10px] border-t-slate-900"></div>
+                  <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[12px] border-l-transparent border-r-[12px] border-r-transparent border-t-[12px] border-t-slate-900"></div>
                 </div>
               </button>
             );
           })}
         </div>
 
-        {/* Live Functional definition block */}
-        <div className={`mt-5 px-6 py-5 rounded-[1.5rem] border flex items-start space-x-5 transition-all duration-500 ${activeInfo.bg} ${activeInfo.border}`}>
-           <div className="text-2xl shrink-0 mt-1 drop-shadow-sm">{activeInfo.icon}</div>
+        {/* Static Capability Indicator - Direct visibility of what the active level means for this module */}
+        <div className={`mt-5 px-6 py-5 rounded-[1.5rem] border-2 flex items-start space-x-5 transition-all duration-500 ${activeInfo.bg} ${activeInfo.border} shadow-sm`}>
+           <div className="text-3xl shrink-0 mt-0.5 drop-shadow-sm">{activeInfo.icon}</div>
            <div>
-              <div className={`text-[10px] font-black uppercase tracking-[0.2em] ${activeInfo.color}`}>Functional Authority</div>
-              <p className="text-[12px] font-black text-slate-800 italic mt-1 leading-snug">
-                This account <span className="underline decoration-indigo-200">{ (moduleCtx as any)[currentVal].toLowerCase() }</span>
+              <div className={`text-[10px] font-black uppercase tracking-[0.2em] ${activeInfo.color}`}>Functional Policy Mapping</div>
+              <p className="text-[13px] font-black text-slate-800 italic mt-1 leading-snug">
+                This account <span className="underline decoration-indigo-200 underline-offset-4">{ (moduleCtx as any)[currentVal].toLowerCase() }</span>
               </p>
-              <p className="text-[10px] font-medium text-slate-500 normal-case mt-1.5 opacity-80">{activeInfo.longDesc}</p>
+              <div className="flex items-center space-x-3 mt-2">
+                 <div className="flex space-x-1">
+                    {[1,2,3,4].map(b => (
+                      <div key={b} className={`w-3 h-1 rounded-full ${b <= PERM_LEVELS.indexOf(currentVal) + 1 ? activeInfo.color.replace('text', 'bg') : 'bg-slate-200'}`}></div>
+                    ))}
+                 </div>
+                 <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Sovereignty Score: {PERM_LEVELS.indexOf(currentVal) + 1}/4</p>
+              </div>
            </div>
         </div>
       </div>
@@ -360,14 +378,15 @@ const UserForm: React.FC<UserFormProps> = ({ initialData, availableRoles, onCanc
                   
                   {/* Inline Legend Helper */}
                   <div className="flex items-center space-x-8 bg-white p-3 rounded-[2rem] border border-slate-200 shadow-sm px-8">
-                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Key:</span>
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Global Tiers:</span>
                     {PERM_LEVELS.map(level => {
                        const info = PERM_LEVEL_INFO[level];
                        return (
                          <div key={level} className="flex items-center space-x-2 group/key cursor-help relative">
                             <div className={`w-3 h-3 rounded-full border shadow-sm transition-transform group-hover/key:scale-150 ${info.bg} ${info.border}`}></div>
                             <span className={`text-[10px] font-black uppercase tracking-tighter ${info.color}`}>{level}</span>
-                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-40 p-4 bg-slate-900 text-white rounded-2xl shadow-2xl opacity-0 invisible group-hover/key:opacity-100 group-hover/key:visible transition-all z-50 text-[10px] normal-case font-medium">
+                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-48 p-4 bg-slate-900 text-white rounded-2xl shadow-2xl opacity-0 invisible group-hover/key:opacity-100 group-hover/key:visible transition-all z-50 text-[10px] normal-case font-medium">
+                               <div className="font-black uppercase tracking-widest text-indigo-400 text-[8px] mb-1">{info.label}</div>
                                {info.desc}
                                <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-slate-900"></div>
                             </div>
@@ -375,6 +394,36 @@ const UserForm: React.FC<UserFormProps> = ({ initialData, availableRoles, onCanc
                        );
                     })}
                   </div>
+               </div>
+
+               {/* Global Permission Preset Bar */}
+               <div className="bg-slate-900 rounded-[2.5rem] p-10 text-white relative overflow-hidden shadow-2xl border-4 border-slate-800 mb-10">
+                  <div className="relative z-10">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-10">
+                      <div className="flex items-center space-x-6">
+                        <div className="w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center text-3xl shadow-xl shadow-indigo-900/40 transform -rotate-3 transition-transform hover:rotate-0">
+                           🎯
+                        </div>
+                        <div>
+                          <h4 className="text-[12px] font-black uppercase tracking-widest text-indigo-400 mb-2">Sovereign Override (Batch Preset)</h4>
+                          <p className="text-[11px] text-slate-400 font-medium max-w-sm leading-relaxed italic">Instantly synchronize all modules to a standardized access tier. This overrides manual individual settings.</p>
+                        </div>
+                      </div>
+                      <div className="flex bg-white/5 p-1.5 rounded-2xl border border-white/10 backdrop-blur-md">
+                        {PERM_LEVELS.map((level) => (
+                          <button
+                            key={level}
+                            type="button"
+                            onClick={() => handleGlobalApply(level)}
+                            className="px-6 py-3 text-[10px] font-black uppercase tracking-tighter rounded-xl transition-all text-indigo-200 hover:bg-white/5 hover:text-white"
+                          >
+                            {level}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-600 rounded-full blur-[120px] opacity-20 -mr-40 -mt-40 pointer-events-none"></div>
                </div>
 
                <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
@@ -411,7 +460,7 @@ const UserForm: React.FC<UserFormProps> = ({ initialData, availableRoles, onCanc
                             <div className={`text-[12px] font-black uppercase tracking-widest ${info.color}`}>{info.label}</div>
                             <p className="text-[11px] text-slate-500 font-medium leading-relaxed mt-1.5">{info.desc}</p>
                             <div className="flex flex-wrap gap-1.5 mt-4">
-                               {info.globalCapabilities.map(c => <span key={c} className="text-[8px] font-bold bg-slate-100 px-2 py-1 rounded-lg uppercase tracking-tighter text-slate-400 border border-slate-200/50">{c}</span>)}
+                               {info.capabilities.map(c => <span key={c} className="text-[8px] font-bold bg-slate-100 px-2 py-1 rounded-lg uppercase tracking-tighter text-slate-400 border border-slate-200/50">{c}</span>)}
                             </div>
                          </div>
                       </div>

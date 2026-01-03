@@ -147,7 +147,7 @@ export interface LedgerEntry {
 
 export interface Voucher {
   id: string;
-  type: 'Sales' | 'Purchase' | 'Payment' | 'Receipt' | 'Journal' | 'Contra';
+  type: 'Sales' | 'Purchase' | 'Payment' | 'Receipt' | 'Journal' | 'Contra' | 'Delivery Note' | 'Receipt Note' | 'Stock Journal' | 'Purchase Order';
   date: string;
   party: string;
   amount: number;
@@ -227,4 +227,16 @@ export interface Tax {
   classification: 'Input' | 'Output';
   supplyType: 'Local' | 'Central';
   groupId?: string;
+}
+
+export type TaskPriority = 'Low' | 'Medium' | 'High';
+
+export interface Task {
+  id: string;
+  title: string;
+  description?: string;
+  dueDate: string; // Statutory or operational deadline
+  priority: TaskPriority;
+  status: 'Pending' | 'Completed';
+  createdAt: string;
 }

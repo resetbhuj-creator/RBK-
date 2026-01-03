@@ -1,11 +1,10 @@
-
 import React, { useState, useMemo } from 'react';
 import { TransactionSubMenu, Voucher, Ledger, Item } from '../types';
 import { TRANSACTION_SUB_MENUS } from '../constants';
 import VoucherEntryForm from './VoucherEntryForm';
 import InventoryVoucherForm from './InventoryVoucherForm';
 import DayBook from './DayBook';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
 interface TransactionModuleProps {
   activeCompany: any;
@@ -24,6 +23,11 @@ const TransactionModule: React.FC<TransactionModuleProps> = ({
   activeCompany, currentFY, isReadOnly, activeSubAction, setActiveSubAction, ledgers, items, vouchers, setVouchers, onViewVoucher 
 }) => {
 
+  /**
+   * Sequential Voucher ID Engine
+   * Generates a unique, sequential ID based on voucher type and financial year.
+   * Pattern: [PREFIX]/[YY-YY]/[SERIAL]
+   */
   const generateVoucherId = (type: string) => {
     const prefixMap: Record<string, string> = {
       'Sales': 'SL',
@@ -31,36 +35,56 @@ const TransactionModule: React.FC<TransactionModuleProps> = ({
       'Payment': 'PY',
       'Receipt': 'RC',
       'Contra': 'CN',
-      'Journal': 'JR'
+      'Journal': 'JR',
+      'Delivery Note': 'DN',
+      'Receipt Note': 'RN',
+      'Stock Journal': 'SJ',
+      'Purchase Order': 'PO'
     };
     const prefix = prefixMap[type] || 'VCH';
-    // Format year part to 23-24 from 2023 - 2024
-    const yearPart = currentFY.split(' - ').map(y => y.trim().slice(-2)).join('-');
     
-    // FORENSIC FILTER: Isolate only vouchers of this type within the CURRENT financial year
-    const yearPattern = `/${yearPart}/`;
-    const relevantVouchers = vouchers.filter(v => v.type === type && v.id.includes(yearPattern));
+    // Normalize financial year string (e.g., "2023 - 2024" -> "23-24")
+    const yearParts = currentFY.split(' - ').map(y => y.trim().slice(-2));
+    const yearPart = yearParts.join('-');
+    const yearIdentifier = `/${yearPart}/`;
+    
+    // Filter current registry for conflicts and find current peak
+    const relevantVouchers = vouchers.filter(v => 
+      v.type === type && 
+      v.id.includes(yearIdentifier)
+    );
     
     let maxNum = 0;
     relevantVouchers.forEach(v => {
-      // Extract the terminal digits from the ID (e.g., 0042 from PY/23-24/0042)
-      const match = v.id.match(/\d+$/);
-      if (match) {
-        const num = parseInt(match[0]);
-        if (num > maxNum) maxNum = num;
+      const parts = v.id.split('/');
+      const serialPart = parts[parts.length - 1];
+      const num = parseInt(serialPart);
+      if (!isNaN(num) && num > maxNum) {
+        maxNum = num;
       }
     });
 
-    const nextNum = (maxNum + 1).toString().padStart(4, '0');
+    const nextNum = (maxNum + 1).toString().padStart(5, '0');
     return `${prefix}/${yearPart}/${nextNum}`;
   };
 
   const handlePostVoucher = (data: Omit<Voucher, 'id' | 'status'>) => {
+    // FINAL SEQUENTIAL ASSIGNMENT
+    const assignedId = generateVoucherId(data.type);
+    
+    // Uniqueness Safety Check
+    const isDuplicate = vouchers.some(v => v.id === assignedId);
+    if (isDuplicate) {
+      alert("Serial Collision Detected: System is re-calculating integrity sequence. Please try again.");
+      return;
+    }
+
     const newVch: Voucher = {
       ...data,
-      id: generateVoucherId(data.type),
+      id: assignedId,
       status: 'Posted'
     };
+    
     setVouchers(prev => [newVch, ...prev]);
     setActiveSubAction(TransactionSubMenu.DAY_BOOK);
   };
@@ -69,24 +93,21 @@ const TransactionModule: React.FC<TransactionModuleProps> = ({
     setActiveSubAction(v.items ? TransactionSubMenu.INVENTORY_VOUCHERS : TransactionSubMenu.ACCOUNTING_VOUCHERS);
   };
 
-  const flowData = useMemo(() => {
-    return [
-      { day: 'Mon', sales: 4000, purchase: 2400 },
-      { day: 'Tue', sales: 3000, purchase: 1398 },
-      { day: 'Wed', sales: 2000, purchase: 9800 },
-      { day: 'Thu', sales: 2780, purchase: 3908 },
-      { day: 'Fri', sales: 1890, expenses: 4800 },
-      { day: 'Sat', sales: 2390, purchase: 3800 },
-      { day: 'Sun', sales: 3490, purchase: 4300 },
-    ];
-  }, []);
-
   const stats = useMemo(() => {
     const posted = vouchers.filter(v => v.status === 'Posted').length;
     const totalVal = vouchers.reduce((acc, v) => acc + v.amount, 0);
     const dayTurnover = vouchers.filter(v => v.date === new Date().toISOString().split('T')[0]).reduce((acc, v) => acc + v.amount, 0);
-    return { posted, totalVal, dayTurnover };
+    
+    const typeGroups: Record<string, number> = {};
+    vouchers.forEach(v => {
+      typeGroups[v.type] = (typeGroups[v.type] || 0) + v.amount;
+    });
+    const pieData = Object.entries(typeGroups).map(([name, value]) => ({ name, value }));
+
+    return { posted, totalVal, dayTurnover, pieData };
   }, [vouchers]);
+
+  const COLORS = ['#6366f1', '#ec4899', '#10b981', '#f59e0b', '#3b82f6'];
 
   const renderContent = () => {
     switch (activeSubAction) {
@@ -95,9 +116,9 @@ const TransactionModule: React.FC<TransactionModuleProps> = ({
           <VoucherEntryForm 
             isReadOnly={isReadOnly} 
             ledgers={ledgers} 
+            vouchers={vouchers}
             onSubmit={handlePostVoucher} 
             onCancel={() => setActiveSubAction(null)}
-            // Provide preview mapping for various voucher classes
             getNextId={(type) => generateVoucherId(type)}
           />
         );
@@ -124,21 +145,21 @@ const TransactionModule: React.FC<TransactionModuleProps> = ({
       <div className="bg-slate-900 rounded-[3rem] p-10 text-white relative overflow-hidden shadow-2xl border-b-8 border-indigo-600">
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-10">
           <div className="flex items-center space-x-6">
-            <div className="w-16 h-16 bg-indigo-600 rounded-[1.5rem] flex items-center justify-center shadow-2xl border-4 border-indigo-400/20">
+            <div className="w-16 h-16 bg-indigo-600 rounded-[1.5rem] flex items-center justify-center shadow-2xl border-4 border-indigo-400/20 transform -rotate-3 transition-transform hover:rotate-0">
               <svg className="w-9 h-9" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
             </div>
             <div>
-              <h2 className="text-3xl font-black italic uppercase tracking-tighter">Operational Stream</h2>
-              <p className="text-[10px] font-black uppercase tracking-[0.4em] text-indigo-400 mt-2">Verified Ledger Throughput • {activeCompany.name}</p>
+              <h2 className="text-3xl font-black italic uppercase tracking-tighter">Operational Node</h2>
+              <p className="text-[10px] font-black uppercase tracking-[0.4em] text-indigo-400 mt-2">Verified Throughput • {activeCompany.name}</p>
             </div>
           </div>
-          <div className="flex gap-8 border-l border-white/10 pl-10">
+          <div className="flex gap-12 border-l border-white/10 pl-12">
              <div className="text-center">
-                <div className="text-[9px] font-black uppercase text-slate-500 tracking-widest mb-1">Today's Vol.</div>
+                <div className="text-[9px] font-black uppercase text-slate-500 tracking-widest mb-1">Today's Delta</div>
                 <div className="text-2xl font-black italic tabular-nums">${stats.dayTurnover.toLocaleString()}</div>
              </div>
              <div className="text-center">
-                <div className="text-[9px] font-black uppercase text-slate-500 tracking-widest mb-1">Queue Depth</div>
+                <div className="text-[9px] font-black uppercase text-slate-500 tracking-widest mb-1">Total Registry</div>
                 <div className="text-2xl font-black italic tabular-nums">{stats.posted}</div>
              </div>
           </div>
@@ -150,40 +171,66 @@ const TransactionModule: React.FC<TransactionModuleProps> = ({
         {TRANSACTION_SUB_MENUS.map((item) => (
           <button key={item.id} onClick={() => setActiveSubAction(item.id as TransactionSubMenu)} className="group relative bg-white p-10 rounded-[3rem] border border-slate-200 shadow-sm hover:shadow-2xl hover:border-indigo-200 transition-all duration-300 text-left overflow-hidden">
             <div className={`w-14 h-14 ${item.color} rounded-2xl flex items-center justify-center text-white mb-8 group-hover:scale-110 transition-transform shadow-xl`}>
-              {/* FIX: Use React.Element<any> to avoid className error during cloning */}
               {React.cloneElement(item.icon as React.ReactElement<any>, { className: 'w-7 h-7' })}
             </div>
             <h3 className="text-xl font-black text-slate-800 mb-2 group-hover:text-indigo-600 transition-colors uppercase italic">{item.label}</h3>
             <p className="text-sm text-slate-400 font-medium leading-relaxed">{item.description}</p>
             <div className="mt-8 flex items-center text-indigo-600 font-black text-[10px] uppercase tracking-[0.2em] opacity-0 group-hover:opacity-100 transition-all translate-y-2 group-hover:translate-y-0">
-               <span>Launch Engine</span>
+               <span>Open Workspace</span>
                <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" /></svg>
             </div>
           </button>
         ))}
       </div>
 
-      <div className="bg-white rounded-[3rem] p-12 border border-slate-200 shadow-sm relative overflow-hidden group">
-         <div className="flex items-center justify-between mb-12">
-            <h3 className="text-[11px] font-black uppercase text-slate-400 tracking-[0.4em]">Throughput Velocity (7D)</h3>
-            <div className="px-4 py-1.5 bg-emerald-50 text-emerald-600 rounded-xl text-[9px] font-black uppercase tracking-widest border border-emerald-100">Statutory Reconciliation Active</div>
-         </div>
-         <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={flowData}>
-                <defs>
-                  <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.1}/>
-                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 9, fontWeight: 900}} />
-                <Tooltip contentStyle={{ borderRadius: '24px', border: 'none', boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.15)' }} />
-                <Area type="monotone" dataKey="sales" stroke="#6366f1" strokeWidth={3} fillOpacity={1} fill="url(#colorSales)" />
-              </AreaChart>
-            </ResponsiveContainer>
-         </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 bg-white rounded-[3rem] p-12 border border-slate-200 shadow-sm relative overflow-hidden group">
+           <div className="flex items-center justify-between mb-12">
+              <h3 className="text-[11px] font-black uppercase text-slate-400 tracking-[0.4em]">Flow Dynamics (24h)</h3>
+              <div className="px-4 py-1.5 bg-emerald-50 text-emerald-600 rounded-xl text-[9px] font-black uppercase tracking-widest border border-emerald-100">Live Postings ✓</div>
+           </div>
+           <div className="h-64 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={[{day:'Mon', s:4000},{day:'Tue', s:3000},{day:'Wed', s:5000},{day:'Thu', s:2000},{day:'Fri', s:stats.dayTurnover}]}>
+                  <defs>
+                    <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#6366f1" stopOpacity={0.1}/>
+                      <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 9, fontWeight: 900}} />
+                  <Tooltip contentStyle={{ borderRadius: '24px', border: 'none', boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.15)' }} />
+                  <Area type="monotone" dataKey="s" stroke="#6366f1" strokeWidth={3} fillOpacity={1} fill="url(#colorSales)" />
+                </AreaChart>
+              </ResponsiveContainer>
+           </div>
+        </div>
+
+        <div className="bg-white rounded-[3rem] p-12 border border-slate-200 shadow-sm">
+           <h3 className="text-[11px] font-black uppercase text-slate-400 tracking-[0.4em] mb-10">Class Concentration</h3>
+           <div className="h-48 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                 <PieChart>
+                    <Pie data={stats.pieData} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                       {stats.pieData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                    </Pie>
+                    <Tooltip />
+                 </PieChart>
+              </ResponsiveContainer>
+           </div>
+           <div className="mt-8 space-y-3">
+              {stats.pieData.map((d, i) => (
+                <div key={i} className="flex justify-between items-center text-[10px] font-black uppercase">
+                   <div className="flex items-center space-x-2">
+                      <div className="w-2 h-2 rounded-full" style={{backgroundColor: COLORS[i % COLORS.length]}}></div>
+                      <span className="text-slate-500">{d.name}</span>
+                   </div>
+                   <span className="text-slate-800">${d.value.toLocaleString()}</span>
+                </div>
+              ))}
+           </div>
+        </div>
       </div>
     </div>
   );
@@ -196,7 +243,7 @@ const TransactionModule: React.FC<TransactionModuleProps> = ({
           className="flex items-center space-x-2 text-[10px] font-black uppercase text-slate-400 hover:text-indigo-600 transition-colors group mb-4"
         >
           <svg className="w-5 h-5 group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7" /></svg>
-          <span>Return to Transaction Hub</span>
+          <span>Exit Module</span>
         </button>
       )}
       {renderContent()}

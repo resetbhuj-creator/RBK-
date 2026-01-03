@@ -9,38 +9,95 @@ interface RoleFormProps {
 
 const PERM_LEVELS = ['none', 'read', 'write', 'all'] as const;
 
-const PERM_LEVEL_DATA = {
+// Standardized permission info for visual feedback
+const PERM_LEVEL_INFO = {
   none: { 
-    label: 'Restricted', 
-    desc: 'Access strictly prohibited. Module hidden from sidebar.',
-    color: 'text-slate-400',
-    bg: 'bg-slate-100'
+    label: 'RESTRICTED', 
+    desc: 'Zero Visibility', 
+    color: 'text-slate-400', 
+    bg: 'bg-slate-100',
+    border: 'border-slate-200',
+    icon: '🔒',
+    meterWidth: 'w-0',
+    risk: 'Low',
+    longDesc: 'Complete isolation. The module is hidden from the interface and all API interactions are strictly blocked.',
+    capabilities: ['No View', 'No Edit', 'No API Access']
   },
   read: { 
-    label: 'Analyst', 
-    desc: 'View records and analytics. No data modification allowed.',
-    color: 'text-sky-600',
-    bg: 'bg-sky-50'
+    label: 'ANALYST', 
+    desc: 'Audit & Review', 
+    color: 'text-sky-600', 
+    bg: 'bg-sky-50',
+    border: 'border-sky-200',
+    icon: '👁️',
+    meterWidth: 'w-1/4',
+    risk: 'Low',
+    longDesc: 'Passive access. Allows browsing records, generating reports, and viewing analytics without modification rights.',
+    capabilities: ['View Records', 'Run Reports', 'Audit Logs']
   },
   write: { 
-    label: 'Operator', 
-    desc: 'Create and modify records. Cannot purge system masters.',
-    color: 'text-indigo-600',
-    bg: 'bg-indigo-50'
+    label: 'OPERATOR', 
+    desc: 'Create & Update', 
+    color: 'text-indigo-600', 
+    bg: 'bg-indigo-50',
+    border: 'border-indigo-200',
+    icon: '✏️',
+    meterWidth: 'w-2/3',
+    risk: 'Medium',
+    longDesc: 'Standard transactional capability. Can create new records and update existing master data.',
+    capabilities: ['Create Data', 'Edit Records', 'Sync Masters']
   },
   all: { 
-    label: 'Superuser', 
-    desc: 'Full administrative control including data purge and migration.',
-    color: 'text-emerald-600',
-    bg: 'bg-emerald-50'
+    label: 'SOVEREIGN', 
+    desc: 'Full Authority', 
+    color: 'text-emerald-600', 
+    bg: 'bg-emerald-50',
+    border: 'border-emerald-200',
+    icon: '⭐',
+    meterWidth: 'w-full',
+    risk: 'High',
+    longDesc: 'Total control. Full CRUD privileges including record purging, system shifts, and sensitive configurations.',
+    capabilities: ['Full CRUD', 'Purge Records', 'Config Access']
   }
 };
 
-const MODULE_BEHAVIOR = {
-  company: "Controls organizational structures, financial year cycles, and statutory localization settings.",
-  administration: "Governs ledger creation, product catalogues, tax rules, and user provisioning.",
-  transaction: "Manages day-to-day financial movements, voucher entry, and historical corrections.",
-  display: "Provides authority to view Balance Sheets, P&L, and export audit trails."
+const MODULE_CONTEXTS = {
+  company: {
+    label: "Corporate Domain",
+    icon: <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>,
+    coverage: "Governs corporate identity, financial years, localization, and branding.",
+    none: "Users cannot access company profile or period settings.",
+    read: "Users can view company profile and financial year history.",
+    write: "Users can update corporate address, logo, and contact data.",
+    all: "Users can delete entities and split financial year cycles."
+  },
+  administration: {
+    label: "Institutional Infrastructure",
+    icon: <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>,
+    coverage: "Controls ledgers, product catalogues, tax structures, and user registry.",
+    none: "No access to masters, users, or system backups.",
+    read: "Users can audit existing account ledgers and tax slabs.",
+    write: "Users can create new items, ledgers, and tax groups.",
+    all: "Full authority over IAM policies and system vaults."
+  },
+  transaction: {
+    label: "Transactional Core",
+    icon: <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>,
+    coverage: "Manages daily financial vouchers, inventory movements, and postings.",
+    none: "Transactional dashboard and voucher entry are hidden.",
+    read: "Users can view the Day Book and transaction history only.",
+    write: "Users can enter and post all voucher types in open periods.",
+    all: "Users can void postings and modify historical vouchers."
+  },
+  display: {
+    label: "Intelligence & Display",
+    icon: <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>,
+    coverage: "Provides authority over balance sheets, P&L, and statutory audit reports.",
+    none: "The reporting and analytics module is inaccessible.",
+    read: "Users can generate and view standard financial statements.",
+    write: "Users can export sensitive audit data to external formats.",
+    all: "Users can access unmasked audit trails and raw logs."
+  }
 };
 
 const RoleForm: React.FC<RoleFormProps> = ({ initialData, onCancel, onSubmit }) => {
@@ -109,60 +166,114 @@ const RoleForm: React.FC<RoleFormProps> = ({ initialData, onCancel, onSubmit }) 
     onSubmit(roleData as Role);
   };
 
-  const PermissionGroup = ({ label, module, icon }: { label: string, module: keyof UserPermissions, icon: React.ReactNode }) => {
+  const PermissionRow = ({ label, module, icon }: { label: string, module: keyof UserPermissions, icon: React.ReactNode }) => {
     const currentVal = roleData.permissions[module];
-    const levelInfo = PERM_LEVEL_DATA[currentVal];
+    const info = (PERM_LEVEL_INFO as any)[currentVal];
+    const moduleCtx = (MODULE_CONTEXTS as any)[module];
 
     return (
-      <div className="bg-white rounded-3xl p-6 border border-slate-200 hover:border-indigo-200 hover:shadow-xl transition-all group/box relative overflow-hidden">
-        <div className="flex items-center justify-between mb-5">
-          <div className="flex items-center space-x-4">
-            <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover/box:bg-indigo-600 group-hover/box:text-white transition-all shadow-sm">
+      <div className={`p-8 rounded-[3.5rem] border-2 transition-all group/row relative bg-white ${info.border} shadow-sm hover:shadow-xl`}>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
+          <div className="flex items-center space-x-5">
+            <div className="w-14 h-14 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover/row:bg-slate-900 group-hover/row:text-white transition-all shadow-sm">
               {icon}
             </div>
             <div>
-              <h4 className="text-xs font-black uppercase tracking-[0.15em] text-slate-800">{label}</h4>
-              <p className="text-[10px] text-slate-400 font-medium tracking-tight mt-0.5">Modular Security Scope</p>
+              <h4 className="text-[14px] font-black uppercase tracking-[0.1em] text-slate-800 italic">{label}</h4>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1 opacity-70">Modular Scope Node</p>
             </div>
           </div>
-          <div className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${levelInfo.bg} ${levelInfo.color}`}>
-            {levelInfo.label}
+          <div className="flex items-center space-x-4">
+             <div className="flex flex-col items-end">
+                <span className={`text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg border shadow-sm ${info.bg} ${info.color} ${info.border}`}>
+                  Authority: {info.label}
+                </span>
+                <span className="text-[8px] font-black text-slate-300 uppercase mt-1 tracking-tighter italic">Risk Index: {info.risk}</span>
+             </div>
+             <div className="w-24 h-1.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
+                <div className={`h-full ${info.color.replace('text', 'bg')} ${info.meterWidth} transition-all duration-700 shadow-[0_0_8px_currentColor]`}></div>
+             </div>
           </div>
         </div>
         
-        <div className="grid grid-cols-4 gap-1.5 bg-slate-100 p-1.5 rounded-2xl border border-slate-200 shadow-inner mb-4">
-          {PERM_LEVELS.map((level) => {
-            const active = roleData.permissions[module] === level;
+        <div className="grid grid-cols-4 gap-1.5 bg-slate-100 p-1.5 rounded-[1.8rem] border border-slate-200 shadow-inner">
+          {PERM_LEVELS.map(level => {
+            const levelInfo = (PERM_LEVEL_INFO as any)[level];
+            const isActive = currentVal === level;
+            const contextText = moduleCtx[level];
+            
             return (
               <button
                 key={level}
                 type="button"
                 onClick={() => handlePermChange(module, level)}
-                className={`py-3 text-[10px] font-black uppercase tracking-tighter rounded-xl transition-all ${
-                  active 
-                    ? 'bg-white text-indigo-600 shadow-lg border border-slate-100 transform -translate-y-0.5' 
+                className={`flex-1 py-4 text-[10px] font-black uppercase tracking-widest rounded-2xl transition-all relative group/btn ${
+                  isActive 
+                    ? 'bg-white text-indigo-600 shadow-xl border border-slate-100 transform -translate-y-0.5' 
                     : 'text-slate-400 hover:text-slate-700'
                 }`}
               >
                 {level}
+                
+                {/* Visual Level Tooltip */}
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-5 w-72 p-6 bg-slate-900 text-white rounded-[2rem] shadow-[0_20px_50px_-10px_rgba(0,0,0,0.5)] opacity-0 invisible group-hover/btn:opacity-100 group-hover/btn:visible transition-all z-50 pointer-events-none border border-white/10">
+                  <div className="flex items-center justify-between mb-4 border-b border-white/10 pb-3">
+                     <div className="flex items-center space-x-3">
+                        <span className="text-xl">{levelInfo.icon}</span>
+                        <div>
+                          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-400 block leading-none">{levelInfo.label} TIER</span>
+                          <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest mt-1 block">Policy Definition</span>
+                        </div>
+                     </div>
+                     <span className={`text-[8px] font-black px-2 py-0.5 rounded border ${levelInfo.risk === 'High' ? 'bg-rose-500/20 text-rose-400 border-rose-500/30' : 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30'}`}>RISK: {levelInfo.risk}</span>
+                  </div>
+                  
+                  <div className="text-[12px] font-black text-white italic mb-4 leading-relaxed">
+                    " {contextText} "
+                  </div>
+                  
+                  <p className="text-[10px] font-medium leading-relaxed normal-case text-slate-400 mb-5">
+                    {levelInfo.longDesc}
+                  </p>
+                  
+                  <div className="flex flex-wrap gap-2">
+                     {levelInfo.capabilities.map((cap: string) => (
+                        <span key={cap} className="px-2 py-1 bg-white/5 rounded-lg text-[8px] font-black uppercase tracking-tighter text-indigo-200/80 border border-white/5">
+                          {cap}
+                        </span>
+                     ))}
+                  </div>
+                  <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[12px] border-l-transparent border-r-[12px] border-r-transparent border-t-[12px] border-t-slate-900"></div>
+                </div>
               </button>
             );
           })}
         </div>
-        
-        <div className="space-y-3">
-          <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-             <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-1 italic opacity-60">Behavioral Impact</p>
-             <p className="text-[11px] text-slate-600 font-medium leading-relaxed">{levelInfo.desc}</p>
-          </div>
-          <p className="text-[9px] text-slate-400 font-medium px-1 italic leading-tight">{MODULE_BEHAVIOR[module]}</p>
+
+        {/* Static Capability Indicator */}
+        <div className={`mt-5 px-6 py-5 rounded-[1.5rem] border-2 flex items-start space-x-5 transition-all duration-500 ${info.bg} ${info.border} shadow-sm`}>
+           <div className="text-3xl shrink-0 mt-0.5 drop-shadow-sm">{info.icon}</div>
+           <div>
+              <div className={`text-[10px] font-black uppercase tracking-[0.2em] ${info.color}`}>Functional Policy Mapping</div>
+              <p className="text-[13px] font-black text-slate-800 italic mt-1 leading-snug">
+                This role <span className="underline decoration-indigo-200 underline-offset-4">{ moduleCtx[currentVal].toLowerCase() }</span>
+              </p>
+              <div className="flex items-center space-x-3 mt-2">
+                 <div className="flex space-x-1">
+                    {[1,2,3,4].map(b => (
+                      <div key={b} className={`w-3 h-1 rounded-full ${b <= PERM_LEVELS.indexOf(currentVal) + 1 ? info.color.replace('text', 'bg') : 'bg-slate-200'}`}></div>
+                    ))}
+                 </div>
+                 <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Sovereignty Score: {PERM_LEVELS.indexOf(currentVal) + 1}/4</p>
+              </div>
+           </div>
         </div>
       </div>
     );
   };
 
   return (
-    <div className="bg-slate-50 rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 border border-slate-200 max-w-6xl mx-auto">
+    <div className="bg-slate-50 rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 border border-slate-200 max-w-7xl mx-auto">
       <div className="px-12 py-10 bg-slate-900 text-white flex justify-between items-center relative overflow-hidden">
         <div className="relative z-10 flex items-center space-x-6">
           <div className="w-16 h-16 bg-indigo-600 rounded-[1.5rem] flex items-center justify-center text-white shadow-2xl shadow-indigo-900/50 transform -rotate-3 hover:rotate-0 transition-transform">
@@ -189,7 +300,7 @@ const RoleForm: React.FC<RoleFormProps> = ({ initialData, onCancel, onSubmit }) 
                   value={roleData.name} 
                   onChange={e => { setRoleData({...roleData, name: e.target.value}); setError(null); }}
                   placeholder="e.g. Senior Regional Auditor" 
-                  className={`w-full px-7 py-5 rounded-[1.5rem] border outline-none transition-all text-sm font-black shadow-sm ${error ? 'border-rose-500 bg-rose-50/50 text-rose-900' : 'border-slate-200 focus:ring-4 focus:ring-indigo-500/10 bg-white'}`}
+                  className={`w-full px-7 py-5 rounded-[1.5rem] border outline-none transition-all text-sm font-black shadow-sm ${error ? 'border-rose-500 bg-rose-50/50' : 'border-slate-200 focus:ring-4 focus:ring-indigo-500/10 bg-white'}`}
                 />
                 {error && <p className="text-[11px] text-rose-500 font-black mt-2 ml-1 animate-pulse">{error}</p>}
               </div>
@@ -205,12 +316,16 @@ const RoleForm: React.FC<RoleFormProps> = ({ initialData, onCancel, onSubmit }) 
               </div>
             </div>
 
-            <div className="bg-slate-900 rounded-[2.5rem] p-10 text-white relative overflow-hidden shadow-2xl shadow-indigo-100 border-4 border-slate-800">
+            {/* Global Authority Policy Presets */}
+            <div className="bg-slate-900 rounded-[2.5rem] p-10 text-white relative overflow-hidden shadow-2xl border-4 border-slate-800">
                <div className="relative z-10">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-10">
-                    <div>
-                      <h4 className="text-[12px] font-black uppercase tracking-[0.3em] text-indigo-400 mb-2">Global Authority Policy</h4>
-                      <p className="text-[11px] text-slate-400 font-medium max-w-sm leading-relaxed">Instantly synchronize all modules to a standardized access tier. Overrides manual overrides.</p>
+                    <div className="flex items-center space-x-6">
+                      <div className="w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center text-3xl shadow-xl shadow-indigo-900/40 transform rotate-3">🎯</div>
+                      <div>
+                        <h4 className="text-[12px] font-black uppercase tracking-widest text-indigo-400 mb-2">Global Authority Policy</h4>
+                        <p className="text-[11px] text-slate-400 font-medium max-w-sm leading-relaxed italic">Instantly synchronize all modules to a standardized access tier.</p>
+                      </div>
                     </div>
                     <div className="flex bg-white/5 p-1.5 rounded-2xl border border-white/10 backdrop-blur-md">
                       {PERM_LEVELS.map((level) => (
@@ -257,6 +372,27 @@ const RoleForm: React.FC<RoleFormProps> = ({ initialData, onCancel, onSubmit }) 
                 ))}
               </div>
             </div>
+
+            {/* Visual Legend for Permissions */}
+            <div className="bg-white rounded-[2rem] p-8 border border-slate-200 shadow-sm relative overflow-hidden group/guide">
+               <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400 mb-8 border-b border-slate-50 pb-4">Authority Hierarchy</h4>
+               <div className="space-y-6">
+                  {PERM_LEVELS.map(level => {
+                    const info = (PERM_LEVEL_INFO as any)[level];
+                    return (
+                      <div key={level} className="flex items-start space-x-4">
+                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0 shadow-sm border ${info.bg} ${info.border}`}>
+                            {info.icon}
+                         </div>
+                         <div>
+                            <div className={`text-[10px] font-black uppercase tracking-widest ${info.color}`}>{info.label}</div>
+                            <p className="text-[9px] text-slate-500 font-medium leading-relaxed mt-0.5">{info.desc}</p>
+                         </div>
+                      </div>
+                    );
+                  })}
+               </div>
+            </div>
           </div>
         </div>
 
@@ -264,16 +400,16 @@ const RoleForm: React.FC<RoleFormProps> = ({ initialData, onCancel, onSubmit }) 
           <div className="flex items-center space-x-4">
             <div className="w-2 h-8 bg-indigo-600 rounded-full"></div>
             <div>
-              <h4 className="text-sm font-black uppercase tracking-[0.2em] text-slate-800">Granular Modular Blueprints</h4>
-              <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Override specific module authority levels</p>
+              <h4 className="text-sm font-black uppercase tracking-[0.2em] text-slate-800">Modular Access Blueprints</h4>
+              <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Hover on levels for specific module impact</p>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            <PermissionGroup label="Company" module="company" icon={<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>} />
-            <PermissionGroup label="Administration" module="administration" icon={<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>} />
-            <PermissionGroup label="Transaction" module="transaction" icon={<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>} />
-            <PermissionGroup label="Display" module="display" icon={<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>} />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <PermissionRow label="Corporate Domain" module="company" icon={MODULE_CONTEXTS.company.icon} />
+            <PermissionRow label="Infrastructure" module="administration" icon={MODULE_CONTEXTS.administration.icon} />
+            <PermissionRow label="Transactional Core" module="transaction" icon={MODULE_CONTEXTS.transaction.icon} />
+            <PermissionRow label="Analytics & Display" module="display" icon={MODULE_CONTEXTS.display.icon} />
           </div>
         </div>
 

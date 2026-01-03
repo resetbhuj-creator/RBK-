@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Voucher, Item, Ledger, Company } from '../types';
+import { Voucher, Item, Ledger, Company, VoucherItem, LedgerEntry } from '../types';
 import * as XLSX from 'xlsx';
 
 interface TransferJob {
@@ -91,20 +91,27 @@ const ImportExportModule: React.FC<ImportExportModuleProps> = ({
     'Accounting Vouchers': [
       { source: 'id', target: 'VoucherNo', type: 'String', required: true },
       { source: 'date', target: 'Date', type: 'Date', required: true },
-      { source: 'type', target: 'Type', type: 'Enum', required: true },
+      { source: 'type', target: 'VoucherType', type: 'Enum', required: true },
       { source: 'party', target: 'PartyName', type: 'String', required: true },
-      { source: 'amount', target: 'Amount', type: 'Float', required: true },
-      { source: 'narration', target: 'Narration', type: 'String' }
+      { source: 'amount', target: 'TotalAmount', type: 'Float', required: true },
+      { source: 'narration', target: 'Narration', type: 'String' },
+      // Line item fields for flat files (CSV/XLSX)
+      { source: 'ledgerName', target: 'LineLedger', type: 'String' },
+      { source: 'entryType', target: 'LineType', type: 'String' },
+      { source: 'entryAmount', target: 'LineAmount', type: 'Float' }
     ],
     'Inventory Vouchers': [
       { source: 'id', target: 'VoucherNo', type: 'String', required: true },
       { source: 'date', target: 'Date', type: 'Date', required: true },
-      { source: 'type', target: 'Type', type: 'Enum', required: true },
+      { source: 'type', target: 'VoucherType', type: 'Enum', required: true },
       { source: 'party', target: 'PartyName', type: 'String', required: true },
-      { source: 'subTotal', target: 'SubTotal', type: 'Float', required: true },
-      { source: 'taxTotal', target: 'TaxTotal', type: 'Float', required: true },
       { source: 'amount', target: 'GrandTotal', type: 'Float', required: true },
-      { source: 'narration', target: 'Narration', type: 'String' }
+      { source: 'narration', target: 'Narration', type: 'String' },
+      // Line item fields for flat files
+      { source: 'itemName', target: 'ItemName', type: 'String' },
+      { source: 'itemQty', target: 'Quantity', type: 'Float' },
+      { source: 'itemRate', target: 'Rate', type: 'Float' },
+      { source: 'itemAmount', target: 'LineTotal', type: 'Float' }
     ],
     'Inventory Items': [
       { source: 'name', target: 'ItemName', type: 'String', required: true },
@@ -137,12 +144,10 @@ const ImportExportModule: React.FC<ImportExportModuleProps> = ({
     const lines = content.split(/\r?\n/);
     if (lines.length < 1) return [];
     
-    // Split headers handling potential quotes
     const headers = lines[0].split(csvDelimiter).map(h => h.trim().replace(/^"|"$/g, ''));
     const rows = lines.slice(1).filter(line => line.trim() !== '');
     
     return rows.map(line => {
-      // Split rows handling potential quotes
       const values = line.split(csvDelimiter).map(v => v.trim().replace(/^"|"$/g, ''));
       const obj: any = {};
       headers.forEach((h, i) => {
@@ -231,14 +236,24 @@ const ImportExportModule: React.FC<ImportExportModuleProps> = ({
   const generateXML = (data: any[]) => {
     const rootName = selectedEntity.replace(/\s/g, '') + 'Root';
     const itemName = selectedEntity.replace(/\s/g, '').slice(0, -1) || 'Record';
-    const schema = ENTITY_SCHEMAS[selectedEntity] || ENTITY_SCHEMAS['Accounting Vouchers'];
     
     let xml = `<?xml version="1.0" encoding="UTF-8"?>\n<${rootName}>\n`;
     data.forEach(item => {
       xml += `  <${itemName}>\n`;
-      schema.forEach(s => {
-        const val = (item as any)[s.source] !== undefined ? (item as any)[s.source] : '';
-        xml += `    <${s.target}>${val}</${s.target}>\n`;
+      Object.entries(item).forEach(([key, val]) => {
+        if (Array.isArray(val)) {
+           xml += `    <${key}>\n`;
+           val.forEach(subItem => {
+             xml += `      <${key.slice(0, -1) || 'Entry'}>\n`;
+             Object.entries(subItem).forEach(([sk, sv]) => {
+               xml += `        <${sk}>${sv}</${sk}>\n`;
+             });
+             xml += `      </${key.slice(0, -1) || 'Entry'}>\n`;
+           });
+           xml += `    </${key}>\n`;
+        } else {
+          xml += `    <${key}>${val}</${key}>\n`;
+        }
       });
       xml += `  </${itemName}>\n`;
     });
@@ -250,17 +265,25 @@ const ImportExportModule: React.FC<ImportExportModuleProps> = ({
     const parser = new DOMParser();
     const xmlDoc = parser.parseFromString(content, "text/xml");
     const itemsNodes = Array.from(xmlDoc.documentElement.children);
-    const schema = ENTITY_SCHEMAS[selectedEntity] || ENTITY_SCHEMAS['Accounting Vouchers'];
     
     return itemsNodes.map(node => {
       const obj: any = {};
-      schema.forEach(s => {
-        const mappedTag = mapping[s.target];
-        const element = node.getElementsByTagName(mappedTag)[0];
-        if (element) {
-          let val: any = element.textContent;
-          if (s.type === 'Float') val = parseFloat(val) || 0;
-          obj[s.source] = val;
+      Array.from(node.children).forEach(child => {
+        if (child.children.length > 0) {
+           // Handle arrays (entries, items)
+           obj[child.tagName] = Array.from(child.children).map(subChild => {
+              const subObj: any = {};
+              Array.from(subChild.children).forEach(gc => {
+                let val: any = gc.textContent;
+                if (!isNaN(val as any) && val.trim() !== '') val = parseFloat(val);
+                subObj[gc.tagName] = val;
+              });
+              return subObj;
+           });
+        } else {
+           let val: any = child.textContent;
+           if (!isNaN(val as any) && val.trim() !== '') val = parseFloat(val);
+           obj[child.tagName] = val;
         }
       });
       return obj;
@@ -269,50 +292,77 @@ const ImportExportModule: React.FC<ImportExportModuleProps> = ({
 
   const parseMappedData = (data: any[]): any[] => {
     const schema = ENTITY_SCHEMAS[selectedEntity];
-    let skippedCount = 0;
+    const isVoucher = selectedEntity.includes('Voucher');
     
-    const parsed = data.map((row, idx) => {
-      const obj: any = {};
-      let isValid = true;
-      
-      schema.forEach(s => {
-        const sourceHeader = mapping[s.target];
-        let val = row[sourceHeader];
-        
-        if (s.required && (val === undefined || val === null || val === '')) {
-            isValid = false;
+    if (!isVoucher) {
+      return data.map((row, idx) => {
+        const obj: any = {};
+        let isValid = true;
+        schema.forEach(s => {
+          const sourceHeader = mapping[s.target];
+          let val = row[sourceHeader];
+          if (s.required && (val === undefined || val === null || val === '')) isValid = false;
+          if (s.type === 'Float') val = parseFloat(val) || 0;
+          obj[s.source] = val;
+        });
+
+        if (selectedEntity === 'Companies') {
+          const startYear = new Date(obj.fyStartDate || Date.now()).getFullYear();
+          obj.years = [`${startYear} - ${startYear + 1}`];
+          obj.id = `C-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
+          obj.logo = obj.name?.charAt(0) || 'N';
+        } else if (selectedEntity === 'Inventory Items') {
+          obj.id = `i-${Math.random().toString(36).substr(2, 7)}`;
+        } else if (selectedEntity === 'Ledgers') {
+          obj.id = `l-${Math.random().toString(36).substr(2, 7)}`;
         }
-
-        if (s.type === 'Float') val = parseFloat(val) || 0;
-        obj[s.source] = val;
-      });
-      
-      if (!isValid) {
-          addLog(`ROW ${idx + 1} REJECTED: Mandatory field missing.`);
-          skippedCount++;
-          return null;
-      }
-
-      // Dynamic Meta Logic
-      if (selectedEntity === 'Companies') {
-        const startYear = new Date(obj.fyStartDate || Date.now()).getFullYear();
-        obj.years = [`${startYear} - ${startYear + 1}`];
-        obj.id = `C-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
-        obj.logo = obj.name?.charAt(0) || 'N';
-      } else if (selectedEntity === 'Inventory Items') {
-        obj.id = `i-${Math.random().toString(36).substr(2, 7)}`;
-      } else if (selectedEntity === 'Ledgers') {
-        obj.id = `l-${Math.random().toString(36).substr(2, 7)}`;
-      }
-      
-      return obj;
-    }).filter(x => x !== null);
-
-    if (skippedCount > 0) {
-        addLog(`INTEGRITY CHECK: Skipped ${skippedCount} malformed objects.`);
+        return isValid ? obj : null;
+      }).filter(x => x !== null);
     }
 
-    return parsed;
+    // VOUCHER LOGIC: Handle grouping of line items for flat files
+    const voucherMap = new Map<string, Voucher>();
+    data.forEach(row => {
+      const vId = row[mapping['VoucherNo']];
+      if (!vId) return;
+
+      if (!voucherMap.has(vId)) {
+        const vObj: any = { status: 'Posted' };
+        schema.forEach(s => {
+          // Main fields
+          if (!['ledgerName', 'entryType', 'entryAmount', 'itemName', 'itemQty', 'itemRate', 'itemAmount'].includes(s.source)) {
+             let val = row[mapping[s.target]];
+             if (s.type === 'Float') val = parseFloat(val) || 0;
+             vObj[s.source] = val;
+          }
+        });
+        if (selectedEntity === 'Accounting Vouchers') vObj.entries = [];
+        if (selectedEntity === 'Inventory Vouchers') vObj.items = [];
+        voucherMap.set(vId, vObj as Voucher);
+      }
+
+      const v = voucherMap.get(vId)!;
+      if (selectedEntity === 'Accounting Vouchers') {
+        const lName = row[mapping['LineLedger']];
+        const lType = row[mapping['LineType']];
+        const lAmt = parseFloat(row[mapping['LineAmount']]) || 0;
+        if (lName) {
+           v.entries = v.entries || [];
+           v.entries.push({ id: `e-${Date.now()}-${Math.random()}`, ledgerName: lName, ledgerId: '', type: lType === 'Cr' ? 'Cr' : 'Dr', amount: lAmt });
+        }
+      } else {
+        const iName = row[mapping['ItemName']];
+        const iQty = parseFloat(row[mapping['Quantity']]) || 0;
+        const iRate = parseFloat(row[mapping['Rate']]) || 0;
+        const iAmt = parseFloat(row[mapping['LineTotal']]) || (iQty * iRate);
+        if (iName) {
+           v.items = v.items || [];
+           v.items.push({ id: `i-${Date.now()}-${Math.random()}`, itemId: '', name: iName, hsn: '', qty: iQty, unit: 'Nos', rate: iRate, amount: iAmt });
+        }
+      }
+    });
+
+    return Array.from(voucherMap.values());
   };
 
   const downloadTemplate = () => {
@@ -394,6 +444,30 @@ const ImportExportModule: React.FC<ImportExportModuleProps> = ({
     }, 150);
   };
 
+  const flattenVouchers = (data: Voucher[]) => {
+    const flattened: any[] = [];
+    data.forEach(v => {
+      if (selectedEntity === 'Accounting Vouchers' && v.entries && v.entries.length > 0) {
+        v.entries.forEach(e => {
+          flattened.push({
+            VoucherNo: v.id, Date: v.date, VoucherType: v.type, PartyName: v.party, TotalAmount: v.amount, Narration: v.narration || '',
+            LineLedger: e.ledgerName, LineType: e.type, LineAmount: e.amount
+          });
+        });
+      } else if (selectedEntity === 'Inventory Vouchers' && v.items && v.items.length > 0) {
+        v.items.forEach(i => {
+          flattened.push({
+            VoucherNo: v.id, Date: v.date, VoucherType: v.type, PartyName: v.party, GrandTotal: v.amount, Narration: v.narration || '',
+            ItemName: i.name, Quantity: i.qty, Rate: i.rate, LineTotal: i.amount
+          });
+        });
+      } else {
+        flattened.push({ VoucherNo: v.id, Date: v.date, VoucherType: v.type, PartyName: v.party, TotalAmount: v.amount, Narration: v.narration || '' });
+      }
+    });
+    return flattened;
+  };
+
   const finalizeJob = () => {
     let dataSource: any[] = [];
     if (selectedEntity === 'Companies') dataSource = companies;
@@ -404,21 +478,25 @@ const ImportExportModule: React.FC<ImportExportModuleProps> = ({
     addLog(`SEQUENCE SUCCESSFUL: Operation finalized.`);
     if (activeTab === 'EXPORT') {
       let content = '';
-      if (targetFormat === 'XML') content = generateXML(dataSource);
-      else if (targetFormat === 'XLSX') {
-        const ws = XLSX.utils.json_to_sheet(dataSource);
+      if (targetFormat === 'XML') {
+        content = generateXML(dataSource);
+      } else if (targetFormat === 'XLSX') {
+        const finalData = selectedEntity.includes('Voucher') ? flattenVouchers(dataSource) : dataSource;
+        const ws = XLSX.utils.json_to_sheet(finalData);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Export");
         XLSX.writeFile(wb, `nexus_export_${selectedEntity.toLowerCase().replace(/\s/g, '_')}_${Date.now()}.xlsx`);
         addLog(`Binary XLSX transmitted to local storage.`);
         return;
       } else if (targetFormat === 'CSV') {
-        const schema = ENTITY_SCHEMAS[selectedEntity];
-        const headers = schema.map(s => s.target).join(csvDelimiter);
-        const rows = dataSource.map(item => 
-            schema.map(s => `"${(item as any)[s.source] || ''}"`).join(csvDelimiter)
-        ).join('\n');
-        content = `${headers}\n${rows}`;
+        const finalData = selectedEntity.includes('Voucher') ? flattenVouchers(dataSource) : dataSource;
+        if (finalData.length > 0) {
+           const headers = Object.keys(finalData[0]).join(csvDelimiter);
+           const rows = finalData.map(item => 
+               Object.values(item).map(val => `"${val || ''}"`).join(csvDelimiter)
+           ).join('\n');
+           content = `${headers}\n${rows}`;
+        }
       }
       
       const blob = new Blob([content], { type: targetFormat === 'XML' ? 'text/xml' : 'text/csv' });
@@ -436,7 +514,7 @@ const ImportExportModule: React.FC<ImportExportModuleProps> = ({
       entity: selectedEntity,
       timestamp: new Date().toLocaleString(),
       status: 'Completed',
-      records: activeTab === 'EXPORT' ? dataSource.length : (fileContent ? 0 : 0), // Count will be calculated in logic
+      records: dataSource.length,
       format: targetFormat
     };
     setJobs(prev => [newJob, ...prev]);

@@ -11,10 +11,11 @@ interface CommunicationModuleProps {
   setActiveSubAction: (sub: CommunicationSubMenu | null) => void;
   vouchers: Voucher[];
   ledgers: Ledger[];
+  onViewVoucher: (id: string) => void;
 }
 
 const CommunicationModule: React.FC<CommunicationModuleProps> = ({ 
-  activeCompany, activeSubAction, setActiveSubAction, vouchers, ledgers 
+  activeCompany, activeSubAction, setActiveSubAction, vouchers, ledgers, onViewVoucher 
 }) => {
 
   const deliveryStats = useMemo(() => ({
@@ -153,16 +154,16 @@ const CommunicationModule: React.FC<CommunicationModuleProps> = ({
 
   const DispatchLogs = () => {
     const logs = [
-      { id: 'TXN-9082', type: 'Email', party: 'Acme Global', target: 'finance@acme.com', time: '2 mins ago', status: 'Sent' },
-      { id: 'TXN-9081', type: 'SMS', party: 'Retailers Inc', target: '+141500022', time: '14 mins ago', status: 'Delivered' },
-      { id: 'TXN-9080', type: 'Print', party: 'Self-Pickup', target: 'Local LPT1', time: '1 hour ago', status: 'Printed' },
-      { id: 'TXN-9079', type: 'Email', party: 'Global Supp', target: 'billing@global.net', time: '2 hours ago', status: 'Bounced' },
+      { id: 'TXN-9082', vchId: 'SL/23-24/0001', type: 'Email', party: 'Acme Global', target: 'finance@acme.com', time: '2 mins ago', status: 'Sent' },
+      { id: 'TXN-9081', vchId: 'PY/23-24/0001', type: 'SMS', party: 'Retailers Inc', target: '+141500022', time: '14 mins ago', status: 'Delivered' },
+      { id: 'TXN-9080', vchId: null, type: 'Print', party: 'Self-Pickup', target: 'Local LPT1', time: '1 hour ago', status: 'Printed' },
+      { id: 'TXN-9079', vchId: 'SL/23-24/0001', type: 'Email', party: 'Global Supp', target: 'billing@global.net', time: '2 hours ago', status: 'Bounced' },
     ];
 
     return (
       <div className="bg-white rounded-[3rem] border border-slate-200 overflow-hidden shadow-sm animate-in fade-in duration-500">
         <div className="px-10 py-8 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
-           <h3 className="text-xl font-black italic uppercase text-slate-800 tracking-tight">Comprehensive Dispatch Audit</h3>
+           <h3 className="text-xl font-black italic uppercase text-slate-800 tracking-tight leading-none">Comprehensive Dispatch Audit</h3>
            <div className="flex items-center space-x-3">
               <input type="text" placeholder="Search Logs..." className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm" />
               <button className="px-6 py-2 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all">Export XLS</button>
@@ -173,9 +174,10 @@ const CommunicationModule: React.FC<CommunicationModuleProps> = ({
               <thead className="bg-slate-900 text-[10px] font-black uppercase text-slate-400">
                  <tr>
                     <th className="px-10 py-5">Audit HASH</th>
+                    <th className="px-10 py-5">Originating Vch</th>
                     <th className="px-10 py-5">Communication Mode</th>
                     <th className="px-10 py-5">Counterparty Node</th>
-                    <th className="px-10 py-5">Status</th>
+                    <th className="px-10 py-5 text-center">Status</th>
                     <th className="px-10 py-5 text-right">Time Offset</th>
                  </tr>
               </thead>
@@ -183,6 +185,15 @@ const CommunicationModule: React.FC<CommunicationModuleProps> = ({
                  {logs.map(l => (
                    <tr key={l.id} className="hover:bg-slate-50/80 transition-colors group">
                       <td className="px-10 py-6 font-mono text-[10px] font-black text-indigo-500 italic">{l.id}</td>
+                      <td className="px-10 py-6">
+                        {l.vchId ? (
+                           <button onClick={() => onViewVoucher(l.vchId!)} className="text-[10px] font-black text-slate-900 bg-slate-100 px-3 py-1 rounded-lg border border-slate-200 hover:bg-indigo-600 hover:text-white transition-all shadow-sm">
+                             #{l.vchId}
+                           </button>
+                        ) : (
+                           <span className="text-[10px] font-bold text-slate-300 uppercase italic">Direct</span>
+                        )}
+                      </td>
                       <td className="px-10 py-6">
                          <span className={`px-2.5 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest border ${
                            l.type === 'Email' ? 'bg-indigo-50 text-indigo-600 border-indigo-100' :
@@ -194,8 +205,8 @@ const CommunicationModule: React.FC<CommunicationModuleProps> = ({
                          <div className="text-xs font-black text-slate-800 uppercase italic">{l.party}</div>
                          <div className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter mt-0.5">{l.target}</div>
                       </td>
-                      <td className="px-10 py-6">
-                         <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase border ${
+                      <td className="px-10 py-6 text-center">
+                         <span className={`px-2.5 py-1 rounded text-[9px] font-black uppercase border ${
                            l.status === 'Sent' || l.status === 'Delivered' || l.status === 'Printed' 
                            ? 'bg-emerald-50 text-emerald-600 border-emerald-100' 
                            : 'bg-rose-50 text-rose-600 border-rose-100'
