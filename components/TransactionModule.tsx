@@ -1,8 +1,9 @@
 import React, { useState, useMemo } from 'react';
-import { TransactionSubMenu, Voucher, Ledger, Item } from '../types';
+import { TransactionSubMenu, Voucher, Ledger, Item, VoucherType } from '../types';
 import { TRANSACTION_SUB_MENUS } from '../constants';
 import VoucherEntryForm from './VoucherEntryForm';
 import InventoryVoucherForm from './InventoryVoucherForm';
+import BankReconciliation from './BankReconciliation';
 import DayBook from './DayBook';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
@@ -23,45 +24,34 @@ const TransactionModule: React.FC<TransactionModuleProps> = ({
   activeCompany, currentFY, isReadOnly, activeSubAction, setActiveSubAction, ledgers, items, vouchers, setVouchers, onViewVoucher 
 }) => {
 
-  /**
-   * Sequential Voucher ID Engine
-   * Generates a unique, sequential ID based on voucher type and financial year.
-   * Pattern: [PREFIX]/[YY-YY]/[SERIAL]
-   */
   const generateVoucherId = (type: string) => {
     const prefixMap: Record<string, string> = {
       'Sales': 'SL',
       'Purchase': 'PR',
+      'Sales Return': 'SR',
+      'Purchase Return': 'PR-RET',
       'Payment': 'PY',
       'Receipt': 'RC',
       'Contra': 'CN',
       'Journal': 'JR',
       'Delivery Note': 'DN',
-      'Receipt Note': 'RN',
-      'Stock Journal': 'SJ',
+      'Goods Receipt Note (GRN)': 'GRN',
+      'Stock Adjustment': 'SA',
       'Purchase Order': 'PO'
     };
     const prefix = prefixMap[type] || 'VCH';
-    
-    // Normalize financial year string (e.g., "2023 - 2024" -> "23-24")
     const yearParts = currentFY.split(' - ').map(y => y.trim().slice(-2));
     const yearPart = yearParts.join('-');
     const yearIdentifier = `/${yearPart}/`;
     
-    // Filter current registry for conflicts and find current peak
-    const relevantVouchers = vouchers.filter(v => 
-      v.type === type && 
-      v.id.includes(yearIdentifier)
-    );
+    const relevantVouchers = vouchers.filter(v => v.type === type && v.id.includes(yearIdentifier));
     
     let maxNum = 0;
     relevantVouchers.forEach(v => {
       const parts = v.id.split('/');
       const serialPart = parts[parts.length - 1];
       const num = parseInt(serialPart);
-      if (!isNaN(num) && num > maxNum) {
-        maxNum = num;
-      }
+      if (!isNaN(num) && num > maxNum) maxNum = num;
     });
 
     const nextNum = (maxNum + 1).toString().padStart(5, '0');
@@ -69,24 +59,18 @@ const TransactionModule: React.FC<TransactionModuleProps> = ({
   };
 
   const handlePostVoucher = (data: Omit<Voucher, 'id' | 'status'>) => {
-    // FINAL SEQUENTIAL ASSIGNMENT
     const assignedId = generateVoucherId(data.type);
-    
-    // Uniqueness Safety Check
-    const isDuplicate = vouchers.some(v => v.id === assignedId);
-    if (isDuplicate) {
-      alert("Serial Collision Detected: System is re-calculating integrity sequence. Please try again.");
+    if (vouchers.some(v => v.id === assignedId)) {
+      alert("Serial Collision: Re-calculating...");
       return;
     }
-
-    const newVch: Voucher = {
-      ...data,
-      id: assignedId,
-      status: 'Posted'
-    };
-    
+    const newVch: Voucher = { ...data, id: assignedId, status: 'Posted' };
     setVouchers(prev => [newVch, ...prev]);
     setActiveSubAction(TransactionSubMenu.DAY_BOOK);
+  };
+
+  const updateVoucher = (updated: Voucher) => {
+    setVouchers(prev => prev.map(v => v.id === updated.id ? updated : v));
   };
 
   const handleCloneVoucher = (v: Voucher) => {
@@ -133,6 +117,15 @@ const TransactionModule: React.FC<TransactionModuleProps> = ({
             getNextId={(type) => generateVoucherId(type)}
           />
         );
+      case TransactionSubMenu.BANK_RECONCILIATION:
+        return (
+          <BankReconciliation 
+            vouchers={vouchers} 
+            ledgers={ledgers} 
+            onUpdateVoucher={updateVoucher} 
+            onCancel={() => setActiveSubAction(null)} 
+          />
+        );
       case TransactionSubMenu.DAY_BOOK:
         return <DayBook vouchers={vouchers} onClone={handleCloneVoucher} onViewVoucher={onViewVoucher} />;
       default:
@@ -167,70 +160,20 @@ const TransactionModule: React.FC<TransactionModuleProps> = ({
         <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-600 rounded-full blur-[120px] opacity-10 -mr-40 -mt-40"></div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {TRANSACTION_SUB_MENUS.map((item) => (
-          <button key={item.id} onClick={() => setActiveSubAction(item.id as TransactionSubMenu)} className="group relative bg-white p-10 rounded-[3rem] border border-slate-200 shadow-sm hover:shadow-2xl hover:border-indigo-200 transition-all duration-300 text-left overflow-hidden">
+          <button key={item.id} onClick={() => setActiveSubAction(item.id as TransactionSubMenu)} className="group relative bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm hover:shadow-2xl hover:border-indigo-200 transition-all duration-300 text-left overflow-hidden">
             <div className={`w-14 h-14 ${item.color} rounded-2xl flex items-center justify-center text-white mb-8 group-hover:scale-110 transition-transform shadow-xl`}>
               {React.cloneElement(item.icon as React.ReactElement<any>, { className: 'w-7 h-7' })}
             </div>
-            <h3 className="text-xl font-black text-slate-800 mb-2 group-hover:text-indigo-600 transition-colors uppercase italic">{item.label}</h3>
-            <p className="text-sm text-slate-400 font-medium leading-relaxed">{item.description}</p>
+            <h3 className="text-xl font-black text-slate-800 mb-2 group-hover:text-indigo-600 transition-colors uppercase italic leading-tight">{item.label}</h3>
+            <p className="text-xs text-slate-400 font-medium leading-relaxed">{item.description}</p>
             <div className="mt-8 flex items-center text-indigo-600 font-black text-[10px] uppercase tracking-[0.2em] opacity-0 group-hover:opacity-100 transition-all translate-y-2 group-hover:translate-y-0">
                <span>Open Workspace</span>
                <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" /></svg>
             </div>
           </button>
         ))}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 bg-white rounded-[3rem] p-12 border border-slate-200 shadow-sm relative overflow-hidden group">
-           <div className="flex items-center justify-between mb-12">
-              <h3 className="text-[11px] font-black uppercase text-slate-400 tracking-[0.4em]">Flow Dynamics (24h)</h3>
-              <div className="px-4 py-1.5 bg-emerald-50 text-emerald-600 rounded-xl text-[9px] font-black uppercase tracking-widest border border-emerald-100">Live Postings ✓</div>
-           </div>
-           <div className="h-64 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={[{day:'Mon', s:4000},{day:'Tue', s:3000},{day:'Wed', s:5000},{day:'Thu', s:2000},{day:'Fri', s:stats.dayTurnover}]}>
-                  <defs>
-                    <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#6366f1" stopOpacity={0.1}/>
-                      <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 9, fontWeight: 900}} />
-                  <Tooltip contentStyle={{ borderRadius: '24px', border: 'none', boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.15)' }} />
-                  <Area type="monotone" dataKey="s" stroke="#6366f1" strokeWidth={3} fillOpacity={1} fill="url(#colorSales)" />
-                </AreaChart>
-              </ResponsiveContainer>
-           </div>
-        </div>
-
-        <div className="bg-white rounded-[3rem] p-12 border border-slate-200 shadow-sm">
-           <h3 className="text-[11px] font-black uppercase text-slate-400 tracking-[0.4em] mb-10">Class Concentration</h3>
-           <div className="h-48 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                 <PieChart>
-                    <Pie data={stats.pieData} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
-                       {stats.pieData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
-                    </Pie>
-                    <Tooltip />
-                 </PieChart>
-              </ResponsiveContainer>
-           </div>
-           <div className="mt-8 space-y-3">
-              {stats.pieData.map((d, i) => (
-                <div key={i} className="flex justify-between items-center text-[10px] font-black uppercase">
-                   <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 rounded-full" style={{backgroundColor: COLORS[i % COLORS.length]}}></div>
-                      <span className="text-slate-500">{d.name}</span>
-                   </div>
-                   <span className="text-slate-800">${d.value.toLocaleString()}</span>
-                </div>
-              ))}
-           </div>
-        </div>
       </div>
     </div>
   );

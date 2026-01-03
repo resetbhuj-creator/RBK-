@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Voucher, Task, TaskPriority } from '../types';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell, PieChart, Pie } from 'recharts';
 
 const data = [
   { name: 'Mon', revenue: 4000, expenses: 2400 },
@@ -25,9 +25,24 @@ interface DashboardProps {
 const Dashboard: React.FC<DashboardProps> = ({ activeCompany, vouchers, tasks, setTasks, onViewVoucher }) => {
   const symbol = activeCompany?.currencyConfig?.symbol || '$';
   
-  // Quick Add State
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [newTaskDueDate, setNewTaskDueDate] = useState(new Date().toISOString().split('T')[0]);
+  const [priorityFilter, setPriorityFilter] = useState<'All' | TaskPriority>('All');
+
+  const filteredTasks = useMemo(() => {
+    if (priorityFilter === 'All') return tasks;
+    return tasks.filter(t => t.priority === priorityFilter);
+  }, [tasks, priorityFilter]);
+
+  const financialHealth = useMemo(() => {
+    const revenue = vouchers.filter(v => v.type === 'Sales').reduce((acc, v) => acc + v.amount, 0);
+    const expenses = vouchers.filter(v => v.type === 'Purchase' || v.type === 'Payment').reduce((acc, v) => acc + v.amount, 0);
+    const cash = vouchers.filter(v => v.type === 'Receipt').reduce((acc, v) => acc + v.amount, 0);
+    
+    // Quick ratio calculation (mocked based on available data)
+    const ratio = expenses > 0 ? (cash / (expenses * 0.4)).toFixed(2) : '1.00';
+    return { revenue, expenses, ratio };
+  }, [vouchers]);
 
   const addTask = (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,78 +82,98 @@ const Dashboard: React.FC<DashboardProps> = ({ activeCompany, vouchers, tasks, s
   };
 
   return (
-    <div className="space-y-4 animate-in fade-in duration-300">
+    <div className="space-y-6 animate-in fade-in duration-300">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-black text-slate-800 tracking-tight italic uppercase">Operational Intel</h2>
+          <h2 className="text-2xl font-black text-slate-800 tracking-tight italic uppercase">Operational Intel</h2>
           <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Active Node: <span className="text-indigo-600">{activeCompany?.name || '---'}</span></p>
         </div>
-        <div className="hidden sm:block text-right">
-          <div className="text-[8px] font-black text-slate-300 uppercase tracking-[0.2em]">Working Period</div>
-          <div className="text-xs font-black text-slate-600">{activeCompany?.years?.[activeCompany.years.length - 1] || 'N/A'}</div>
+        <div className="flex items-center space-x-3">
+          <div className="hidden sm:block text-right border-r border-slate-200 pr-4">
+            <div className="text-[8px] font-black text-slate-300 uppercase tracking-[0.2em]">Working Period</div>
+            <div className="text-xs font-black text-slate-600">{activeCompany?.years?.[activeCompany.years.length - 1] || 'N/A'}</div>
+          </div>
+          <div className="p-3 bg-white rounded-xl shadow-sm border border-slate-100 flex items-center space-x-3">
+             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+             <span className="text-[10px] font-black uppercase text-slate-500">Gateway Status: Online</span>
+          </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Revenue (7D)', value: `${symbol}128,430`, trend: '+12.5%', color: 'text-emerald-500', bg: 'bg-emerald-50' },
-          { label: 'Unposted Queue', value: '43', trend: '-2.4%', color: 'text-amber-500', bg: 'bg-amber-50' },
-          { label: 'Active Personnel', value: '1,240', trend: '+5.1%', color: 'text-blue-500', bg: 'bg-blue-50' },
-          { label: 'Procurement Gap', value: '94.2%', trend: '+0.8%', color: 'text-indigo-500', bg: 'bg-indigo-50' }
+          { label: 'Total Revenue', value: `${symbol}${financialHealth.revenue.toLocaleString()}`, trend: '+12.5%', color: 'text-emerald-500', bg: 'bg-emerald-50' },
+          { label: 'Unposted Queue', value: vouchers.filter(v => v.status === 'Draft').length.toString(), trend: '-2.4%', color: 'text-amber-500', bg: 'bg-amber-50' },
+          { label: 'Liquidity Ratio', value: financialHealth.ratio, trend: 'Optimal', color: 'text-blue-500', bg: 'bg-blue-50' },
+          { label: 'Reconciliation', value: '94.2%', trend: '+0.8%', color: 'text-indigo-500', bg: 'bg-indigo-50' }
         ].map((stat, i) => (
-          <div key={i} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm transition-all hover:shadow-md hover:border-indigo-100">
-            <div className="flex justify-between items-start mb-2">
-              <span className="text-slate-400 text-[9px] font-black uppercase tracking-widest">{stat.label}</span>
-              <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-md ${stat.bg} ${stat.color}`}>
+          <div key={i} className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm transition-all hover:shadow-xl hover:border-indigo-100 group">
+            <div className="flex justify-between items-start mb-4">
+              <span className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] group-hover:text-indigo-500 transition-colors">{stat.label}</span>
+              <span className={`text-[8px] font-black px-2 py-0.5 rounded-lg ${stat.bg} ${stat.color} border border-current opacity-60`}>
                 {stat.trend}
               </span>
             </div>
-            <div className="text-xl font-black text-slate-800 italic tracking-tighter tabular-nums">{stat.value}</div>
+            <div className="text-3xl font-black text-slate-800 italic tracking-tighter tabular-nums">{stat.value}</div>
           </div>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2 space-y-4">
-          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col h-[350px]">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest">Growth Velocity</h3>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-6">
+          <div className="bg-white p-10 rounded-[3rem] border border-slate-200 shadow-sm flex flex-col h-[400px] relative overflow-hidden">
+            <div className="flex justify-between items-center mb-8 relative z-10">
+              <div>
+                <h3 className="text-sm font-black text-slate-800 uppercase tracking-[0.3em]">Growth Velocity</h3>
+                <p className="text-[10px] text-slate-400 mt-1 font-medium">Outward supply vs operational burn</p>
+              </div>
+              <div className="flex space-x-2">
+                 <div className="px-3 py-1 bg-indigo-50 rounded-lg text-[9px] font-black text-indigo-600 border border-indigo-100">REV</div>
+                 <div className="px-3 py-1 bg-slate-50 rounded-lg text-[9px] font-black text-slate-400 border border-slate-200">EXP</div>
+              </div>
             </div>
-            <div className="flex-1 w-full">
+            <div className="flex-1 w-full relative z-10">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={data}>
                   <defs>
                     <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#6366f1" stopOpacity={0.1}/>
+                      <stop offset="5%" stopColor="#6366f1" stopOpacity={0.15}/>
                       <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 9, fontWeight: 900}} />
-                  <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 9, fontWeight: 900}} />
+                  <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10, fontWeight: 900}} />
+                  <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10, fontWeight: 900}} />
                   <Tooltip 
-                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontSize: '11px' }}
+                    contentStyle={{ borderRadius: '24px', border: 'none', boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.15)', fontSize: '12px', fontWeight: 900 }}
                     formatter={(value: any) => [`${symbol}${value}`, 'Vol']}
                   />
-                  <Area type="monotone" dataKey="revenue" stroke="#6366f1" strokeWidth={2.5} fillOpacity={1} fill="url(#colorRev)" />
+                  <Area type="monotone" dataKey="revenue" stroke="#6366f1" strokeWidth={4} fillOpacity={1} fill="url(#colorRev)" />
+                  <Area type="monotone" dataKey="expenses" stroke="#cbd5e1" strokeWidth={2} fillOpacity={0} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
+            <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-600 rounded-full blur-[120px] opacity-[0.03] -mr-32 -mt-32"></div>
           </div>
 
-          {/* Verification Registry */}
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[350px]">
-            <div className="px-6 py-3 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
-              <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest">Verification Registry</h3>
+          <div className="bg-white rounded-[3rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[450px]">
+            <div className="px-10 py-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
+              <div className="flex items-center space-x-4">
+                 <div className="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center text-white shadow-lg transform -rotate-3">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+                 </div>
+                 <h3 className="text-sm font-black text-slate-800 uppercase tracking-[0.3em]">Verification Registry</h3>
+              </div>
+              <button className="text-[10px] font-black text-indigo-600 uppercase hover:underline underline-offset-4 decoration-indigo-200 tracking-widest">Audit Full Stream</button>
             </div>
             <div className="overflow-auto custom-scrollbar flex-1">
               <table className="w-full text-left">
-                <thead className="bg-white/50 text-slate-400 uppercase text-[8px] font-black sticky top-0 border-b border-slate-100">
+                <thead className="bg-white/50 text-slate-400 uppercase text-[9px] font-black sticky top-0 border-b border-slate-100 backdrop-blur-md">
                   <tr>
-                    <th className="px-6 py-2.5">Txn Hash</th>
-                    <th className="px-6 py-2.5">Party Node</th>
-                    <th className="px-6 py-2.5">Value</th>
-                    <th className="px-6 py-2.5">Status</th>
+                    <th className="px-10 py-5">Txn Hash</th>
+                    <th className="px-10 py-5">Counterparty Node</th>
+                    <th className="px-10 py-5">Type</th>
+                    <th className="px-10 py-5 text-right">Value</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
@@ -146,14 +181,16 @@ const Dashboard: React.FC<DashboardProps> = ({ activeCompany, vouchers, tasks, s
                     <tr 
                       key={v.id} 
                       onClick={() => onViewVoucher(v.id)}
-                      className="hover:bg-indigo-50/80 transition-colors cursor-pointer group"
+                      className="hover:bg-indigo-50/50 transition-all cursor-pointer group"
                     >
-                      <td className="px-6 py-3 font-mono text-[10px] text-indigo-600 font-black tracking-tighter group-hover:underline">#{v.id}</td>
-                      <td className="px-6 py-3 font-black text-slate-700 text-[10px] truncate max-w-[120px] italic uppercase">{v.party}</td>
-                      <td className="px-6 py-3 font-black text-slate-900 text-xs tabular-nums tracking-tighter">{symbol}{v.amount.toLocaleString()}</td>
-                      <td className="px-6 py-3">
-                        <span className="px-2 py-0.5 bg-emerald-50 text-emerald-600 text-[8px] font-black rounded uppercase border border-emerald-100 shadow-sm">Verified</span>
+                      <td className="px-10 py-5 font-mono text-[11px] text-indigo-600 font-black tracking-tighter group-hover:translate-x-1 transition-transform">#{v.id}</td>
+                      <td className="px-10 py-5 font-black text-slate-700 text-xs truncate max-w-[150px] italic uppercase">{v.party}</td>
+                      <td className="px-10 py-5">
+                         <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase border ${v.type === 'Sales' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
+                            {v.type}
+                         </span>
                       </td>
+                      <td className="px-10 py-5 font-black text-slate-900 text-sm tabular-nums tracking-tighter text-right">{symbol}{v.amount.toLocaleString()}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -162,109 +199,107 @@ const Dashboard: React.FC<DashboardProps> = ({ activeCompany, vouchers, tasks, s
           </div>
         </div>
 
-        <div className="space-y-4">
-          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col h-[300px]">
-            <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest mb-4">Channel Partition</h3>
-            <div className="flex-1 w-full">
+        <div className="space-y-6">
+          <div className="bg-slate-900 p-10 rounded-[3rem] border border-slate-800 shadow-2xl flex flex-col h-[350px] text-white relative overflow-hidden group">
+            <h3 className="text-xs font-black uppercase tracking-[0.4em] mb-10 text-indigo-400 relative z-10">Sector Partition</h3>
+            <div className="flex-1 w-full relative z-10">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={data.slice(0, 4)}>
-                  <Bar dataKey="revenue" radius={[4, 4, 0, 0]}>
+                <PieChart>
+                  <Pie
+                    data={[{name:'B2B', value: 400}, {name:'Retail', value: 300}, {name:'E-Com', value: 300}, {name:'Misc', value: 200}]}
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={8}
+                    dataKey="value"
+                    stroke="none"
+                  >
                     {data.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
-                  </Bar>
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 9}} />
-                  <Tooltip cursor={{fill: '#f8fafc'}} formatter={(value: any) => [value, 'Vol']} />
-                </BarChart>
+                  </Pie>
+                  <Tooltip contentStyle={{backgroundColor: '#0f172a', border: 'none', borderRadius: '12px', color: '#fff'}} />
+                </PieChart>
               </ResponsiveContainer>
             </div>
-            <div className="mt-4 grid grid-cols-2 gap-2">
-              {['Sales', 'Service', 'Other', 'Misc'].map((label, i) => (
-                <div key={i} className="flex items-center space-x-2 text-[9px] font-bold uppercase text-slate-400">
-                  <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: COLORS[i] }}></div>
-                  <span className="truncate">{label}</span>
-                </div>
-              ))}
-            </div>
+            <div className="absolute top-0 right-0 w-48 h-48 bg-indigo-600 rounded-full blur-[100px] opacity-10 -mr-24 -mt-24 group-hover:opacity-20 transition-opacity"></div>
           </div>
 
-          {/* Mission Control: Tasks Widget */}
-          <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm flex flex-col h-[416px]">
-            <div className="flex justify-between items-center mb-6">
-               <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest flex items-center">
-                 <div className="w-1.5 h-4 bg-indigo-600 rounded-full mr-2"></div>
+          <div className="bg-white p-10 rounded-[3rem] border border-slate-200 shadow-sm flex flex-col h-[500px]">
+            <div className="flex justify-between items-center mb-8">
+               <h3 className="text-xs font-black text-slate-800 uppercase tracking-[0.3em] flex items-center">
+                 <div className="w-1.5 h-4 bg-indigo-600 rounded-full mr-3"></div>
                  Mission Control
                </h3>
-               <span className="text-[10px] font-black text-slate-400 bg-slate-100 px-2 py-0.5 rounded-lg">{tasks.filter(t => t.status === 'Pending').length} Pending</span>
+               <span className="text-[10px] font-black text-slate-400 bg-slate-100 px-3 py-1 rounded-xl">{tasks.filter(t => t.status === 'Pending').length} Pending</span>
             </div>
 
-            {/* Quick Add Form */}
-            <form onSubmit={addTask} className="mb-6 space-y-2">
-              <input 
-                type="text" 
-                placeholder="New action item..." 
-                value={newTaskTitle}
-                onChange={(e) => setNewTaskTitle(e.target.value)}
-                className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white transition-all"
-              />
-              <div className="flex space-x-2">
-                <input 
-                  type="date" 
-                  value={newTaskDueDate}
-                  onChange={(e) => setNewTaskDueDate(e.target.value)}
-                  className="flex-1 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-[10px] font-black uppercase outline-none focus:ring-2 focus:ring-indigo-500/20"
-                />
-                <button type="submit" className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-100">Add</button>
-              </div>
-            </form>
+            <div className="flex space-x-1 mb-8 bg-slate-100 p-1.5 rounded-[1.5rem] border border-slate-200">
+              {(['All', 'High', 'Medium', 'Low'] as const).map((filter) => (
+                <button
+                  key={filter}
+                  onClick={() => setPriorityFilter(filter)}
+                  className={`flex-1 py-2 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all ${
+                    priorityFilter === filter 
+                      ? 'bg-white text-indigo-600 shadow-lg border border-slate-100' 
+                      : 'text-slate-400 hover:text-slate-600'
+                  }`}
+                >
+                  {filter}
+                </button>
+              ))}
+            </div>
 
-            {/* Task List */}
-            <div className="flex-1 overflow-auto custom-scrollbar space-y-3 pr-2">
-              {tasks.length > 0 ? tasks.map((task) => {
+            <div className="flex-1 overflow-auto custom-scrollbar space-y-4 pr-2">
+              {filteredTasks.length > 0 ? filteredTasks.map((task) => {
                 const overdue = isOverdue(task.dueDate) && task.status === 'Pending';
                 return (
                   <div 
                     key={task.id} 
-                    className={`p-4 rounded-2xl border transition-all relative group ${task.status === 'Completed' ? 'bg-slate-50 border-slate-100 opacity-60' : 'bg-white border-slate-200 hover:border-indigo-200 hover:shadow-md'}`}
+                    className={`p-6 rounded-[2rem] border transition-all relative group ${task.status === 'Completed' ? 'bg-slate-50 border-slate-100 opacity-60' : 'bg-white border-slate-200 hover:border-indigo-200 hover:shadow-xl'}`}
                   >
                     <div className="flex items-start justify-between">
-                      <div className="flex items-start space-x-3">
+                      <div className="flex items-start space-x-4">
                         <button 
                           onClick={() => toggleTask(task.id)}
-                          className={`mt-1 w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all ${task.status === 'Completed' ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300 hover:border-indigo-500'}`}
+                          className={`mt-1 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${task.status === 'Completed' ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-slate-300 hover:border-indigo-500 hover:scale-110'}`}
                         >
-                          {task.status === 'Completed' && <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M5 13l4 4L19 7" /></svg>}
+                          {task.status === 'Completed' && <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={4}><path d="M5 13l4 4L19 7" /></svg>}
                         </button>
                         <div>
-                          <div className={`text-[11px] font-black tracking-tight leading-tight italic uppercase ${task.status === 'Completed' ? 'line-through text-slate-400' : 'text-slate-800'}`}>
+                          <div className={`text-[12px] font-black tracking-tight leading-tight italic uppercase ${task.status === 'Completed' ? 'line-through text-slate-400' : 'text-slate-800'}`}>
                             {task.title}
                           </div>
-                          <div className="flex items-center space-x-2 mt-2">
-                            <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase border flex items-center ${overdue ? 'bg-rose-50 text-rose-600 border-rose-100 animate-pulse' : 'bg-indigo-50 text-indigo-600 border-indigo-100'}`}>
-                              <svg className="w-2.5 h-2.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                          <div className="flex items-center space-x-3 mt-3">
+                            <span className={`px-3 py-1 rounded-xl text-[9px] font-black uppercase border flex items-center ${overdue ? 'bg-rose-50 text-rose-600 border-rose-100 animate-pulse' : 'bg-indigo-50 text-indigo-600 border-indigo-100'}`}>
                               {formatDueDate(task.dueDate)}
                             </span>
-                            <span className={`text-[8px] font-black uppercase tracking-widest ${task.priority === 'High' ? 'text-rose-500' : task.priority === 'Medium' ? 'text-amber-500' : 'text-slate-400'}`}>
+                            <span className={`text-[9px] font-black uppercase tracking-widest ${task.priority === 'High' ? 'text-rose-500' : task.priority === 'Medium' ? 'text-amber-500' : 'text-slate-400'}`}>
                               {task.priority}
                             </span>
                           </div>
                         </div>
                       </div>
-                      <button onClick={() => setTasks(prev => prev.filter(t => t.id !== task.id))} className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                      </button>
                     </div>
                   </div>
                 );
               }) : (
-                <div className="h-full flex flex-col items-center justify-center text-center py-10 opacity-30">
-                  <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-4">
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                  </div>
-                  <p className="text-[10px] font-black uppercase tracking-widest">No Active Tasks</p>
+                <div className="h-full flex flex-col items-center justify-center text-center opacity-30">
+                  <div className="w-16 h-16 bg-slate-100 rounded-[2rem] flex items-center justify-center mb-6 grayscale">🏙️</div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.3em]">No matching tasks in buffer</p>
                 </div>
               )}
             </div>
+
+            <form onSubmit={addTask} className="mt-8 space-y-3">
+              <input 
+                type="text" 
+                placeholder="Queue new action item..." 
+                value={newTaskTitle}
+                onChange={(e) => setNewTaskTitle(e.target.value)}
+                className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold outline-none focus:ring-8 focus:ring-indigo-500/5 focus:bg-white transition-all shadow-inner"
+              />
+              <button type="submit" className="w-full bg-slate-900 text-white py-4 rounded-2xl text-[10px] font-black uppercase tracking-[0.4em] hover:bg-indigo-600 transition-all shadow-2xl border-b-4 border-slate-950">Push to Queue</button>
+            </form>
           </div>
         </div>
       </div>

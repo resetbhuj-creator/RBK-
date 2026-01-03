@@ -53,7 +53,7 @@ const INITIAL_AUDIT_LOGS: AuditLog[] = [
 const INITIAL_LEDGERS: Ledger[] = [
   { id: 'l1', name: 'HDFC Bank - 0012', group: 'Bank Accounts', openingBalance: 54000, type: 'Debit' },
   { id: 'l2', name: 'Cash-in-hand', group: 'Cash-in-hand', openingBalance: 1200, type: 'Debit' },
-  { id: 'l3', name: 'Office Rent', group: 'Indirect Expenses', openingBalance: 0, type: 'Debit' },
+  { id: 'l3', name: 'Office Rent', group: 'Indirect Expenses', openingBalance: 0, type: 'Debit', budget: 30000 },
   { id: 'l4', name: 'Acme Retailers', group: 'Sundry Debtors', openingBalance: 0, type: 'Debit' },
   { id: 'l5', name: 'Global Suppliers', group: 'Sundry Creditors', openingBalance: 0, type: 'Credit' }
 ];
@@ -80,13 +80,59 @@ const INITIAL_VOUCHERS: Voucher[] = [
     ] 
   },
   { id: 'SL/23-24/0001', type: 'Sales', date: '2023-11-20', party: 'Acme Retailers', amount: 12500, status: 'Posted', narration: 'Bulk sale of laptops', subTotal: 10593.22, taxTotal: 1906.78, items: [{ id: 'vi1', itemId: 'i1', name: 'MacBook Pro M3', hsn: '8471', qty: 5, unit: 'Nos', rate: 2118.64, amount: 10593.22 }] },
-  { id: 'PY/23-24/0001', type: 'Payment', date: '2023-12-01', party: 'Real Estate Holdings', amount: 2500, status: 'Posted', narration: 'Monthly office rent' }
+  { id: 'PY/23-24/0001', type: 'Payment', date: '2023-12-01', party: 'Real Estate Holdings', amount: 2500, status: 'Posted', narration: 'Monthly office rent', ledgerId: 'l3' }
 ];
 
 const INITIAL_TASKS: Task[] = [
   { id: 'tsk-1', title: 'GST Filing GSTR-3B', description: 'Monthly statutory filing for Maharashtra node.', dueDate: new Date(Date.now() + 86400000 * 3).toISOString().split('T')[0], priority: 'High', status: 'Pending', createdAt: new Date().toISOString() },
   { id: 'tsk-2', title: 'Reconcile HDFC Bank A/c', description: 'Review terminal 0012 statements for Q3.', dueDate: new Date(Date.now() + 86400000).toISOString().split('T')[0], priority: 'Medium', status: 'Pending', createdAt: new Date().toISOString() }
 ];
+
+const ToolPalette = () => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [calcDisplay, setCalcDisplay] = useState('0');
+
+  return (
+    <div className="fixed bottom-8 right-8 z-[200] flex flex-col items-end space-y-4">
+      {isOpen && (
+        <div className="w-64 bg-slate-900 rounded-[2.5rem] border-4 border-slate-800 shadow-[0_50px_100px_-20px_rgba(0,0,0,0.5)] overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
+           <div className="p-6 bg-indigo-600 text-white flex justify-between items-center">
+              <span className="text-[10px] font-black uppercase tracking-widest">Financial Utility</span>
+              <button onClick={() => setIsOpen(false)}><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg></button>
+           </div>
+           <div className="p-6 space-y-6">
+              <div className="space-y-1.5">
+                 <label className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Master Calculator</label>
+                 <div className="bg-black/40 rounded-2xl p-4 text-right text-2xl font-black italic tracking-tighter text-white tabular-nums border border-white/10 shadow-inner">
+                    {calcDisplay}
+                 </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                 <button className="py-3 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black text-slate-400 hover:bg-indigo-600 hover:text-white transition-all">Clear</button>
+                 <button className="py-3 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black text-slate-400 hover:bg-indigo-600 hover:text-white transition-all">Tax Calc</button>
+              </div>
+              <div className="pt-4 border-t border-white/5 space-y-4">
+                 <div className="flex justify-between items-center text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                    <span>USD / INR</span>
+                    <span className="text-emerald-400">83.14 ↗</span>
+                 </div>
+                 <div className="flex justify-between items-center text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                    <span>EUR / USD</span>
+                    <span className="text-rose-400">1.08 ↘</span>
+                 </div>
+              </div>
+           </div>
+        </div>
+      )}
+      <button 
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-16 h-16 bg-indigo-600 rounded-[1.8rem] flex items-center justify-center text-white shadow-2xl hover:scale-110 active:scale-95 transition-all transform border-4 border-indigo-400/20"
+      >
+        <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m12 4a2 2 0 100-4m0 4a2 2 0 110-4" /></svg>
+      </button>
+    </div>
+  );
+};
 
 const App: React.FC = () => {
   const [activeMenu, setActiveMenu] = useState<MainMenuType>(MainMenuType.DASHBOARD);
@@ -97,10 +143,8 @@ const App: React.FC = () => {
   const [activeHouseKeepingSubMenu, setActiveHouseKeepingSubMenu] = useState<HouseKeepingSubMenu | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
-  // Global Document Viewer State
   const [viewingVoucherId, setViewingVoucherId] = useState<string | null>(null);
 
-  // Persistence State
   const [companies, setCompanies] = useState<Company[]>(() => JSON.parse(localStorage.getItem('nexus_erp_companies') || JSON.stringify(INITIAL_COMPANIES)));
   const [users, setUsers] = useState<User[]>(() => JSON.parse(localStorage.getItem('nexus_erp_users') || JSON.stringify(INITIAL_USERS)));
   const [roles, setRoles] = useState<Role[]>(() => JSON.parse(localStorage.getItem('nexus_erp_roles') || JSON.stringify(INITIAL_ROLES)));
@@ -111,7 +155,6 @@ const App: React.FC = () => {
   const [taxes, setTaxes] = useState<Tax[]>(() => JSON.parse(localStorage.getItem('nexus_erp_taxes') || '[]'));
   const [taxGroups, setTaxGroups] = useState<TaxGroup[]>(() => JSON.parse(localStorage.getItem('nexus_erp_tax_groups') || '[]'));
   const [tasks, setTasks] = useState<Task[]>(() => JSON.parse(localStorage.getItem('nexus_erp_tasks') || JSON.stringify(INITIAL_TASKS)));
-  
   const [unitMeasures, setUnitMeasures] = useState<string[]>(() => JSON.parse(localStorage.getItem('nexus_erp_unit_measures') || JSON.stringify(DEFAULT_UNITS)));
 
   const [currentCompanyId, setCurrentCompanyId] = useState(() => localStorage.getItem('nexus_erp_current_company_id') || '1');
@@ -143,7 +186,7 @@ const App: React.FC = () => {
       ...log, 
       id: `IAM-${Math.random().toString(36).substr(2, 6).toUpperCase()}`, 
       timestamp: new Date().toISOString(), 
-      actor: log.actor || 'Vance Alexander' // Defaulting to the Session Admin
+      actor: log.actor || 'Vance Alexander'
     };
     setAuditLogs(prev => [newLog, ...prev]);
   };
@@ -214,14 +257,9 @@ const App: React.FC = () => {
           </div>
         </main>
       </div>
-
-      {/* Global Document Viewer Modal */}
+      <ToolPalette />
       {voucherToView && (
-        <VoucherModal 
-          voucher={voucherToView} 
-          activeCompany={activeCompany} 
-          onClose={() => setViewingVoucherId(null)} 
-        />
+        <VoucherModal voucher={voucherToView} activeCompany={activeCompany} onClose={() => setViewingVoucherId(null)} />
       )}
     </div>
   );

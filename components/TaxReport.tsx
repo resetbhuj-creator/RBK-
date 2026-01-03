@@ -14,12 +14,15 @@ const TaxReport: React.FC<TaxReportProps> = ({ vouchers }) => {
     
     vouchers.forEach(v => {
       const tax = v.taxTotal || 0;
+      // Reverse logic for returns: Sales return reduces output, Purchase return reduces input
       if (v.gstClassification === 'Output') {
-        if (v.supplyType === 'Local') outputLocal += tax;
-        else outputCentral += tax;
+        const factor = v.type === 'Sales Return' ? -1 : 1;
+        if (v.supplyType === 'Local') outputLocal += (tax * factor);
+        else outputCentral += (tax * factor);
       } else {
-        if (v.supplyType === 'Local') inputLocal += tax;
-        else inputCentral += tax;
+        const factor = v.type === 'Purchase Return' ? -1 : 1;
+        if (v.supplyType === 'Local') inputLocal += (tax * factor);
+        else inputCentral += (tax * factor);
       }
     });
 
@@ -55,7 +58,7 @@ const TaxReport: React.FC<TaxReportProps> = ({ vouchers }) => {
               <div className="w-12 h-12 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center text-xl font-black shadow-inner">📤</div>
               <div>
                  <h4 className="text-lg font-black uppercase italic tracking-tight text-slate-800">Output GST Liability</h4>
-                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Tax Collected on Sales</p>
+                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Tax Collected on Sales (Net of Returns)</p>
               </div>
            </div>
            <div className="space-y-6">
@@ -80,7 +83,7 @@ const TaxReport: React.FC<TaxReportProps> = ({ vouchers }) => {
               <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center text-xl font-black shadow-inner">📥</div>
               <div>
                  <h4 className="text-lg font-black uppercase italic tracking-tight text-slate-800">Input Tax Credit (ITC)</h4>
-                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Tax Paid on Purchases</p>
+                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Tax Paid on Purchases (Net of Returns)</p>
               </div>
            </div>
            <div className="space-y-6">
@@ -104,9 +107,9 @@ const TaxReport: React.FC<TaxReportProps> = ({ vouchers }) => {
       <div className="p-8 bg-amber-50 rounded-[2.5rem] border border-amber-200 flex flex-col md:flex-row items-center gap-10">
          <div className="w-16 h-16 bg-amber-200 rounded-2xl flex items-center justify-center text-2xl shadow-xl shadow-amber-900/10 shrink-0">🏛️</div>
          <div className="space-y-2">
-            <h5 className="text-[11px] font-black uppercase tracking-[0.2em] text-amber-900">Regulatory Advisory Node</h5>
-            <p className="text-sm font-medium text-amber-800 leading-relaxed italic">
-              Nexus has automatically applied the $CGST + SGST = IGST$ reconciliation rule across all partitions. Please ensure that all central transactions have valid Interstate registration mapping before filing GSTR-1 / GSTR-3B summaries.
+            <h5 className="text-sm font-black uppercase tracking-[0.2em] text-amber-900">Regulatory Advisory Node</h5>
+            <p className="text-xs font-medium text-amber-800 leading-relaxed italic">
+              Nexus has automatically integrated Credit/Debit notes into your statutory liability cluster. Please ensure that all returns have valid Source Document Reference mapping to maintain high-fidelity audit parity.
             </p>
          </div>
       </div>

@@ -17,8 +17,13 @@ const InventorySummary: React.FC<InventorySummaryProps> = ({ items, vouchers }) 
         if (v.items) {
           const vItem = v.items.find(vi => vi.itemId === item.id);
           if (vItem) {
+            // Purchases increase stock, Purchase Returns decrease it
             if (v.type === 'Purchase') qtyIn += vItem.qty;
+            if (v.type === 'Purchase Return') qtyOut += vItem.qty;
+            
+            // Sales decrease stock, Sales Returns increase it
             if (v.type === 'Sales') qtyOut += vItem.qty;
+            if (v.type === 'Sales Return') qtyIn += vItem.qty;
           }
         }
       });

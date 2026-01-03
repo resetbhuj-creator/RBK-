@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Item, Ledger, Voucher, VoucherItem, Adjustment } from '../types';
+import { Item, Ledger, Voucher, VoucherItem, Adjustment, VoucherType } from '../types';
 
 interface InventoryVoucherFormProps {
   isReadOnly?: boolean;
@@ -10,9 +10,10 @@ interface InventoryVoucherFormProps {
   getNextId: (type: string) => string;
 }
 
-type InvType = 'Sales' | 'Purchase' | 'Purchase Order' | 'Delivery Note' | 'Receipt Note' | 'Stock Journal';
+type InvType = Extract<VoucherType, 'Sales' | 'Purchase' | 'Sales Return' | 'Purchase Return' | 'Purchase Order' | 'Delivery Note' | 'Goods Receipt Note (GRN)' | 'Stock Adjustment'>;
 
 const COMMON_ADJUSTMENTS = ['Freight Charges', 'Insurance', 'Labor', 'Packaging', 'Rounding Off'];
+const RETURN_REASONS = ['Damaged Goods', 'Quality Discrepancy', 'Wrong Item Shipped', 'Order Cancelled', 'Shortage in Delivery', 'Excess Supply Return'];
 
 const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly, items, ledgers, onSubmit, onCancel, getNextId }) => {
   const [vchType, setVchType] = useState<InvType>('Sales');
@@ -20,6 +21,8 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [partyId, setPartyId] = useState('');
   const [reference, setReference] = useState('');
+  const [sourceDocRef, setSourceDocRef] = useState('');
+  const [returnReason, setReturnReason] = useState('');
   const [narration, setNarration] = useState('');
   const [vchItems, setVchItems] = useState<VoucherItem[]>([]);
   const [adjustments, setAdjustments] = useState<Adjustment[]>([]);
@@ -30,14 +33,13 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
 
   const nextIdPreview = useMemo(() => getNextId(vchType), [vchType, getNextId]);
 
-  // PO is treated as financial to allow rate/tax planning
-  const isFinancial = vchType === 'Sales' || vchType === 'Purchase' || vchType === 'Purchase Order';
-  const isAdjustment = vchType === 'Stock Journal';
+  const isFinancial = ['Sales', 'Purchase', 'Purchase Order', 'Sales Return', 'Purchase Return'].includes(vchType);
+  const isReturn = vchType === 'Sales Return' || vchType === 'Purchase Return';
+  const isAdjustment = vchType === 'Stock Adjustment';
 
   const filteredParties = useMemo(() => {
     if (isAdjustment) return [];
-    // PO and Purchase/Receipt go to Creditors; Sales/Delivery to Debtors
-    const group = (vchType === 'Sales' || vchType === 'Delivery Note') ? 'Sundry Debtors' : 'Sundry Creditors';
+    const group = (vchType === 'Sales' || vchType === 'Delivery Note' || vchType === 'Sales Return') ? 'Sundry Debtors' : 'Sundry Creditors';
     return ledgers.filter(l => l.group === group);
   }, [vchType, ledgers, isAdjustment]);
 
@@ -158,38 +160,41 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
       return;
     }
     
-    const partyName = isAdjustment ? 'Internal Stock Movement' : ledgers.find(l => l.id === partyId)?.name || 'Unknown';
+    const partyName = isAdjustment ? 'INTERNAL STOCK NODE' : ledgers.find(l => l.id === partyId)?.name || 'Unknown';
     
     onSubmit({
-      type: vchType as any,
+      type: vchType,
       date,
       party: partyName,
       amount: totals.grandTotal,
       reference,
+      sourceDocRef,
+      returnReason,
       narration,
       items: vchItems,
       adjustments: adjustments,
       subTotal: totals.subTotal,
       taxTotal: totals.taxTotal,
       supplyType,
-      gstClassification: (vchType === 'Sales' || vchType === 'Delivery Note') ? 'Output' : 'Input'
+      gstClassification: (vchType === 'Sales' || vchType === 'Delivery Note' || vchType === 'Sales Return') ? 'Output' : 'Input'
     });
   };
 
   const themeConfig: Record<string, { color: string, label: string, icon: string }> = {
     'Sales': { color: 'emerald', label: 'Sales Invoice', icon: '📤' },
     'Purchase': { color: 'indigo', label: 'Purchase Bill', icon: '📥' },
-    'Purchase Order': { color: 'violet', label: 'Purchase Order', icon: '📝' },
+    'Sales Return': { color: 'rose', label: 'Sales Return (Credit Note)', icon: '♻️' },
+    'Purchase Return': { color: 'violet', label: 'Purchase Return (Debit Note)', icon: '🔙' },
+    'Purchase Order': { color: 'sky', label: 'Purchase Order', icon: '📝' },
     'Delivery Note': { color: 'amber', label: 'Delivery Note', icon: '🚚' },
-    'Receipt Note': { color: 'sky', label: 'Receipt Note', icon: '📦' },
-    'Stock Journal': { color: 'slate', label: 'Stock Journal', icon: '⚖️' }
+    'Goods Receipt Note (GRN)': { color: 'blue', label: 'Receipt Note (GRN)', icon: '📦' },
+    'Stock Adjustment': { color: 'slate', label: 'Stock Adjustment', icon: '⚖️' }
   };
 
   const activeTheme = themeConfig[vchType] || themeConfig['Sales'];
 
   return (
     <div className="bg-white rounded-[3.5rem] border border-slate-200 shadow-2xl overflow-hidden max-w-7xl mx-auto animate-in zoom-in-95 duration-300">
-      {/* Dynamic Header */}
       <div className={`px-10 py-12 bg-${activeTheme.color}-600 text-white flex justify-between items-center transition-all duration-700 relative overflow-hidden`}>
         <div className="flex items-center space-x-8 relative z-10">
           <div className="w-20 h-20 bg-white/20 rounded-[2rem] flex items-center justify-center text-4xl border border-white/10 backdrop-blur-md shadow-2xl transform -rotate-6 group-hover:rotate-0 transition-transform">
@@ -223,21 +228,19 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
       </div>
 
       <form onSubmit={handleSubmit} className="p-12 space-y-12">
-        {/* Type Selector Tabs */}
-        <div className="flex bg-slate-100 p-2 rounded-[3rem] border border-slate-200 shadow-inner max-w-5xl mx-auto overflow-x-auto no-scrollbar">
+        <div className="flex bg-slate-100 p-2 rounded-[3rem] border border-slate-200 shadow-inner max-w-7xl mx-auto overflow-x-auto no-scrollbar">
           {(Object.keys(themeConfig) as InvType[]).map(t => (
             <button 
               key={t} 
               type="button" 
               onClick={() => { setVchType(t); setPartyId(''); setVchItems([]); setAdjustments([]); }} 
-              className={`flex-1 min-w-[140px] py-4 text-[10px] font-black uppercase tracking-[0.2em] rounded-[2.5rem] transition-all ${vchType === t ? 'bg-white shadow-2xl text-indigo-600 scale-[1.02] border border-slate-100' : 'text-slate-400 hover:text-slate-600'}`}
+              className={`flex-1 min-w-[160px] py-4 text-[10px] font-black uppercase tracking-[0.2em] rounded-[2.5rem] transition-all ${vchType === t ? 'bg-white shadow-2xl text-indigo-600 scale-[1.02] border border-slate-100' : 'text-slate-400 hover:text-slate-600'}`}
             >
               {t}
             </button>
           ))}
         </div>
 
-        {/* Core Metadata */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-10 bg-slate-50 p-10 rounded-[3.5rem] border border-slate-100 shadow-inner">
           <div className="space-y-2">
             <label className="text-[10px] font-black uppercase text-slate-400 ml-2 tracking-[0.2em]">Transaction Date</label>
@@ -246,11 +249,11 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
           
           <div className="md:col-span-2 space-y-2">
             <label className="text-[10px] font-black uppercase text-slate-400 ml-2 tracking-[0.2em]">
-              {isAdjustment ? 'Stock Shard Context' : 'Authorized Party Node'}
+              {isAdjustment ? 'Adjustment Classification' : 'Authorized Party Node'}
             </label>
             {isAdjustment ? (
-              <div className="px-7 py-4 rounded-2xl border border-slate-200 bg-slate-100 text-sm font-black text-slate-400 italic">
-                Internal Movement Logic Active
+              <div className="px-7 py-4 rounded-2xl border border-slate-200 bg-slate-200 text-sm font-black text-slate-500 italic shadow-inner">
+                 INTERNAL WAREHOUSE MOVEMENT
               </div>
             ) : (
               <select value={partyId} onChange={e => setPartyId(e.target.value)} className="w-full px-7 py-4 rounded-2xl border border-slate-200 text-sm font-black text-indigo-600 bg-white outline-none focus:ring-8 focus:ring-indigo-500/5 shadow-sm appearance-none cursor-pointer">
@@ -262,11 +265,26 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
 
           <div className="space-y-2">
             <label className="text-[10px] font-black uppercase text-slate-400 ml-2 tracking-[0.2em]">External Ref Hash</label>
-            <input value={reference} onChange={e => setReference(e.target.value)} placeholder="e.g. BILL-922-A" className="w-full px-7 py-4 rounded-2xl border border-slate-200 text-sm font-black bg-white outline-none focus:ring-8 focus:ring-indigo-500/5" />
+            <input value={reference} onChange={e => setReference(e.target.value)} placeholder="e.g. GRN-922-A" className="w-full px-7 py-4 rounded-2xl border border-slate-200 text-sm font-black bg-white outline-none focus:ring-8 focus:ring-indigo-500/5 shadow-sm" />
           </div>
+
+          {isReturn && (
+            <>
+              <div className="md:col-span-2 space-y-2 animate-in slide-in-from-top-2">
+                <label className="text-[10px] font-black uppercase text-indigo-600 ml-2 tracking-[0.2em]">Source Document Ref (Original Invoice)</label>
+                <input value={sourceDocRef} onChange={e => setSourceDocRef(e.target.value)} placeholder="e.g. SL/23-24/0012" className="w-full px-7 py-4 rounded-2xl border border-indigo-200 bg-white text-sm font-black outline-none focus:ring-8 focus:ring-indigo-500/5 shadow-sm" />
+              </div>
+              <div className="md:col-span-2 space-y-2 animate-in slide-in-from-top-2">
+                <label className="text-[10px] font-black uppercase text-indigo-600 ml-2 tracking-[0.2em]">Statutory Return Reason</label>
+                <select value={returnReason} onChange={e => setReturnReason(e.target.value)} className="w-full px-7 py-4 rounded-2xl border border-indigo-200 bg-white text-sm font-black outline-none focus:ring-8 focus:ring-indigo-500/5 shadow-sm appearance-none cursor-pointer">
+                  <option value="">-- Choose Reason --</option>
+                  {RETURN_REASONS.map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
+              </div>
+            </>
+          )}
         </div>
 
-        {/* Item Catalogue Matrix */}
         <div className="space-y-6">
            <div className="flex items-center justify-between px-4">
               <div className="flex items-center space-x-4">
@@ -377,7 +395,6 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
            </div>
         </div>
 
-        {/* Adjustments Section (Financial Only) */}
         {isFinancial && (
           <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
             <div className="flex items-center space-x-4 px-4">
@@ -456,7 +473,6 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
           </div>
         )}
 
-        {/* Narrative & Resolution Section */}
         <div className="flex flex-col xl:flex-row gap-12 pt-8 border-t border-slate-100">
            <div className="flex-1 space-y-4">
               <label className="text-[11px] font-black uppercase text-slate-400 ml-4 tracking-[0.4em]">Audit Narrative & Context</label>
@@ -506,7 +522,7 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
               <button 
                 type="submit" 
                 disabled={isReadOnly || vchItems.length === 0 || (!partyId && !isAdjustment)} 
-                className={`w-full py-8 rounded-[2.5rem] font-black text-xs uppercase tracking-[0.4em] shadow-2xl transition-all transform active:scale-95 shadow-2xl border-b-8 border-slate-950 ${isReadOnly ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none border-none' : 'bg-slate-900 text-white hover:bg-black group'}`}
+                className={`w-full py-8 rounded-[2.5rem] font-black text-xs uppercase tracking-[0.4em] shadow-2xl transition-all transform active:scale-95 border-b-8 border-slate-950 ${isReadOnly ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none border-none' : 'bg-slate-900 text-white hover:bg-black group'}`}
               >
                  <span className="group-hover:scale-110 transition-transform block">Authorize Resource Transmission</span>
               </button>

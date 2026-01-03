@@ -32,12 +32,14 @@ export enum AdminSubMenu {
 export enum TransactionSubMenu {
   ACCOUNTING_VOUCHERS = 'Accounting Vouchers',
   INVENTORY_VOUCHERS = 'Inventory Vouchers',
+  BANK_RECONCILIATION = 'Bank Reconciliation',
   DAY_BOOK = 'Day Book'
 }
 
 export enum DisplaySubMenu {
   BALANCE_SHEET = 'Balance Sheet',
   PROFIT_LOSS = 'Profit & Loss',
+  BUDGET_VARIANCE = 'Budget vs Actual',
   TRIAL_BALANCE = 'Trial Balance',
   CASH_FLOW = 'Cash Flow',
   INVENTORY_SUMMARY = 'Inventory Summary',
@@ -57,6 +59,7 @@ export enum HouseKeepingSubMenu {
   DATABASE_UTILITY = 'Database Utility',
   INTEGRITY_CHECK = 'Data Integrity',
   SYSTEM_AUDIT = 'Security Audit',
+  DATA_PURGE = 'Data Purge Utility',
   PREFERENCES = 'System Preferences'
 }
 
@@ -109,7 +112,7 @@ export interface AuditLog {
   id: string;
   actor: string;
   action: 'CREATE' | 'UPDATE' | 'DELETE' | 'STATUS_CHANGE';
-  entityType: 'USER' | 'ROLE' | 'SYSTEM' | 'COMPANY';
+  entityType: 'USER' | 'ROLE' | 'SYSTEM' | 'COMPANY' | 'VOUCHER' | 'MASTER';
   entityName: string;
   details: string;
   timestamp: string;
@@ -145,24 +148,30 @@ export interface LedgerEntry {
   amount: number;
 }
 
+export type VoucherType = 'Sales' | 'Purchase' | 'Sales Return' | 'Purchase Return' | 'Payment' | 'Receipt' | 'Journal' | 'Contra' | 'Delivery Note' | 'Goods Receipt Note (GRN)' | 'Stock Adjustment' | 'Purchase Order';
+
 export interface Voucher {
   id: string;
-  type: 'Sales' | 'Purchase' | 'Payment' | 'Receipt' | 'Journal' | 'Contra' | 'Delivery Note' | 'Receipt Note' | 'Stock Journal' | 'Purchase Order';
+  type: VoucherType;
   date: string;
   party: string;
   amount: number;
-  status: 'Draft' | 'Posted' | 'Cancelled';
+  status: 'Draft' | 'Posted' | 'Cancelled' | 'Pending Approval';
   narration?: string;
   ledgerId?: string;
   secondaryLedgerId?: string;
-  entries?: LedgerEntry[]; // For multi-ledger double entry
+  entries?: LedgerEntry[];
   reference?: string;
+  sourceDocRef?: string; // New: Link to original invoice
+  returnReason?: string; // New: Context for return
   items?: VoucherItem[];
   adjustments?: Adjustment[];
   subTotal?: number;
   taxTotal?: number;
   supplyType?: 'Local' | 'Central';
   gstClassification?: 'Input' | 'Output';
+  isReconciled?: boolean;
+  bankDate?: string;
 }
 
 export interface Ledger {
@@ -171,6 +180,7 @@ export interface Ledger {
   group: string;
   openingBalance: number;
   type: 'Debit' | 'Credit';
+  budget?: number; // Annual budget ceiling
 }
 
 export interface Item {
@@ -180,7 +190,7 @@ export interface Item {
   unit: string;
   salePrice: number;
   hsnCode: string;
-  gstRate: number; // Combined rate (IGST)
+  gstRate: number;
   taxGroupId?: string;
 }
 
@@ -196,13 +206,6 @@ export interface SubMenuItem {
   description: string;
   icon: React.ReactNode;
   color: string;
-}
-
-export interface StatsData {
-  label: string;
-  value: string;
-  trend: number;
-  icon: React.ReactNode;
 }
 
 export interface AccountGroup {
@@ -235,7 +238,7 @@ export interface Task {
   id: string;
   title: string;
   description?: string;
-  dueDate: string; // Statutory or operational deadline
+  dueDate: string;
   priority: TaskPriority;
   status: 'Pending' | 'Completed';
   createdAt: string;

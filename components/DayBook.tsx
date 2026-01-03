@@ -120,7 +120,7 @@ const DayBook: React.FC<DayBookProps> = ({ vouchers, onClone, onViewVoucher }) =
             
             <div className="flex items-center space-x-4">
               <div className="flex bg-slate-200/50 p-1.5 rounded-[1.8rem] border border-slate-200 overflow-x-auto no-scrollbar shadow-inner">
-                {['All', 'Sales', 'Purchase', 'Payment', 'Receipt', 'Contra', 'Journal'].map(t => (
+                {['All', 'Sales', 'Purchase', 'Sales Return', 'Purchase Return', 'Payment', 'Receipt', 'Contra', 'Journal', 'Delivery Note', 'Goods Receipt Note (GRN)', 'Stock Adjustment'].map(t => (
                   <button key={t} onClick={() => setFilterType(t)} className={`px-6 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all whitespace-nowrap ${filterType === t ? 'bg-white text-indigo-600 shadow-xl scale-[1.02] border border-slate-100' : 'text-slate-500 hover:text-slate-800'}`}>{t}</button>
                 ))}
               </div>
@@ -186,6 +186,7 @@ const DayBook: React.FC<DayBookProps> = ({ vouchers, onClone, onViewVoucher }) =
                        <span className={`px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] border self-start shadow-sm transition-transform group-hover:scale-105 ${
                          v.type === 'Sales' || v.type === 'Receipt' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
                          v.type === 'Purchase' || v.type === 'Payment' ? 'bg-rose-50 text-rose-600 border-rose-100' : 
+                         v.type === 'Sales Return' || v.type === 'Purchase Return' ? 'bg-amber-50 text-amber-600 border-amber-100' :
                          'bg-indigo-50 text-indigo-600 border-indigo-100'
                        }`}>{v.type}</span>
                        <span className="text-[9px] font-black text-slate-300 uppercase tracking-[0.3em] ml-1">{v.supplyType || 'Internal Node'}</span>
