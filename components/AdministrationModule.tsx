@@ -75,7 +75,8 @@ const AdministrationModule: React.FC<AdministrationModuleProps> = ({
       return data.filter(x => {
         const nameMatch = x.name?.toLowerCase().includes(term);
         const descMatch = activeTab === 'TAX_GROUPS' && x.description?.toLowerCase().includes(term);
-        return nameMatch || descMatch;
+        const hsnMatch = activeTab === 'ITEMS' && x.hsnCode?.toLowerCase().includes(term);
+        return nameMatch || descMatch || hsnMatch;
       });
     }, [activeTab, ledgers, items, accountGroups, taxes, taxGroups, searchTerm]);
 
@@ -169,7 +170,7 @@ const AdministrationModule: React.FC<AdministrationModuleProps> = ({
             <div className="relative flex-1 max-w-xs">
                 <input 
                   type="text" 
-                  placeholder={`Search ${activeTab.replace('_', ' ').toLowerCase()}...`} 
+                  placeholder={`Search ${activeTab.replace('_', ' ').toLowerCase()} by name or code...`} 
                   value={searchTerm} 
                   onChange={(e) => setSearchTerm(e.target.value)} 
                   className="w-full pl-8 pr-4 py-1.5 rounded-lg border border-slate-200 text-[11px] font-bold shadow-inner outline-none focus:ring-2 focus:ring-indigo-500/20" 

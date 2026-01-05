@@ -5,6 +5,7 @@ import DatabaseUtility from './HouseKeeping/DatabaseUtility';
 import IntegrityCheck from './HouseKeeping/IntegrityCheck';
 import SystemAudit from './HouseKeeping/SystemAudit';
 import PreferenceCenter from './HouseKeeping/PreferenceCenter';
+import VoucherRenumbering from './HouseKeeping/VoucherRenumbering';
 
 interface HouseKeepingModuleProps {
   activeCompany: any;
@@ -13,10 +14,11 @@ interface HouseKeepingModuleProps {
   auditLogs: AuditLog[];
   ledgers: Ledger[];
   vouchers: Voucher[];
+  setVouchers?: React.Dispatch<React.SetStateAction<Voucher[]>>;
 }
 
 const HouseKeepingModule: React.FC<HouseKeepingModuleProps> = ({ 
-  activeCompany, activeSubAction, setActiveSubAction, auditLogs, ledgers, vouchers 
+  activeCompany, activeSubAction, setActiveSubAction, auditLogs, ledgers, vouchers, setVouchers 
 }) => {
 
   const renderContent = () => {
@@ -27,6 +29,8 @@ const HouseKeepingModule: React.FC<HouseKeepingModuleProps> = ({
         return <IntegrityCheck ledgers={ledgers} vouchers={vouchers} />;
       case HouseKeepingSubMenu.SYSTEM_AUDIT:
         return <SystemAudit auditLogs={auditLogs} />;
+      case HouseKeepingSubMenu.RENUMBERING:
+        return <VoucherRenumbering vouchers={vouchers} setVouchers={setVouchers} activeCompany={activeCompany} />;
       case HouseKeepingSubMenu.PREFERENCES:
         return <PreferenceCenter />;
       default:
@@ -43,7 +47,7 @@ const HouseKeepingModule: React.FC<HouseKeepingModuleProps> = ({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {HOUSE_KEEPING_SUB_MENUS.map((item) => (
           <button
             key={item.id}

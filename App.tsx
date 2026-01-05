@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { MainMenuType, Role, User, AuditLog, AdminSubMenu, TransactionSubMenu, DisplaySubMenu, CommunicationSubMenu, HouseKeepingSubMenu, Ledger, Item, Voucher, Tax, TaxGroup, Company, Task } from './types';
-import Sidebar from './components/Sidebar';
 import Header from './components/Header';
+import Sidebar from './components/Sidebar';
+import RibbonMenu from './components/RibbonMenu';
 import Dashboard from './components/Dashboard';
 import ModulePlaceholder from './components/ModulePlaceholder';
 import CompanyModule from './components/CompanyModule';
@@ -11,21 +12,24 @@ import DisplayModule from './components/DisplayModule';
 import CommunicationModule from './components/CommunicationModule';
 import HouseKeepingModule from './components/HouseKeepingModule';
 import VoucherModal from './components/VoucherModal';
+import AIAssistant from './components/AIAssistant';
 import { UNIT_MEASURES as DEFAULT_UNITS } from './constants';
 
 const INITIAL_ROLES: Role[] = [
-  { id: 'r1', name: 'Super Admin', permissions: { company: 'all', administration: 'all', transaction: 'all', display: 'all' }, isSystem: true },
-  { id: 'r2', name: 'Admin', permissions: { company: 'write', administration: 'write', transaction: 'write', display: 'all' }, isSystem: true },
-  { id: 'r3', name: 'Manager', permissions: { company: 'read', administration: 'none', transaction: 'write', display: 'all' }, isSystem: true },
-  { id: 'r4', name: 'Accountant', permissions: { company: 'read', administration: 'none', transaction: 'write', display: 'all' }, isSystem: true },
-  { id: 'r5', name: 'Auditor', permissions: { company: 'read', administration: 'none', transaction: 'none', display: 'all' }, isSystem: true }
+  { id: 'r-sys-01', name: 'Super Admin', permissions: { company: 'all', administration: 'all', transaction: 'all', display: 'all' }, isSystem: true, description: 'Institutional oversight with full sovereign authority over all system modules and data vaults.' },
+  { id: 'r-sys-02', name: 'Admin', permissions: { company: 'write', administration: 'write', transaction: 'write', display: 'all' }, isSystem: true, description: 'Standard administrative node for day-to-day management of organizational masters and users.' },
+  { id: 'r-sys-03', name: 'Auditor', permissions: { company: 'read', administration: 'none', transaction: 'none', display: 'all' }, isSystem: true, description: 'Read-only access tier for external compliance and statutory review processes.' }
+];
+
+const INITIAL_USERS: User[] = [
+  { id: 'u-001', name: 'Vance Alexander', email: 'vance@nexus-core.net', role: 'Super Admin', status: 'Active', lastLogin: new Date().toISOString(), permissions: INITIAL_ROLES[0].permissions }
 ];
 
 const INITIAL_COMPANIES = [
   { 
     id: '1', 
     name: 'Nexus Global Industries Ltd.', 
-    years: ['2022 - 2023', '2023 - 2024'], 
+    years: ['2023 - 2024'], 
     country: 'India', 
     state: 'Maharashtra', 
     currency: 'INR (₹)', 
@@ -34,105 +38,24 @@ const INITIAL_COMPANIES = [
     taxId: '27AAAAA0000A1Z5', 
     address: 'Nexus Tower, BKC, Mumbai - 400051',
     dataPath: 'C:\\NexusERP\\Data\\Company001',
-    businessType: 'Private Limited Company',
     fyStartDate: '2023-04-01',
-    booksBeginDate: '2023-04-01'
+    booksBeginDate: '2023-04-01',
+    approvalThreshold: 10000
   }
-];
-
-const INITIAL_USERS: User[] = [
-  { id: 'u1', name: 'System Admin', email: 'admin@nexus.com', role: 'Super Admin', status: 'Active', lastLogin: '2 mins ago', permissions: { company: 'all', administration: 'all', transaction: 'all', display: 'all' } }
-];
-
-const INITIAL_AUDIT_LOGS: AuditLog[] = [
-  { id: 'log-1', actor: 'System Admin', action: 'CREATE', entityType: 'SYSTEM', entityName: 'Nexus Core', details: 'System initialization successful. Multi-region master mapping complete.', timestamp: new Date(Date.now() - 3600000).toISOString() },
-  { id: 'log-2', actor: 'System Admin', action: 'STATUS_CHANGE', entityType: 'USER', entityName: 'System Admin', details: 'LIFECYCLE SHIFT: Account integrity status changed from Suspended to Active.', timestamp: new Date(Date.now() - 1800000).toISOString() },
-  { id: 'log-3', actor: 'System Admin', action: 'UPDATE', entityType: 'ROLE', entityName: 'Accountant', details: 'MODIFICATION TRACE: [PERM:TRANSACTION] read → write | [PERM:DISPLAY] none → all', timestamp: new Date(Date.now() - 600000).toISOString() }
 ];
 
 const INITIAL_LEDGERS: Ledger[] = [
   { id: 'l1', name: 'HDFC Bank - 0012', group: 'Bank Accounts', openingBalance: 54000, type: 'Debit' },
-  { id: 'l2', name: 'Cash-in-hand', group: 'Cash-in-hand', openingBalance: 1200, type: 'Debit' },
-  { id: 'l3', name: 'Office Rent', group: 'Indirect Expenses', openingBalance: 0, type: 'Debit', budget: 30000 },
-  { id: 'l4', name: 'Acme Retailers', group: 'Sundry Debtors', openingBalance: 0, type: 'Debit' },
-  { id: 'l5', name: 'Global Suppliers', group: 'Sundry Creditors', openingBalance: 0, type: 'Credit' }
+  { id: 'l2', name: 'Cash-in-hand', group: 'Cash-in-hand', openingBalance: 1200, type: 'Debit' }
 ];
 
 const INITIAL_ITEMS: Item[] = [
-  { id: 'i1', name: 'MacBook Pro M3', category: 'Electronics', unit: 'Nos', salePrice: 2400, hsnCode: '8471', gstRate: 18 },
-  { id: 'i2', name: 'Software License', category: 'Digital Assets', unit: 'Unit', salePrice: 500, hsnCode: '9973', gstRate: 18 },
-  { id: 'i3', name: 'Premium Support Package', category: 'Services', unit: 'Months', salePrice: 2500, hsnCode: '9983', gstRate: 18 }
+  { id: 'i1', name: 'MacBook Pro M3', category: 'Electronics', unit: 'Nos', salePrice: 2400, hsnCode: '8471', gstRate: 18 }
 ];
 
 const INITIAL_VOUCHERS: Voucher[] = [
-  { 
-    id: 'PO/23-24/0001', 
-    type: 'Purchase Order', 
-    date: '2023-12-05', 
-    party: 'Global Suppliers', 
-    amount: 28320, 
-    status: 'Posted', 
-    narration: 'Procurement of 10 units for development team expansion.', 
-    subTotal: 24000, 
-    taxTotal: 4320, 
-    items: [
-      { id: 'vi-po1', itemId: 'i1', name: 'MacBook Pro M3', hsn: '8471', qty: 10, unit: 'Nos', rate: 2400, amount: 24000, igstRate: 18, taxAmount: 4320 }
-    ] 
-  },
-  { id: 'SL/23-24/0001', type: 'Sales', date: '2023-11-20', party: 'Acme Retailers', amount: 12500, status: 'Posted', narration: 'Bulk sale of laptops', subTotal: 10593.22, taxTotal: 1906.78, items: [{ id: 'vi1', itemId: 'i1', name: 'MacBook Pro M3', hsn: '8471', qty: 5, unit: 'Nos', rate: 2118.64, amount: 10593.22 }] },
-  { id: 'PY/23-24/0001', type: 'Payment', date: '2023-12-01', party: 'Real Estate Holdings', amount: 2500, status: 'Posted', narration: 'Monthly office rent', ledgerId: 'l3' }
+  { id: 'SL/23-24/00001', type: 'Sales', date: '2023-11-20', party: 'Acme Retailers', amount: 12500, status: 'Posted', narration: 'Bulk sale of laptops', subTotal: 10593.22, taxTotal: 1906.78, items: [{ id: 'vi1', itemId: 'i1', name: 'MacBook Pro M3', hsn: '8471', qty: 5, unit: 'Nos', rate: 2118.64, amount: 10593.22 }] }
 ];
-
-const INITIAL_TASKS: Task[] = [
-  { id: 'tsk-1', title: 'GST Filing GSTR-3B', description: 'Monthly statutory filing for Maharashtra node.', dueDate: new Date(Date.now() + 86400000 * 3).toISOString().split('T')[0], priority: 'High', status: 'Pending', createdAt: new Date().toISOString() },
-  { id: 'tsk-2', title: 'Reconcile HDFC Bank A/c', description: 'Review terminal 0012 statements for Q3.', dueDate: new Date(Date.now() + 86400000).toISOString().split('T')[0], priority: 'Medium', status: 'Pending', createdAt: new Date().toISOString() }
-];
-
-const ToolPalette = () => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [calcDisplay, setCalcDisplay] = useState('0');
-
-  return (
-    <div className="fixed bottom-8 right-8 z-[200] flex flex-col items-end space-y-4">
-      {isOpen && (
-        <div className="w-64 bg-slate-900 rounded-[2.5rem] border-4 border-slate-800 shadow-[0_50px_100px_-20px_rgba(0,0,0,0.5)] overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
-           <div className="p-6 bg-indigo-600 text-white flex justify-between items-center">
-              <span className="text-[10px] font-black uppercase tracking-widest">Financial Utility</span>
-              <button onClick={() => setIsOpen(false)}><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg></button>
-           </div>
-           <div className="p-6 space-y-6">
-              <div className="space-y-1.5">
-                 <label className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Master Calculator</label>
-                 <div className="bg-black/40 rounded-2xl p-4 text-right text-2xl font-black italic tracking-tighter text-white tabular-nums border border-white/10 shadow-inner">
-                    {calcDisplay}
-                 </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                 <button className="py-3 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black text-slate-400 hover:bg-indigo-600 hover:text-white transition-all">Clear</button>
-                 <button className="py-3 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black text-slate-400 hover:bg-indigo-600 hover:text-white transition-all">Tax Calc</button>
-              </div>
-              <div className="pt-4 border-t border-white/5 space-y-4">
-                 <div className="flex justify-between items-center text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                    <span>USD / INR</span>
-                    <span className="text-emerald-400">83.14 ↗</span>
-                 </div>
-                 <div className="flex justify-between items-center text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                    <span>EUR / USD</span>
-                    <span className="text-rose-400">1.08 ↘</span>
-                 </div>
-              </div>
-           </div>
-        </div>
-      )}
-      <button 
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-16 h-16 bg-indigo-600 rounded-[1.8rem] flex items-center justify-center text-white shadow-2xl hover:scale-110 active:scale-95 transition-all transform border-4 border-indigo-400/20"
-      >
-        <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m12 4a2 2 0 100-4m0 4a2 2 0 110-4" /></svg>
-      </button>
-    </div>
-  );
-};
 
 const App: React.FC = () => {
   const [activeMenu, setActiveMenu] = useState<MainMenuType>(MainMenuType.DASHBOARD);
@@ -141,75 +64,78 @@ const App: React.FC = () => {
   const [activeDisplaySubMenu, setActiveDisplaySubMenu] = useState<DisplaySubMenu | null>(null);
   const [activeCommSubMenu, setActiveCommSubMenu] = useState<CommunicationSubMenu | null>(null);
   const [activeHouseKeepingSubMenu, setActiveHouseKeepingSubMenu] = useState<HouseKeepingSubMenu | null>(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isRibbonCollapsed, setIsRibbonCollapsed] = useState(false);
   const [viewingVoucherId, setViewingVoucherId] = useState<string | null>(null);
 
+  // Core Data State
   const [companies, setCompanies] = useState<Company[]>(() => JSON.parse(localStorage.getItem('nexus_erp_companies') || JSON.stringify(INITIAL_COMPANIES)));
-  const [users, setUsers] = useState<User[]>(() => JSON.parse(localStorage.getItem('nexus_erp_users') || JSON.stringify(INITIAL_USERS)));
-  const [roles, setRoles] = useState<Role[]>(() => JSON.parse(localStorage.getItem('nexus_erp_roles') || JSON.stringify(INITIAL_ROLES)));
-  const [auditLogs, setAuditLogs] = useState<AuditLog[]>(() => JSON.parse(localStorage.getItem('nexus_erp_audit_logs') || JSON.stringify(INITIAL_AUDIT_LOGS)));
   const [ledgers, setLedgers] = useState<Ledger[]>(() => JSON.parse(localStorage.getItem('nexus_erp_ledgers') || JSON.stringify(INITIAL_LEDGERS)));
   const [items, setItems] = useState<Item[]>(() => JSON.parse(localStorage.getItem('nexus_erp_items') || JSON.stringify(INITIAL_ITEMS)));
   const [vouchers, setVouchers] = useState<Voucher[]>(() => JSON.parse(localStorage.getItem('nexus_erp_vouchers') || JSON.stringify(INITIAL_VOUCHERS)));
-  const [taxes, setTaxes] = useState<Tax[]>(() => JSON.parse(localStorage.getItem('nexus_erp_taxes') || '[]'));
-  const [taxGroups, setTaxGroups] = useState<TaxGroup[]>(() => JSON.parse(localStorage.getItem('nexus_erp_tax_groups') || '[]'));
-  const [tasks, setTasks] = useState<Task[]>(() => JSON.parse(localStorage.getItem('nexus_erp_tasks') || JSON.stringify(INITIAL_TASKS)));
-  const [unitMeasures, setUnitMeasures] = useState<string[]>(() => JSON.parse(localStorage.getItem('nexus_erp_unit_measures') || JSON.stringify(DEFAULT_UNITS)));
+  
+  // IAM State
+  const [users, setUsers] = useState<User[]>(() => JSON.parse(localStorage.getItem('nexus_erp_users') || JSON.stringify(INITIAL_USERS)));
+  const [roles, setRoles] = useState<Role[]>(() => JSON.parse(localStorage.getItem('nexus_erp_roles') || JSON.stringify(INITIAL_ROLES)));
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>(() => JSON.parse(localStorage.getItem('nexus_erp_audit_logs') || '[]'));
 
+  const [unitMeasures, setUnitMeasures] = useState<string[]>(() => JSON.parse(localStorage.getItem('nexus_erp_unit_measures') || JSON.stringify(DEFAULT_UNITS)));
   const [currentCompanyId, setCurrentCompanyId] = useState(() => localStorage.getItem('nexus_erp_current_company_id') || '1');
   const [currentFY, setCurrentFY] = useState(() => localStorage.getItem('nexus_erp_current_fy') || '2023 - 2024');
   const [isFYLocked, setIsFYLocked] = useState(() => localStorage.getItem('nexus_erp_fy_locked') === 'true');
 
+  // Persistence Sync
   useEffect(() => {
     localStorage.setItem('nexus_erp_companies', JSON.stringify(companies));
-    localStorage.setItem('nexus_erp_users', JSON.stringify(users));
-    localStorage.setItem('nexus_erp_roles', JSON.stringify(roles));
-    localStorage.setItem('nexus_erp_audit_logs', JSON.stringify(auditLogs));
     localStorage.setItem('nexus_erp_ledgers', JSON.stringify(ledgers));
     localStorage.setItem('nexus_erp_items', JSON.stringify(items));
     localStorage.setItem('nexus_erp_vouchers', JSON.stringify(vouchers));
-    localStorage.setItem('nexus_erp_taxes', JSON.stringify(taxes));
-    localStorage.setItem('nexus_erp_tax_groups', JSON.stringify(taxGroups));
-    localStorage.setItem('nexus_erp_tasks', JSON.stringify(tasks));
-    localStorage.setItem('nexus_erp_unit_measures', JSON.stringify(unitMeasures));
+    localStorage.setItem('nexus_erp_users', JSON.stringify(users));
+    localStorage.setItem('nexus_erp_roles', JSON.stringify(roles));
+    localStorage.setItem('nexus_erp_audit_logs', JSON.stringify(auditLogs));
     localStorage.setItem('nexus_erp_current_company_id', currentCompanyId);
     localStorage.setItem('nexus_erp_current_fy', currentFY);
-    localStorage.setItem('nexus_erp_fy_locked', isFYLocked.toString());
-  }, [companies, users, roles, auditLogs, ledgers, items, vouchers, taxes, taxGroups, tasks, unitMeasures, currentCompanyId, currentFY, isFYLocked]);
+    localStorage.setItem('nexus_erp_fy_locked', String(isFYLocked));
+  }, [companies, ledgers, items, vouchers, users, roles, auditLogs, currentCompanyId, currentFY, isFYLocked]);
+
+  const addAuditLog = useCallback((logData: Omit<AuditLog, 'id' | 'timestamp' | 'actor'> & { actor?: string }) => {
+    const newLog: AuditLog = {
+      ...logData,
+      id: `EV-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
+      timestamp: new Date().toISOString(),
+      actor: logData.actor || 'Vance Alexander'
+    };
+    setAuditLogs(prev => [newLog, ...prev]);
+  }, []);
 
   const activeCompany = companies.find((c: any) => c.id === currentCompanyId) || { name: 'None Selected' };
   const voucherToView = viewingVoucherId ? vouchers.find(v => v.id === viewingVoucherId) : null;
 
-  const addAuditLog = (log: Omit<AuditLog, 'id' | 'timestamp' | 'actor'> & { actor?: string }) => {
-    const newLog: AuditLog = { 
-      ...log, 
-      id: `IAM-${Math.random().toString(36).substr(2, 6).toUpperCase()}`, 
-      timestamp: new Date().toISOString(), 
-      actor: log.actor || 'Vance Alexander'
-    };
-    setAuditLogs(prev => [newLog, ...prev]);
+  const handleSetCurrentFY = (fy: string, locked?: boolean) => {
+    setCurrentFY(fy);
+    if (locked !== undefined) setIsFYLocked(locked);
   };
 
   const renderContent = () => {
     switch (activeMenu) {
       case MainMenuType.DASHBOARD:
-        return <Dashboard activeCompany={activeCompany} vouchers={vouchers} onViewVoucher={setViewingVoucherId} tasks={tasks} setTasks={setTasks} />;
+        return <Dashboard activeCompany={activeCompany} vouchers={vouchers} onViewVoucher={setViewingVoucherId} tasks={[]} setTasks={() => {}} />;
       case MainMenuType.COMPANY:
-        return <CompanyModule companies={companies} setCompanies={setCompanies} currentCompanyId={currentCompanyId} setCurrentCompanyId={setCurrentCompanyId} currentFY={currentFY} setCurrentFY={setCurrentFY} addAuditLog={addAuditLog} />;
+        return <CompanyModule companies={companies} setCompanies={setCompanies} currentCompanyId={currentCompanyId} setCurrentCompanyId={setCurrentCompanyId} currentFY={currentFY} setCurrentFY={handleSetCurrentFY} addAuditLog={addAuditLog} />;
       case MainMenuType.ADMINISTRATION:
         return (
           <AdministrationModule 
-            users={users} setUsers={setUsers} roles={roles} setRoles={setRoles} auditLogs={auditLogs} addAuditLog={addAuditLog} 
-            activeCompany={activeCompany} currentFY={currentFY} activeSubAction={activeAdminSubMenu} setActiveSubAction={setActiveAdminSubMenu} setCurrentFY={(fy, locked) => {
-              setCurrentFY(fy);
-              if (locked !== undefined) setIsFYLocked(locked);
-            }}
-            companies={companies} setCompanies={setCompanies}
-            ledgers={ledgers} setLedgers={setLedgers} items={items} setItems={setItems}
-            taxes={taxes} setTaxes={setTaxes} taxGroups={taxGroups} setTaxGroups={setTaxGroups}
-            vouchers={vouchers} setVouchers={setVouchers}
+            users={users} setUsers={setUsers} 
+            roles={roles} setRoles={setRoles} 
+            auditLogs={auditLogs} addAuditLog={addAuditLog} 
+            activeCompany={activeCompany} currentFY={currentFY} 
+            activeSubAction={activeAdminSubMenu} setActiveSubAction={setActiveAdminSubMenu} 
+            setCurrentFY={handleSetCurrentFY}
+            companies={companies} ledgers={ledgers} setLedgers={setLedgers} items={items} setItems={setItems}
+            taxes={[]} setTaxes={() => {}} taxGroups={[]} setTaxGroups={() => {}} vouchers={vouchers} setVouchers={setVouchers}
             unitMeasures={unitMeasures} setUnitMeasures={setUnitMeasures}
+            isFYLocked={isFYLocked}
           />
         );
       case MainMenuType.TRANSACTION:
@@ -223,44 +149,79 @@ const App: React.FC = () => {
         return (
           <DisplayModule 
             activeCompany={activeCompany} activeSubAction={activeDisplaySubMenu} setActiveSubAction={setActiveDisplaySubMenu}
-            ledgers={ledgers} vouchers={vouchers} items={items} taxes={taxes} taxGroups={taxGroups}
+            ledgers={ledgers} vouchers={vouchers} items={items} taxes={[]} taxGroups={[]}
             onViewVoucher={setViewingVoucherId}
           />
         );
       case MainMenuType.COMMUNICATION:
         return <CommunicationModule activeCompany={activeCompany} activeSubAction={activeCommSubMenu} setActiveSubAction={setActiveCommSubMenu} vouchers={vouchers} ledgers={ledgers} onViewVoucher={setViewingVoucherId} />;
       case MainMenuType.HOUSE_KEEPING:
-        return <HouseKeepingModule activeCompany={activeCompany} activeSubAction={activeHouseKeepingSubMenu} setActiveSubAction={setActiveHouseKeepingSubMenu} auditLogs={auditLogs} ledgers={ledgers} vouchers={vouchers} />;
+        return <HouseKeepingModule activeCompany={activeCompany} activeSubAction={activeHouseKeepingSubMenu} setActiveSubAction={setActiveHouseKeepingSubMenu} auditLogs={auditLogs} ledgers={ledgers} vouchers={vouchers} setVouchers={setVouchers} />;
       default:
         return <ModulePlaceholder type={activeMenu} />;
     }
   };
 
   return (
-    <div className="flex h-screen bg-slate-50 overflow-hidden">
-      {isSidebarOpen && <div className="fixed inset-0 bg-slate-900/60 z-40 md:hidden backdrop-blur-sm transition-all duration-300" onClick={() => setIsSidebarOpen(false)} />}
+    <div className="flex h-screen bg-slate-50 overflow-hidden font-sans">
       <Sidebar 
         activeMenu={activeMenu} 
-        setActiveMenu={(menu) => { setActiveMenu(menu); setActiveAdminSubMenu(null); setActiveTransactionSubMenu(null); setActiveDisplaySubMenu(null); setActiveCommSubMenu(null); setActiveHouseKeepingSubMenu(null); }} 
-        activeAdminSubMenu={activeAdminSubMenu} setActiveAdminSubMenu={setActiveAdminSubMenu} 
-        activeTransactionSubMenu={activeTransactionSubMenu} setActiveTransactionSubMenu={setActiveTransactionSubMenu} 
+        setActiveMenu={setActiveMenu}
+        activeAdminSubMenu={activeAdminSubMenu} setActiveAdminSubMenu={setActiveAdminSubMenu}
+        activeTransactionSubMenu={activeTransactionSubMenu} setActiveTransactionSubMenu={setActiveTransactionSubMenu}
         activeDisplaySubMenu={activeDisplaySubMenu} setActiveDisplaySubMenu={setActiveDisplaySubMenu}
         activeCommSubMenu={activeCommSubMenu} setActiveCommSubMenu={setActiveCommSubMenu}
         activeHouseKeepingSubMenu={activeHouseKeepingSubMenu} setActiveHouseKeepingSubMenu={setActiveHouseKeepingSubMenu}
-        isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} activeCompany={activeCompany} 
+        isOpen={isSidebarOpen}
+        setIsOpen={setIsSidebarOpen}
+        activeCompany={activeCompany}
       />
-      <div className="flex-1 flex flex-col min-w-0 h-screen">
-        <Header onMenuToggle={() => setIsSidebarOpen(!isSidebarOpen)} title={activeMenu} activeCompanyName={activeCompany.name} currentFY={currentFY} isFYLocked={isFYLocked} />
-        <main className="flex-1 overflow-y-auto overflow-x-hidden p-3 md:p-6 bg-slate-50/50 custom-scrollbar scroll-smooth">
-          <div className="max-w-[1600px] mx-auto animate-in fade-in duration-500">
+      
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
+        <Header 
+          title={activeMenu} 
+          activeCompanyName={activeCompany.name} 
+          currentFY={currentFY} 
+          isFYLocked={isFYLocked} 
+          onMenuToggle={() => setIsSidebarOpen(!isSidebarOpen)}
+        />
+        
+        <RibbonMenu 
+          activeMenu={activeMenu} 
+          setActiveMenu={setActiveMenu}
+          activeAdminSubMenu={activeAdminSubMenu} setActiveAdminSubMenu={setActiveAdminSubMenu}
+          activeTransactionSubMenu={activeTransactionSubMenu} setActiveTransactionSubMenu={setActiveTransactionSubMenu}
+          activeDisplaySubMenu={activeDisplaySubMenu} setActiveDisplaySubMenu={setActiveDisplaySubMenu}
+          activeCommSubMenu={activeCommSubMenu} setActiveCommSubMenu={setActiveCommSubMenu}
+          activeHouseKeepingSubMenu={activeHouseKeepingSubMenu} setActiveHouseKeepingSubMenu={setActiveHouseKeepingSubMenu}
+          isCollapsed={isRibbonCollapsed}
+          setIsCollapsed={setIsRibbonCollapsed}
+        />
+
+        <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-8 custom-scrollbar scroll-smooth bg-slate-100/50">
+          <div className="max-w-[1600px] mx-auto animate-in fade-in duration-700">
             {renderContent()}
           </div>
         </main>
+
+        <AIAssistant vouchers={vouchers} ledgers={ledgers} activeCompany={activeCompany} />
+        {voucherToView && (
+          <VoucherModal voucher={voucherToView} activeCompany={activeCompany} onClose={() => setViewingVoucherId(null)} />
+        )}
+        
+        <footer className="h-6 bg-indigo-900 text-white flex items-center justify-between px-4 text-[9px] font-black uppercase tracking-widest shrink-0 border-t border-white/5">
+           <div className="flex items-center space-x-4">
+              <span className="flex items-center"><div className="w-1.5 h-1.5 bg-emerald-400 rounded-full mr-2 animate-pulse"></div> Secure Node: Operational</span>
+              <span className="opacity-30">|</span>
+              <span>Draft Buffer: {vouchers.filter(v => v.status === 'Draft').length} Objects</span>
+           </div>
+           <div className="flex items-center space-x-4">
+              <span>Thread Integrity: Verified</span>
+              <span className="opacity-30">|</span>
+              <span>Cluster: US-EAST-1</span>
+           </div>
+        </footer>
       </div>
-      <ToolPalette />
-      {voucherToView && (
-        <VoucherModal voucher={voucherToView} activeCompany={activeCompany} onClose={() => setViewingVoucherId(null)} />
-      )}
     </div>
   );
 };

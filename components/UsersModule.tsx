@@ -66,8 +66,8 @@ const UsersModule: React.FC<UsersModuleProps> = ({ users, setUsers, roles, setRo
     
     trackableFields.forEach(field => {
       if (oldData[field] !== newData[field]) {
-        const from = oldData[field] || 'EMPTY_NULL';
-        const to = newData[field] || 'EMPTY_NULL';
+        const from = oldData[field] || 'EMPTY';
+        const to = newData[field] || 'EMPTY';
         deltas.push(`[FIELD:${field.toUpperCase()}] ${from} → ${to}`);
       }
     });
@@ -83,7 +83,7 @@ const UsersModule: React.FC<UsersModuleProps> = ({ users, setUsers, roles, setRo
     }
 
     return deltas.length > 0 
-      ? `MUTATION TRACE: ${deltas.join(' | ')}`
+      ? `MUTATION DETECTED: ${deltas.join(' | ')}`
       : 'Structural verification performed. No attribute mutations detected.';
   };
 
@@ -226,9 +226,9 @@ const UsersModule: React.FC<UsersModuleProps> = ({ users, setUsers, roles, setRo
   ];
 
   const LogInspectorModal = ({ log }: { log: AuditLog }) => {
-    const isMutation = log.details.startsWith('MUTATION TRACE:');
+    const isMutation = log.details.startsWith('MUTATION DETECTED:');
     const shards = isMutation 
-      ? log.details.replace('MUTATION TRACE: ', '').split(' | ') 
+      ? log.details.replace('MUTATION DETECTED: ', '').split(' | ') 
       : [log.details];
 
     return (
@@ -278,7 +278,7 @@ const UsersModule: React.FC<UsersModuleProps> = ({ users, setUsers, roles, setRo
              <div className="p-10 bg-slate-50 rounded-[3rem] border border-slate-200 shadow-inner">
                 <label className="text-[10px] font-black uppercase text-indigo-600 tracking-[0.2em] mb-6 block flex items-center">
                    <div className="w-1.5 h-4 bg-indigo-600 rounded-full mr-2"></div>
-                   Payload Modifications
+                   Audit Payload Shards
                 </label>
                 <div className="space-y-4">
                   {shards.map((shard, i) => (
@@ -303,14 +303,14 @@ const UsersModule: React.FC<UsersModuleProps> = ({ users, setUsers, roles, setRo
     <div className="space-y-10 animate-in fade-in duration-500 pb-20">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-8">
         <div>
-          <h2 className="text-4xl font-black text-slate-800 tracking-tighter italic uppercase leading-none">Security Governance</h2>
-          <p className="text-sm text-slate-500 font-medium mt-4">Modular Identity lifecycle and high-fidelity forensic stream.</p>
+          <h2 className="text-4xl font-black text-slate-800 tracking-tighter italic uppercase leading-none">Identity Governance</h2>
+          <p className="text-sm text-slate-500 font-medium mt-4">Modular Identity lifecycle management and high-fidelity forensic stream.</p>
         </div>
         <div className="flex items-center space-x-4">
            {activeTab === 'AUDIT' && (
              <button onClick={exportAuditCSV} className="flex items-center space-x-3 px-8 py-4 bg-white border border-slate-200 rounded-[1.5rem] font-black text-[10px] uppercase tracking-widest hover:bg-slate-50 shadow-sm transition-all">
                 <svg className="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                <span>Export Ledger</span>
+                <span>Export Audit Registry</span>
              </button>
            )}
            <button 
@@ -341,11 +341,11 @@ const UsersModule: React.FC<UsersModuleProps> = ({ users, setUsers, roles, setRo
           <div className="animate-in fade-in duration-500 flex flex-col h-full">
              <div className="grid grid-cols-2 md:grid-cols-5 gap-6 p-10 border-b border-slate-100 bg-slate-50/50">
                {[
-                 { label: 'Event Points', value: auditStats.total, color: 'text-slate-800' },
-                 { label: 'Provisioned', value: auditStats.creations, color: 'text-emerald-600' },
-                 { label: 'Mutations', value: auditStats.modifications, color: 'text-indigo-600' },
-                 { label: 'Decommissioned', value: auditStats.deletions, color: 'text-rose-600' },
-                 { label: 'Risk Indices', value: auditStats.statusChanges, color: 'text-amber-600' }
+                 { label: 'Event Ledger', value: auditStats.total, color: 'text-slate-800' },
+                 { label: 'Identities Provisioned', value: auditStats.creations, color: 'text-emerald-600' },
+                 { label: 'Security Mutations', value: auditStats.modifications, color: 'text-indigo-600' },
+                 { label: 'Nodes Purged', value: auditStats.deletions, color: 'text-rose-600' },
+                 { label: 'Integrity Shifts', value: auditStats.statusChanges, color: 'text-amber-600' }
                ].map((stat, i) => (
                  <div key={i} className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm group hover:-translate-y-1 transition-all">
                     <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 group-hover:text-indigo-500">{stat.label}</div>
@@ -358,7 +358,7 @@ const UsersModule: React.FC<UsersModuleProps> = ({ users, setUsers, roles, setRo
                 <div className="relative max-w-lg w-full">
                   <input 
                     type="text" 
-                    placeholder="Query Forensic Matrix (Actor, Hash, Identity)..." 
+                    placeholder="Query Forensic Matrix (Actor, ID, Target)..." 
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="w-full pl-14 pr-6 py-4 bg-slate-50 border border-slate-200 rounded-3xl text-sm font-bold focus:ring-8 focus:ring-indigo-500/5 transition-all shadow-inner outline-none italic"
@@ -373,7 +373,7 @@ const UsersModule: React.FC<UsersModuleProps> = ({ users, setUsers, roles, setRo
                       onClick={() => setActionFilter(act)}
                       className={`px-5 py-3 text-[9px] font-black uppercase tracking-tighter rounded-xl transition-all whitespace-nowrap ${actionFilter === act ? 'bg-white text-indigo-600 shadow-md scale-105' : 'text-slate-400 hover:text-slate-700'}`}
                      >
-                       {act === 'STATUS_CHANGE' ? 'RISK' : act}
+                       {act === 'STATUS_CHANGE' ? 'INTEGRITY' : act}
                      </button>
                    ))}
                 </div>
@@ -383,15 +383,15 @@ const UsersModule: React.FC<UsersModuleProps> = ({ users, setUsers, roles, setRo
                <table className="w-full text-left border-collapse">
                  <thead className="bg-slate-950 text-[10px] uppercase font-black tracking-widest text-slate-500 border-b border-slate-900 sticky top-0 z-10">
                     <tr>
-                      <th className="px-12 py-7">Event Signature</th>
+                      <th className="px-12 py-7">Log Entry Signature</th>
                       <th className="px-12 py-7">Authorized Actor</th>
-                      <th className="px-12 py-7">Identity Subject</th>
+                      <th className="px-12 py-7">Identity Context</th>
                       <th className="px-12 py-7 text-right">Execution Moment</th>
                     </tr>
                  </thead>
                  <tbody className="divide-y divide-slate-50">
                     {filteredLogs.map((log) => (
-                      <tr key={log.id} onClick={() => setSelectedLog(log)} className="hover:bg-indigo-50/30 cursor-pointer transition-all group border-b border-slate-50 last:border-0 animate-in fade-in slide-in-from-left-2">
+                      <tr key={log.id} onClick={() => setSelectedLog(log)} className="hover:bg-indigo-50/30 cursor-pointer transition-all group border-b border-slate-50 last:border-0 animate-in fade-in">
                         <td className="px-12 py-8 max-w-md">
                            <div className="flex items-center space-x-4 mb-3">
                               <span className={`px-2.5 py-1 rounded-lg text-[8px] font-black border tracking-widest ${
@@ -400,7 +400,7 @@ const UsersModule: React.FC<UsersModuleProps> = ({ users, setUsers, roles, setRo
                                 log.action === 'STATUS_CHANGE' ? 'bg-amber-50 text-amber-600 border-amber-100' :
                                 'bg-indigo-50 text-indigo-600 border-indigo-100'
                               }`}>{log.action}</span>
-                              <span className="font-mono text-[9px] text-slate-300 font-bold tracking-tighter uppercase">HASH: {log.id}</span>
+                              <span className="font-mono text-[9px] text-slate-300 font-bold tracking-tighter uppercase">{log.id}</span>
                            </div>
                            <p className="text-xs font-black text-slate-600 leading-relaxed italic truncate group-hover:text-indigo-900 transition-colors">"{log.details}"</p>
                         </td>
@@ -412,11 +412,11 @@ const UsersModule: React.FC<UsersModuleProps> = ({ users, setUsers, roles, setRo
                         </td>
                         <td className="px-12 py-8">
                            <div className="text-[12px] font-black text-slate-900 uppercase tracking-tighter italic">{log.entityName}</div>
-                           <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">CLASS: {log.entityType}</div>
+                           <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">{log.entityType} CLASS</div>
                         </td>
                         <td className="px-12 py-8 text-right">
                            <div className="text-[11px] font-black text-slate-900 italic tabular-nums">{new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
-                           <div className="text-[9px] font-bold text-slate-300 mt-1 uppercase tracking-widest">VERIFIED_BLOCK</div>
+                           <div className="text-[9px] font-bold text-slate-300 mt-1 uppercase tracking-widest">{new Date(log.timestamp).toLocaleDateString()}</div>
                         </td>
                       </tr>
                     ))}
@@ -426,7 +426,7 @@ const UsersModule: React.FC<UsersModuleProps> = ({ users, setUsers, roles, setRo
                            <div className="w-24 h-24 bg-slate-50 rounded-[2.5rem] flex items-center justify-center mx-auto mb-6 border-2 border-dashed border-slate-200">
                              <svg className="w-10 h-10 text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                            </div>
-                           <p className="text-sm font-black uppercase text-slate-300 tracking-[0.4em] italic">Forensic Matrix Exhausted</p>
+                           <p className="text-sm font-black uppercase text-slate-300 tracking-[0.4em] italic">Forensic Buffer Empty</p>
                         </td>
                       </tr>
                     )}
@@ -448,7 +448,7 @@ const UsersModule: React.FC<UsersModuleProps> = ({ users, setUsers, roles, setRo
                 <svg className="w-6 h-6 text-slate-300 absolute left-5 top-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
               </div>
               <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                 {activeTab === 'USERS' ? filteredUsers.length : filteredRoles.length} OBJECTS IN BUFFER
+                 {activeTab === 'USERS' ? filteredUsers.length : filteredRoles.length} OBJECTS REGISTERED
               </div>
             </div>
             
@@ -457,8 +457,8 @@ const UsersModule: React.FC<UsersModuleProps> = ({ users, setUsers, roles, setRo
                 <table className="w-full text-left">
                   <thead className="bg-slate-950 text-[10px] uppercase font-black tracking-widest text-slate-500 border-b border-slate-900 sticky top-0 z-10">
                     <tr>
-                      <th className="px-12 py-7">Staff Node Identity</th>
-                      <th className="px-12 py-7">Active Blueprint</th>
+                      <th className="px-12 py-7">Staff Identity Node</th>
+                      <th className="px-12 py-7">Authorized Blueprint</th>
                       <th className="px-12 py-7">Integrity Status</th>
                       <th className="px-12 py-7 text-right">Modular Operations</th>
                     </tr>
@@ -501,7 +501,7 @@ const UsersModule: React.FC<UsersModuleProps> = ({ users, setUsers, roles, setRo
                 <table className="w-full text-left">
                   <thead className="bg-slate-950 text-[10px] uppercase font-black tracking-widest text-slate-500 border-b border-slate-900 sticky top-0 z-10">
                     <tr>
-                      <th className="px-12 py-7">Security Blueprint Profile</th>
+                      <th className="px-12 py-7">Access Blueprint Profile</th>
                       <th className="px-12 py-7">Classification</th>
                       <th className="px-12 py-7 text-right">Modular Operations</th>
                     </tr>
@@ -545,8 +545,8 @@ const UsersModule: React.FC<UsersModuleProps> = ({ users, setUsers, roles, setRo
                    {togglingUser.status === 'Active' ? '🔒' : '🔓'}
                 </div>
                 <div>
-                   <h3 className="text-2xl font-black uppercase italic tracking-tighter leading-none">Access Guard</h3>
-                   <p className="text-[10px] font-bold uppercase tracking-[0.4em] opacity-80 mt-2">Integrity Confirmation</p>
+                   <h3 className="text-2xl font-black uppercase italic tracking-tighter leading-none">Security Guard</h3>
+                   <p className="text-[10px] font-bold uppercase tracking-[0.4em] opacity-80 mt-2">Status Integrity Shift</p>
                 </div>
               </div>
               <div className="absolute top-0 right-0 w-48 h-48 bg-white rounded-full blur-[80px] opacity-20 -mr-24 -mt-24"></div>
@@ -556,7 +556,7 @@ const UsersModule: React.FC<UsersModuleProps> = ({ users, setUsers, roles, setRo
                 ⚠️
               </div>
               <p className="text-base font-bold text-slate-600 leading-relaxed italic">
-                Confirm {togglingUser.status === 'Active' ? 'Deactivation' : 'Activation'} of <span className="text-slate-900 font-black uppercase underline decoration-indigo-200 underline-offset-4">{togglingUser.name}</span>?
+                Authorize {togglingUser.status === 'Active' ? 'Deactivation' : 'Activation'} of <span className="text-slate-900 font-black uppercase underline decoration-indigo-200 underline-offset-4">{togglingUser.name}</span>?
               </p>
               <p className="text-[9px] text-slate-400 font-black uppercase tracking-[0.3em] mt-6 border-t border-slate-50 pt-6">Action will be committed to forensic ledger.</p>
               
@@ -565,13 +565,13 @@ const UsersModule: React.FC<UsersModuleProps> = ({ users, setUsers, roles, setRo
                   onClick={executeStatusToggle}
                   className={`w-full py-5 rounded-[1.5rem] font-black text-[11px] uppercase tracking-[0.3em] text-white shadow-2xl transition-all transform active:scale-95 border-b-8 border-black/20 ${togglingUser.status === 'Active' ? 'bg-rose-600 hover:bg-rose-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}
                 >
-                  Confirm & Commit Shift
+                  Authorize Status Shift
                 </button>
                 <button 
                   onClick={() => setTogglingUser(null)}
                   className="w-full py-5 rounded-[1.5rem] font-black text-[11px] uppercase tracking-[0.3em] text-slate-400 hover:bg-slate-50 transition-all"
                 >
-                  Abort Protocol
+                  Abort Sequence
                 </button>
               </div>
             </div>

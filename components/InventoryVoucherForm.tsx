@@ -8,14 +8,23 @@ interface InventoryVoucherFormProps {
   onSubmit: (data: Omit<Voucher, 'id' | 'status'>) => void;
   onCancel: () => void;
   getNextId: (type: string) => string;
+  activeCompany?: any;
 }
 
 type InvType = Extract<VoucherType, 'Sales' | 'Purchase' | 'Sales Return' | 'Purchase Return' | 'Purchase Order' | 'Delivery Note' | 'Goods Receipt Note (GRN)' | 'Stock Adjustment'>;
 
+const CURRENCIES = [
+  { code: 'USD', symbol: '$', name: 'US Dollar' },
+  { code: 'EUR', symbol: '€', name: 'Euro' },
+  { code: 'GBP', symbol: '£', name: 'British Pound' },
+  { code: 'INR', symbol: '₹', name: 'Indian Rupee' },
+  { code: 'JPY', symbol: '¥', name: 'Japanese Yen' }
+];
+
 const COMMON_ADJUSTMENTS = ['Freight Charges', 'Insurance', 'Labor', 'Packaging', 'Rounding Off'];
 const RETURN_REASONS = ['Damaged Goods', 'Quality Discrepancy', 'Wrong Item Shipped', 'Order Cancelled', 'Shortage in Delivery', 'Excess Supply Return'];
 
-const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly, items, ledgers, onSubmit, onCancel, getNextId }) => {
+const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly, items, ledgers, onSubmit, onCancel, getNextId, activeCompany }) => {
   const [vchType, setVchType] = useState<InvType>('Sales');
   const [supplyType, setSupplyType] = useState<'Local' | 'Central'>('Local');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -27,9 +36,15 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
   const [vchItems, setVchItems] = useState<VoucherItem[]>([]);
   const [adjustments, setAdjustments] = useState<Adjustment[]>([]);
   
+  const [currency, setCurrency] = useState(activeCompany?.currencyConfig?.code || 'USD');
+  const [exchangeRate, setExchangeRate] = useState(1);
+
   const [searchIdx, setSearchIdx] = useState<number | null>(null);
   const [query, setQuery] = useState('');
   const searchRef = useRef<HTMLTableDataCellElement>(null);
+
+  const baseCurrencyCode = activeCompany?.currencyConfig?.code || 'USD';
+  const isForeignCurrency = currency !== baseCurrencyCode;
 
   const nextIdPreview = useMemo(() => getNextId(vchType), [vchType, getNextId]);
 
@@ -103,7 +118,7 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
   const selectItem = (idx: number, item: Item) => {
     setVchItems(prev => prev.map((vi, i) => {
       if (i === idx) {
-        const fullRate = item.gstRate || 18;
+        const fullRate = item.gstRate || 0;
         const amount = vi.qty * item.salePrice;
         let taxAmount = isFinancial ? amount * (fullRate / 100) : 0;
 
@@ -115,9 +130,9 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
           rate: item.salePrice,
           unit: item.unit,
           amount,
-          igstRate: isFinancial ? fullRate : 0,
-          cgstRate: isFinancial ? fullRate / 2 : 0,
-          sgstRate: isFinancial ? fullRate / 2 : 0,
+          igstRate: fullRate,
+          cgstRate: supplyType === 'Local' ? fullRate / 2 : 0,
+          sgstRate: supplyType === 'Local' ? fullRate / 2 : 0,
           taxAmount
         };
       }
@@ -153,6 +168,8 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
     return { subTotal: itemsSubTotal, taxTotal, netAfterTax, adjustmentsTotal, grandTotal };
   }, [vchItems, adjustments, isFinancial]);
 
+  const baseGrandTotal = totals.grandTotal * exchangeRate;
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (isReadOnly || vchItems.length === 0 || (!partyId && !isAdjustment)) {
@@ -167,6 +184,8 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
       date,
       party: partyName,
       amount: totals.grandTotal,
+      currency,
+      exchangeRate,
       reference,
       sourceDocRef,
       returnReason,
@@ -215,6 +234,30 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
           </div>
         </div>
         <div className="flex items-center space-x-6 relative z-10">
+           <div className="bg-white/10 p-4 rounded-3xl backdrop-blur-xl border border-white/10 flex items-center space-x-6">
+              <div className="space-y-1">
+                 <label className="text-[8px] font-black uppercase tracking-widest text-white/60">Currency</label>
+                 <select 
+                   value={currency} 
+                   onChange={e => setCurrency(e.target.value)}
+                   className="bg-transparent border-none text-sm font-black text-white outline-none cursor-pointer"
+                 >
+                   {CURRENCIES.map(c => <option key={c.code} value={c.code} className="bg-slate-900">{c.code}</option>)}
+                 </select>
+              </div>
+              {isForeignCurrency && (
+                <div className="space-y-1 border-l border-white/10 pl-6">
+                   <label className="text-[8px] font-black uppercase tracking-widest text-white/60">Exch Rate</label>
+                   <input 
+                     type="number" 
+                     step="0.0001"
+                     value={exchangeRate} 
+                     onChange={e => setExchangeRate(parseFloat(e.target.value) || 1)}
+                     className="bg-transparent border-none text-sm font-black text-white outline-none w-20"
+                   />
+                </div>
+              )}
+           </div>
            {!isAdjustment && (
              <div className="flex p-1.5 bg-black/20 rounded-2xl backdrop-blur-md border border-white/10 shadow-lg">
                 {(['Local', 'Central'] as const).map(s => (
@@ -302,11 +345,11 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
                     <th className="px-10 py-7 text-center w-32">Volume</th>
                     {isFinancial && (
                       <>
-                        <th className="px-10 py-7 text-right w-44">Unit Price</th>
-                        <th className="px-10 py-7 text-center w-32">GST %</th>
+                        <th className="px-10 py-7 text-right w-44">Unit Price ({currency})</th>
+                        <th className="px-10 py-7 text-center w-36">GST Analysis</th>
                       </>
                     )}
-                    <th className="px-10 py-7 text-right w-56">Resolved Value</th>
+                    <th className="px-10 py-7 text-right w-56">Resolved Value ({currency})</th>
                     <th className="px-8 py-7 w-20"></th>
                   </tr>
                 </thead>
@@ -334,14 +377,11 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
                                            </div>
                                         </div>
                                         <div className="text-right">
-                                          <div className="text-[11px] font-black text-slate-900 tabular-nums">${res.salePrice.toLocaleString()}</div>
+                                          <div className="text-[11px] font-black text-slate-900 tabular-nums">{currency} {res.salePrice.toLocaleString()}</div>
                                           <div className="text-[8px] font-bold text-slate-300 uppercase tracking-widest mt-1">Base Price</div>
                                         </div>
                                     </div>
                                   ))}
-                                  {searchResults.length === 0 && (
-                                     <div className="p-12 text-center text-slate-300 italic text-sm font-medium uppercase tracking-widest">No catalogue matches</div>
-                                  )}
                                 </div>
                             </div>
                           ) : (
@@ -361,15 +401,31 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
                       </td>
                       {isFinancial && (
                         <>
-                          <td className="px-10 py-6 text-right font-black text-slate-700 tabular-nums text-sm italic underline decoration-slate-100 underline-offset-4">${item.rate.toLocaleString()}</td>
+                          <td className="px-10 py-6 text-right font-black text-slate-700 tabular-nums text-sm italic underline decoration-slate-100 underline-offset-4">{item.rate.toLocaleString()}</td>
                           <td className="px-10 py-6 text-center">
-                              <span className="px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-xl text-[10px] font-black border border-indigo-100 shadow-sm">{item.igstRate}%</span>
+                              <div className="group/tax-tip relative">
+                                <span className={`px-3 py-1.5 rounded-xl text-[10px] font-black border shadow-sm cursor-help ${supplyType === 'Local' ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
+                                   {item.igstRate}%
+                                </span>
+                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-40 p-3 bg-slate-900 text-white rounded-xl shadow-2xl opacity-0 invisible group-hover/tax-tip:opacity-100 group-hover/tax-tip:visible transition-all z-50">
+                                   <div className="text-[8px] font-black uppercase text-indigo-400 mb-2 border-b border-white/10 pb-1">Tax Breakdown</div>
+                                   {supplyType === 'Local' ? (
+                                      <div className="space-y-1">
+                                         <div className="flex justify-between text-[9px]"><span>CGST @ {item.cgstRate}%</span><span>{item.taxAmount! / 2}</span></div>
+                                         <div className="flex justify-between text-[9px]"><span>SGST @ {item.sgstRate}%</span><span>{item.taxAmount! / 2}</span></div>
+                                      </div>
+                                   ) : (
+                                      <div className="flex justify-between text-[9px]"><span>IGST @ {item.igstRate}%</span><span>{item.taxAmount}</span></div>
+                                   )}
+                                   <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-4 border-l-transparent border-r-4 border-r-transparent border-t-4 border-t-slate-900"></div>
+                                </div>
+                              </div>
                           </td>
                         </>
                       )}
                       <td className="px-10 py-6 text-right">
                           <div className="text-lg font-black text-slate-900 tabular-nums italic tracking-tighter">
-                            ${(isFinancial ? (item.amount + (item.taxAmount || 0)) : item.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            {(isFinancial ? (item.amount + (item.taxAmount || 0)) : item.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                           </div>
                           {isFinancial && <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Net Valuation</div>}
                       </td>
@@ -378,17 +434,6 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
                       </td>
                     </tr>
                   ))}
-                  {vchItems.length === 0 && (
-                    <tr>
-                      <td colSpan={isFinancial ? 6 : 4} className="py-32 text-center">
-                         <div className="w-20 h-20 bg-slate-50 rounded-[2rem] flex items-center justify-center mx-auto mb-6 border border-slate-100 shadow-inner">
-                            <svg className="w-10 h-10 text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
-                         </div>
-                         <h5 className="text-sm font-black uppercase text-slate-300 tracking-[0.4em] italic">Catalogue Buffer Empty</h5>
-                         <p className="text-[10px] font-bold text-slate-400 uppercase mt-2">Append items to begin verification</p>
-                      </td>
-                    </tr>
-                  )}
                 </tbody>
               </table>
               <button type="button" onClick={addItem} className="w-full py-6 bg-slate-50 text-[11px] font-black uppercase text-indigo-600 hover:bg-indigo-600 hover:text-white transition-all border-t border-slate-100 tracking-[0.4em] shadow-inner">+ APPEND PRODUCT SHARD</button>
@@ -408,7 +453,7 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
                           <tr>
                              <th className="px-10 py-5">Adjustment Node</th>
                              <th className="px-10 py-5 text-center">Protocol</th>
-                             <th className="px-10 py-5 text-right">Debit ($)</th>
+                             <th className="px-10 py-5 text-right">Value ({currency})</th>
                              <th className="px-10 py-5"></th>
                           </tr>
                        </thead>
@@ -460,14 +505,6 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
                          <button key={label} type="button" onClick={() => addAdjustment(label)} className="px-6 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-[10px] font-black uppercase text-slate-500 hover:border-indigo-500 hover:text-indigo-600 hover:shadow-2xl transition-all active:scale-95 shadow-sm transform hover:-translate-y-0.5">{label}</button>
                       ))}
                    </div>
-                   <div className="mt-10 p-8 bg-indigo-50 rounded-[2.5rem] border border-indigo-100 flex items-start space-x-6 relative z-10">
-                      <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-3xl shadow-xl border border-indigo-50 shrink-0">💡</div>
-                      <div>
-                        <h6 className="text-[11px] font-black uppercase text-indigo-900 mb-1 tracking-widest">Regulatory Policy Hint</h6>
-                        <p className="text-[11px] text-indigo-700/70 font-medium leading-relaxed italic">"Financial adjustments define the delta between the statutory tax liability and the final settlement value. Use 'Less' for trade discounts and 'Add' for freight."</p>
-                      </div>
-                   </div>
-                   <div className="absolute top-0 right-0 w-48 h-48 bg-indigo-600 rounded-full blur-[80px] opacity-0 group-hover/presets:opacity-5 transition-opacity"></div>
                 </div>
             </div>
           </div>
@@ -483,37 +520,23 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
               <div className="bg-slate-900 rounded-[3.5rem] p-12 text-white space-y-6 shadow-[0_40px_80px_-20px_rgba(0,0,0,0.4)] relative overflow-hidden border-b-8 border-indigo-600">
                  <div className="relative z-10 space-y-6">
                     <div className="flex justify-between items-center text-[12px] font-black uppercase text-slate-500 tracking-widest">
-                       <span>Physical Shard Value</span>
-                       <span className="text-white tabular-nums">${totals.subTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                    </div>
-
-                    {isFinancial && (
-                      <div className="flex justify-between items-center text-[12px] font-black uppercase text-indigo-400 tracking-widest">
-                         <span>Statutory GST Aggregate</span>
-                         <span className="text-indigo-200 tabular-nums">${totals.taxTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                      </div>
-                    )}
-                    
-                    <div className="pt-6 border-t border-slate-800 flex justify-between items-center text-[12px] font-black uppercase text-slate-500 tracking-widest">
                        <span>Combined Ledger Value</span>
-                       <span className="text-white tabular-nums">${totals.netAfterTax.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                       <span className="text-white tabular-nums">{currency} {totals.grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                     </div>
 
-                    {isFinancial && (
-                      <div className="flex justify-between items-center text-[12px] font-black uppercase tracking-widest">
-                         <span className="text-amber-500 italic">Institutional Adjustments</span>
-                         <span className={`tabular-nums ${totals.adjustmentsTotal >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                           {totals.adjustmentsTotal >= 0 ? '+' : '-'}${Math.abs(totals.adjustmentsTotal).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                         </span>
+                    {isForeignCurrency && (
+                      <div className="pt-6 border-t border-white/5 flex justify-between items-center text-[12px] font-black uppercase text-indigo-400 tracking-widest">
+                         <span>Local Anchor equivalent</span>
+                         <span className="text-indigo-200 tabular-nums">{baseCurrencyCode} {baseGrandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                       </div>
                     )}
                     
                     <div className="pt-12 border-t border-slate-800 flex justify-between items-end">
                        <div className="flex flex-col">
                           <span className="text-[11px] font-black uppercase italic text-indigo-500 tracking-[0.5em] mb-2">Grand Total</span>
-                          <span className="text-[8px] font-bold text-slate-600 uppercase tracking-[0.2em] animate-pulse">Integrity Pass Verified</span>
+                          <span className="text-[8px] font-bold text-slate-600 uppercase tracking-widest">({currency})</span>
                        </div>
-                       <span className="text-6xl font-black tracking-tighter italic tabular-nums text-white drop-shadow-2xl">${totals.grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                       <span className="text-6xl font-black tracking-tighter italic tabular-nums text-white drop-shadow-2xl">{currency} {totals.grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                     </div>
                  </div>
                  <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-indigo-600 rounded-full blur-[200px] opacity-10 -mr-64 -mt-64 pointer-events-none"></div>

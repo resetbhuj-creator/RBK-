@@ -16,6 +16,8 @@ type BackupMode = 'LOCAL' | 'CLOUD' | 'AUTO';
 type Frequency = 'DAILY' | 'WEEKLY' | 'MONTHLY';
 type ActiveView = 'SNAPSHOTS' | 'AUTOMATION' | 'REGISTRY';
 
+const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
 const BackupModule: React.FC = () => {
   const [activeView, setActiveView] = useState<ActiveView>('SNAPSHOTS');
   const [backups, setBackups] = useState<BackupRecord[]>([
@@ -34,10 +36,13 @@ const BackupModule: React.FC = () => {
 
   const [backupName, setBackupName] = useState(`nexus_vault_${new Date().toISOString().split('T')[0]}`);
   const [useEncryption, setUseEncryption] = useState(true);
+  const [useImmutable, setUseImmutable] = useState(false);
   
   // Automatic Backup Config State
   const [autoBackupEnabled, setAutoBackupEnabled] = useState(true);
   const [autoFrequency, setAutoFrequency] = useState<Frequency>(() => (localStorage.getItem('auto_bk_freq') as Frequency) || 'DAILY');
+  const [autoDayOfWeek, setAutoDayOfWeek] = useState(() => localStorage.getItem('auto_bk_dow') || 'Sunday');
+  const [autoDayOfMonth, setAutoDayOfMonth] = useState(() => parseInt(localStorage.getItem('auto_bk_dom') || '1'));
   const [autoTime, setAutoTime] = useState(() => localStorage.getItem('auto_bk_time') || '02:00');
   const [retentionCount, setRetentionCount] = useState(() => parseInt(localStorage.getItem('auto_bk_retention') || '30'));
   const [autoDestination, setAutoDestination] = useState<'INTERNAL' | 'CLOUD'>(() => (localStorage.getItem('auto_bk_dest') as 'INTERNAL' | 'CLOUD') || 'CLOUD');
@@ -154,6 +159,8 @@ const BackupModule: React.FC = () => {
     setIsSavingPolicy(true);
     localStorage.setItem('auto_bk_freq', autoFrequency);
     localStorage.setItem('auto_bk_time', autoTime);
+    localStorage.setItem('auto_bk_dow', autoDayOfWeek);
+    localStorage.setItem('auto_bk_dom', autoDayOfMonth.toString());
     localStorage.setItem('auto_bk_retention', retentionCount.toString());
     localStorage.setItem('auto_bk_dest', autoDestination);
     
@@ -165,19 +172,10 @@ const BackupModule: React.FC = () => {
 
   const getNextRun = () => {
     if (!autoBackupEnabled) return 'Policy Disabled';
-    const now = new Date();
-    const [h, m] = autoTime.split(':').map(Number);
-    const target = new Date();
-    target.setHours(h, m, 0, 0);
-    if (target < now) target.setDate(target.getDate() + 1);
-    
-    if (autoFrequency === 'WEEKLY') {
-      return `Next Sunday at ${autoTime}`;
-    }
-    if (autoFrequency === 'MONTHLY') {
-      return `1st of Next Month at ${autoTime}`;
-    }
-    return `Tomorrow at ${autoTime}`;
+    if (autoFrequency === 'DAILY') return `Tomorrow at ${autoTime}`;
+    if (autoFrequency === 'WEEKLY') return `Next ${autoDayOfWeek} at ${autoTime}`;
+    if (autoFrequency === 'MONTHLY') return `Day ${autoDayOfMonth} of next month at ${autoTime}`;
+    return 'Pending Calculation';
   };
 
   return (
@@ -203,7 +201,7 @@ const BackupModule: React.FC = () => {
                 onClick={() => setActiveView(view)}
                 className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeView === view ? 'bg-indigo-600 text-white shadow-xl' : 'text-slate-400 hover:text-white'}`}
               >
-                {view === 'SNAPSHOTS' ? 'Snapshots' : view === 'AUTOMATION' ? 'Automatic Backups' : 'Registry'}
+                {view === 'SNAPSHOTS' ? 'Snapshots' : view === 'AUTOMATION' ? 'Automation' : 'Registry'}
               </button>
             ))}
           </div>
@@ -246,9 +244,17 @@ const BackupModule: React.FC = () => {
           <div className="lg:col-span-2">
             {activeView === 'SNAPSHOTS' && (
               <div className="bg-white rounded-[3rem] border border-slate-200 p-10 shadow-sm space-y-10 animate-in slide-in-from-left-4 duration-500">
-                <div>
-                  <h3 className="text-xl font-black text-slate-800 tracking-tight italic uppercase leading-none">Manual Data Snapshot</h3>
-                  <p className="text-sm text-slate-400 font-medium mt-2">Trigger an immediate, on-demand archive of the current system state.</p>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h3 className="text-xl font-black text-slate-800 tracking-tight italic uppercase leading-none">Manual Data Snapshot</h3>
+                    <p className="text-sm text-slate-400 font-medium mt-2">Trigger an immediate, on-demand archive of the current system state.</p>
+                  </div>
+                  {autoBackupEnabled && (
+                    <div className="flex items-center space-x-3 px-4 py-2 bg-indigo-50 border border-indigo-100 rounded-xl">
+                       <div className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse"></div>
+                       <span className="text-[9px] font-black text-indigo-600 uppercase">Auto-Scheduler Syncing</span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -290,14 +296,14 @@ const BackupModule: React.FC = () => {
             )}
 
             {activeView === 'AUTOMATION' && (
-              <div className="bg-white rounded-[3rem] border border-slate-200 p-12 shadow-sm space-y-12 animate-in zoom-in-95 duration-500">
+              <div className="bg-white rounded-[3rem] border border-slate-200 p-12 shadow-sm space-y-12 animate-in zoom-in-95 duration-500 relative">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-xl font-black text-slate-800 tracking-tight italic uppercase leading-none">Automatic Backups Configuration</h3>
+                    <h3 className="text-xl font-black text-slate-800 tracking-tight italic uppercase leading-none">Automated Backup Engine</h3>
                     <p className="text-sm text-slate-400 font-medium mt-2">Manage recurring archival sequences and system health synchronization.</p>
                   </div>
                   <div className="flex items-center space-x-4">
-                     <span className={`text-[10px] font-black uppercase tracking-widest ${autoBackupEnabled ? 'text-emerald-600' : 'text-slate-300'}`}>{autoBackupEnabled ? 'ENGINE ONLINE' : 'ENGINE OFFLINE'}</span>
+                     <span className={`text-[10px] font-black uppercase tracking-widest ${autoBackupEnabled ? 'text-emerald-600' : 'text-slate-300'}`}>{autoBackupEnabled ? 'DAEMON ACTIVE' : 'DAEMON OFFLINE'}</span>
                      <button onClick={() => setAutoBackupEnabled(!autoBackupEnabled)} className={`w-14 h-8 rounded-full relative transition-all shadow-md ${autoBackupEnabled ? 'bg-emerald-50' : 'bg-slate-200'}`}>
                         <div className={`absolute top-1 w-6 h-6 bg-white rounded-full transition-all shadow-sm ${autoBackupEnabled ? 'right-1' : 'left-1'}`}></div>
                      </button>
@@ -306,35 +312,70 @@ const BackupModule: React.FC = () => {
 
                 <div className={`space-y-12 transition-all duration-500 ${autoBackupEnabled ? 'opacity-100' : 'opacity-40 pointer-events-none grayscale blur-[2px]'}`}>
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-                      <div className="space-y-8">
-                         <div className="space-y-2">
+                      <div className="space-y-10">
+                         <div className="space-y-3">
                             <label className="text-[10px] font-black uppercase text-indigo-600 tracking-[0.2em] ml-1">Frequency Protocol</label>
                             <div className="grid grid-cols-3 gap-2 bg-slate-50 p-1.5 rounded-2xl border border-slate-200 shadow-inner">
                                {(['DAILY', 'WEEKLY', 'MONTHLY'] as Frequency[]).map(f => (
-                                 <button key={f} onClick={() => setAutoFrequency(f)} className={`py-4 text-[10px] font-black rounded-xl transition-all ${autoFrequency === f ? 'bg-white text-indigo-600 shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}>{f}</button>
+                                 <button key={f} onClick={() => setAutoFrequency(f)} className={`py-4 text-[10px] font-black rounded-xl transition-all ${autoFrequency === f ? 'bg-white text-indigo-600 shadow-lg scale-[1.02]' : 'text-slate-500 hover:text-slate-600'}`}>{f}</button>
                                ))}
                             </div>
                          </div>
-                         <div className="space-y-2">
-                            <label className="text-[10px] font-black uppercase text-indigo-600 tracking-[0.2em] ml-1">Precision Execution Window</label>
+
+                         {autoFrequency === 'WEEKLY' && (
+                           <div className="space-y-3 animate-in slide-in-from-top-2 duration-300">
+                              <label className="text-[10px] font-black uppercase text-indigo-600 tracking-[0.2em] ml-1">Target Day</label>
+                              <div className="flex flex-wrap gap-2">
+                                 {DAYS_OF_WEEK.map(day => (
+                                   <button 
+                                      key={day} 
+                                      type="button"
+                                      onClick={() => setAutoDayOfWeek(day)}
+                                      className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase border transition-all ${autoDayOfWeek === day ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg' : 'bg-white border-slate-200 text-slate-500 hover:border-indigo-300'}`}
+                                   >
+                                      {day.substring(0, 3)}
+                                   </button>
+                                 ))}
+                              </div>
+                           </div>
+                         )}
+
+                         {autoFrequency === 'MONTHLY' && (
+                            <div className="space-y-3 animate-in slide-in-from-top-2 duration-300">
+                               <label className="text-[10px] font-black uppercase text-indigo-600 tracking-[0.2em] ml-1">Calendar Day</label>
+                               <div className="flex items-center space-x-4">
+                                  <input 
+                                    type="number" 
+                                    min="1" max="28" 
+                                    value={autoDayOfMonth} 
+                                    onChange={e => setAutoDayOfMonth(parseInt(e.target.value) || 1)}
+                                    className="w-24 bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3 text-sm font-black text-slate-800 outline-none focus:ring-4 focus:ring-indigo-500/10 shadow-inner" 
+                                  />
+                                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Day of the month</span>
+                               </div>
+                            </div>
+                         )}
+
+                         <div className="space-y-3">
+                            <label className="text-[10px] font-black uppercase text-indigo-600 tracking-[0.2em] ml-1">Execution Window</label>
                             <div className="relative group">
                                <input type="time" value={autoTime} onChange={e => setAutoTime(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-5 text-xl font-black text-slate-800 outline-none focus:ring-4 focus:ring-indigo-500/10 shadow-inner" />
-                               <div className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-300 font-bold group-focus-within:text-indigo-600 transition-colors uppercase tracking-widest text-[10px]">Active Node Local</div>
+                               <div className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-300 font-bold group-focus-within:text-indigo-600 transition-colors uppercase tracking-widest text-[10px]">Node Local Time</div>
                             </div>
-                            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest ml-1 italic leading-relaxed">System performs differential delta at the specified moment to minimize latency.</p>
                          </div>
                       </div>
 
-                      <div className="space-y-8">
-                         <div className="space-y-2">
+                      <div className="space-y-10">
+                         <div className="space-y-3">
                             <div className="flex justify-between items-center px-1">
-                               <label className="text-[10px] font-black uppercase text-indigo-600 tracking-[0.2em]">Rotation Depth (Retention)</label>
-                               <span className="text-xs font-black text-indigo-900 bg-indigo-50 px-2 py-0.5 rounded-lg border border-indigo-100">{retentionCount} Historical States</span>
+                               <label className="text-[10px] font-black uppercase text-indigo-600 tracking-[0.2em]">Archive Retention</label>
+                               <span className="text-xs font-black text-indigo-900 bg-indigo-50 px-3 py-1 rounded-lg border border-indigo-100">{retentionCount} Historical States</span>
                             </div>
                             <input type="range" min="5" max="100" step="5" value={retentionCount} onChange={e => setRetentionCount(parseInt(e.target.value))} className="w-full h-2 bg-slate-100 rounded-full appearance-none cursor-pointer accent-indigo-600 border border-slate-200 mt-4" />
                             <div className="flex justify-between text-[8px] font-black text-slate-300 uppercase tracking-widest mt-2"><span>Min: 5</span><span>Max: 100</span></div>
                          </div>
-                         <div className="space-y-2">
+
+                         <div className="space-y-3">
                             <label className="text-[10px] font-black uppercase text-indigo-600 tracking-[0.2em] ml-1">Vault Destination</label>
                             <div className="grid grid-cols-2 gap-4">
                                <button onClick={() => setAutoDestination('CLOUD')} className={`flex flex-col items-center justify-center p-6 rounded-[2.5rem] border-2 transition-all ${autoDestination === 'CLOUD' ? 'bg-indigo-50 border-indigo-600 shadow-xl' : 'bg-slate-50 border-slate-100 opacity-60'}`}>
@@ -350,29 +391,30 @@ const BackupModule: React.FC = () => {
                       </div>
                    </div>
 
-                   <div className="p-8 bg-slate-900 rounded-[3rem] border-4 border-slate-800 shadow-2xl relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-10">
-                      <div className="relative z-10 flex items-center space-x-6">
-                         <div className="w-16 h-16 bg-emerald-500/20 rounded-2xl flex items-center justify-center text-3xl shadow-lg border border-emerald-500/30 group">
+                   <div className="p-10 bg-slate-900 rounded-[3rem] border-4 border-slate-800 shadow-2xl relative overflow-hidden flex flex-col lg:flex-row items-center justify-between gap-10">
+                      <div className="relative z-10 flex items-center space-x-8">
+                         <div className="w-20 h-20 bg-emerald-500/20 rounded-3xl flex items-center justify-center text-4xl shadow-lg border border-emerald-500/30 group">
                             <div className="animate-pulse group-hover:scale-110 transition-transform">🤖</div>
                          </div>
-                         <div>
-                            <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.4em] mb-1">Automation Intelligence</h4>
-                            <p className="text-sm font-black text-white italic">Next Run Attempt: <span className="text-emerald-400 underline underline-offset-4 decoration-emerald-500/30">{getNextRun()}</span></p>
+                         <div className="max-w-md">
+                            <h4 className="text-[11px] font-black text-indigo-400 uppercase tracking-[0.4em] mb-2">Protocol Intelligence</h4>
+                            <p className="text-lg font-black text-white italic leading-tight">Next Run: <span className="text-emerald-400 underline underline-offset-8 decoration-emerald-500/30">{getNextRun()}</span></p>
+                            <p className="text-[10px] text-slate-500 font-bold uppercase mt-3 tracking-widest">Policy: {autoFrequency} archive to {autoDestination} vault.</p>
                          </div>
                       </div>
                       <div className="flex items-center space-x-4 relative z-10">
                          <button 
                             onClick={saveAutoPolicy}
                             disabled={isSavingPolicy}
-                            className={`px-10 py-5 rounded-[1.5rem] font-black text-[10px] uppercase tracking-[0.3em] shadow-xl transition-all transform active:scale-95 border-b-4 border-slate-950 ${isSavingPolicy ? 'bg-slate-700 text-slate-500' : 'bg-white text-slate-900 hover:bg-emerald-500 hover:text-white'}`}
+                            className={`px-12 py-5 rounded-[1.5rem] font-black text-[10px] uppercase tracking-[0.3em] shadow-xl transition-all transform active:scale-95 border-b-4 border-slate-950 ${isSavingPolicy ? 'bg-slate-700 text-slate-500' : 'bg-white text-slate-900 hover:bg-emerald-500 hover:text-white'}`}
                          >
-                            {isSavingPolicy ? 'Committing Policy...' : 'Save Configuration'}
+                            {isSavingPolicy ? 'Committing Policy...' : 'Verify & Save Policy'}
                          </button>
-                         <button onClick={() => startBackup('AUTO')} className="p-5 bg-white/5 border border-white/10 rounded-2xl text-white hover:bg-white/10 transition-all" title="Dry Run">
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                         <button onClick={() => startBackup('AUTO')} className="p-5 bg-white/5 border border-white/10 rounded-[1.5rem] text-white hover:bg-indigo-600 transition-all shadow-lg" title="Trigger Instant Auto-Sync">
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                          </button>
                       </div>
-                      <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-600 rounded-full blur-[100px] opacity-10 -mr-32 -mt-32"></div>
+                      <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-600 rounded-full blur-[150px] opacity-10 -mr-40 -mt-40 pointer-events-none"></div>
                    </div>
                 </div>
               </div>
@@ -380,8 +422,8 @@ const BackupModule: React.FC = () => {
 
             {activeView === 'REGISTRY' && (
               <div className="bg-white rounded-[3rem] border border-slate-200 shadow-sm overflow-hidden animate-in fade-in duration-500">
-                <table className="w-full text-left">
-                  <thead className="bg-slate-900 text-[10px] uppercase font-black tracking-widest text-slate-400">
+                <table className="w-full text-left border-collapse">
+                  <thead className="bg-slate-900 text-[10px] font-black uppercase tracking-widest text-slate-400">
                     <tr>
                       <th className="px-10 py-7">Archive Identity</th>
                       <th className="px-10 py-7">Execution Class</th>
@@ -389,7 +431,7 @@ const BackupModule: React.FC = () => {
                       <th className="px-10 py-7 text-right">Modular Ops</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-50">
+                  <tbody className="divide-y divide-slate-50 bg-white">
                     {backups.map(bk => (
                       <tr key={bk.id} className="hover:bg-slate-50/80 transition-colors group">
                         <td className="px-10 py-6">
@@ -434,9 +476,9 @@ const BackupModule: React.FC = () => {
                </h3>
                <div className="space-y-8 relative z-10">
                   <div className="space-y-3">
-                     <div className="flex justify-between text-[10px] font-black uppercase text-slate-500 tracking-widest"><span>Cloud Redundancy</span><span>34% Sync</span></div>
+                     <div className="flex justify-between text-[10px] font-black uppercase text-slate-500 tracking-widest"><span>Cloud Redundancy</span><span>{autoBackupEnabled ? 'Enabled' : 'Disabled'}</span></div>
                      <div className="h-2 bg-white/5 rounded-full overflow-hidden border border-white/10 p-0.5 shadow-inner">
-                        <div className="h-full bg-indigo-500 w-[34%] rounded-full shadow-[0_0_12px_rgba(99,102,241,0.6)]"></div>
+                        <div className={`h-full bg-indigo-500 transition-all duration-1000 rounded-full shadow-[0_0_12px_rgba(99,102,241,0.6)] ${autoBackupEnabled ? 'w-[78%]' : 'w-0'}`}></div>
                      </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
@@ -458,15 +500,21 @@ const BackupModule: React.FC = () => {
                <div className="space-y-8">
                   <div className="flex items-center justify-between group">
                      <div className="space-y-0.5">
-                        <span className="text-xs font-black text-slate-800 uppercase italic">Block-Level Encryption</span>
-                        <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tighter">FIPS 140-2 Validated</p>
+                        <span className="text-xs font-black text-slate-800 uppercase italic">AES-256 Encryption</span>
+                        <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tighter">FIPS 140-2 Compliance</p>
                      </div>
                      <button onClick={() => setUseEncryption(!useEncryption)} className={`w-11 h-6 rounded-full relative transition-all shadow-md ${useEncryption ? 'bg-indigo-600 shadow-indigo-900/20' : 'bg-slate-200'}`}>
                         <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-all ${useEncryption ? 'right-1' : 'left-1'}`}></div>
                      </button>
                   </div>
-                  <div className="p-6 bg-indigo-50 rounded-[2rem] border border-indigo-100 group hover:bg-white transition-colors">
-                     <p className="text-[10px] text-indigo-700 font-medium leading-relaxed italic">"Archive logic enforces isolated block persistence. Private keys are never transmitted over plain text channels."</p>
+                  <div className="flex items-center justify-between group">
+                     <div className="space-y-0.5">
+                        <span className="text-xs font-black text-slate-800 uppercase italic">Immutable Logic</span>
+                        <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tighter">Protect from accidental deletion</p>
+                     </div>
+                     <button onClick={() => setUseImmutable(!useImmutable)} className={`w-11 h-6 rounded-full relative transition-all shadow-md ${useImmutable ? 'bg-indigo-600 shadow-indigo-900/20' : 'bg-slate-200'}`}>
+                        <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-all ${useImmutable ? 'right-1' : 'left-1'}`}></div>
+                     </button>
                   </div>
                </div>
             </div>

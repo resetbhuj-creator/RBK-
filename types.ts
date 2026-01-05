@@ -43,7 +43,8 @@ export enum DisplaySubMenu {
   TRIAL_BALANCE = 'Trial Balance',
   CASH_FLOW = 'Cash Flow',
   INVENTORY_SUMMARY = 'Inventory Summary',
-  GST_REPORTS = 'GST Reports'
+  GST_REPORTS = 'GST Reports',
+  GSTR_1 = 'GSTR-1 (Sales)'
 }
 
 export type GstReportType = 'GSTR-1' | 'GSTR-2' | 'GSTR-3B' | 'HSN-SUMMARY';
@@ -60,7 +61,16 @@ export enum HouseKeepingSubMenu {
   INTEGRITY_CHECK = 'Data Integrity',
   SYSTEM_AUDIT = 'Security Audit',
   DATA_PURGE = 'Data Purge Utility',
+  RENUMBERING = 'Voucher Renumbering',
   PREFERENCES = 'System Preferences'
+}
+
+export interface Attachment {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  data: string; // Base64
 }
 
 export interface Company {
@@ -80,6 +90,7 @@ export interface Company {
   fyStartDate: string;
   booksBeginDate: string;
   lastAccessed?: string;
+  approvalThreshold?: number; // Transactions above this need approval
 }
 
 export interface UserPermissions {
@@ -111,7 +122,7 @@ export interface User {
 export interface AuditLog {
   id: string;
   actor: string;
-  action: 'CREATE' | 'UPDATE' | 'DELETE' | 'STATUS_CHANGE';
+  action: 'CREATE' | 'UPDATE' | 'DELETE' | 'STATUS_CHANGE' | 'AUTHORIZE';
   entityType: 'USER' | 'ROLE' | 'SYSTEM' | 'COMPANY' | 'VOUCHER' | 'MASTER';
   entityName: string;
   details: string;
@@ -146,6 +157,8 @@ export interface LedgerEntry {
   ledgerName: string;
   type: 'Dr' | 'Cr';
   amount: number;
+  taxRate?: number;
+  taxAmount?: number;
 }
 
 export type VoucherType = 'Sales' | 'Purchase' | 'Sales Return' | 'Purchase Return' | 'Payment' | 'Receipt' | 'Journal' | 'Contra' | 'Delivery Note' | 'Goods Receipt Note (GRN)' | 'Stock Adjustment' | 'Purchase Order';
@@ -162,8 +175,8 @@ export interface Voucher {
   secondaryLedgerId?: string;
   entries?: LedgerEntry[];
   reference?: string;
-  sourceDocRef?: string; // New: Link to original invoice
-  returnReason?: string; // New: Context for return
+  sourceDocRef?: string;
+  returnReason?: string;
   items?: VoucherItem[];
   adjustments?: Adjustment[];
   subTotal?: number;
@@ -172,6 +185,11 @@ export interface Voucher {
   gstClassification?: 'Input' | 'Output';
   isReconciled?: boolean;
   bankDate?: string;
+  attachments?: Attachment[];
+  approvedBy?: string;
+  approvalDate?: string;
+  currency?: string;
+  exchangeRate?: number;
 }
 
 export interface Ledger {
@@ -180,7 +198,9 @@ export interface Ledger {
   group: string;
   openingBalance: number;
   type: 'Debit' | 'Credit';
-  budget?: number; // Annual budget ceiling
+  budget?: number;
+  taxId?: string; // Statutory identifier for GSTR categorization
+  address?: string;
 }
 
 export interface Item {

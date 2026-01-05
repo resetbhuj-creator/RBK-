@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { MainMenuType, MenuItem, SubMenuItem, CompanySubMenu, AdminSubMenu, TransactionSubMenu, DisplaySubMenu, CommunicationSubMenu, HouseKeepingSubMenu } from './types';
 
@@ -17,7 +16,7 @@ export const MENU_ITEMS: MenuItem[] = [
     label: 'Company',
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
       </svg>
     )
   },
@@ -314,10 +313,16 @@ export const DISPLAY_SUB_MENUS: SubMenuItem[] = [
     description: 'Statutory returns and tax summary.',
     color: 'bg-slate-700',
     icon: <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" /></svg>
+  },
+  {
+    id: DisplaySubMenu.GSTR_1,
+    label: 'GSTR-1 (Sales)',
+    description: 'Consolidated report of all outward supplies and tax liability.',
+    color: 'bg-indigo-600',
+    icon: <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 11l3-3m0 0l3 3m-3-3v8m0-13a9 9 0 110 18 9 9 0 010-18z" /></svg>
   }
 ];
 
-// Added missing COMMUNICATION_SUB_MENUS export
 export const COMMUNICATION_SUB_MENUS: SubMenuItem[] = [
   {
     id: CommunicationSubMenu.PRINT_CENTER,
@@ -386,6 +391,13 @@ export const HOUSE_KEEPING_SUB_MENUS: SubMenuItem[] = [
     description: 'Review granular telemetry of user activities and access patterns.',
     color: 'bg-rose-600',
     icon: <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+  },
+  {
+    id: HouseKeepingSubMenu.RENUMBERING,
+    label: 'Vch Renumbering',
+    description: 'Systematically re-align voucher sequences for audit compliance.',
+    color: 'bg-blue-600',
+    icon: <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" /></svg>
   },
   {
     id: HouseKeepingSubMenu.DATA_PURGE,

@@ -64,7 +64,10 @@ const ItemForm: React.FC<ItemFormProps> = ({ initialData, unitMeasures, taxGroup
     if (currentData.salePrice < 0) newErrors.salePrice = 'Sale price cannot be negative';
     if (currentData.gstRate < 0 || currentData.gstRate > 100) newErrors.gstRate = 'Invalid tax rate (0-100%)';
     
-    // HSN/SAC Statutory Validation Logic
+    if (currentData.gstRate > 0 && !currentData.taxGroupId) {
+      newErrors.taxGroupId = 'Tax Group is required for taxable items';
+    }
+
     const hsn = currentData.hsnCode.trim();
     if (!hsn) {
       newErrors.hsnCode = 'HSN/SAC code is mandatory';
@@ -105,6 +108,12 @@ const ItemForm: React.FC<ItemFormProps> = ({ initialData, unitMeasures, taxGroup
       }
     }
     setFormData(prev => ({ ...prev, taxGroupId: groupId, gstRate: newRate }));
+    if (groupId && errors.taxGroupId) {
+      setErrors(prev => {
+        const { taxGroupId, ...rest } = prev;
+        return rest;
+      });
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -162,7 +171,7 @@ const ItemForm: React.FC<ItemFormProps> = ({ initialData, unitMeasures, taxGroup
       <form onSubmit={handleSubmit} className="p-8 space-y-10">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <div className="md:col-span-2 space-y-2">
-            <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-1">Official Item Name</label>
+            <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-1">Official Item Name <span className="text-rose-500">*</span></label>
             <input 
               value={formData.name} 
               onChange={e => setFormData({...formData, name: e.target.value})} 
@@ -174,7 +183,7 @@ const ItemForm: React.FC<ItemFormProps> = ({ initialData, unitMeasures, taxGroup
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-1">Category</label>
+            <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-1">Category <span className="text-rose-500">*</span></label>
             <select 
               value={formData.category} 
               onChange={e => setFormData({...formData, category: e.target.value})} 
@@ -186,21 +195,28 @@ const ItemForm: React.FC<ItemFormProps> = ({ initialData, unitMeasures, taxGroup
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] font-black uppercase text-indigo-600 tracking-[0.2em] ml-1">Tax Group Association</label>
+            <label className="text-[10px] font-black uppercase text-indigo-600 tracking-[0.2em] ml-1">
+              Tax Group Association {formData.gstRate > 0 && <span className="text-rose-500">*</span>}
+            </label>
             <select 
               value={formData.taxGroupId} 
               onChange={e => handleTaxGroupChange(e.target.value)}
+              onBlur={() => handleBlur('taxGroupId')}
               className={inputClass('taxGroupId')}
             >
               <option value="">-- No Group (Manual Slab) --</option>
               {taxGroups.map(tg => <option key={tg.id} value={tg.id}>{tg.name}</option>)}
             </select>
-            <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-1 ml-1">Pre-fills statutory rate from policy groups.</p>
+            {touched.taxGroupId && errors.taxGroupId ? (
+              <p className="text-[10px] text-rose-500 font-bold mt-1 ml-1">{errors.taxGroupId}</p>
+            ) : (
+              <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-1 ml-1">Required for items with statutory rates.</p>
+            )}
           </div>
 
           <div className="space-y-2">
             <div className="flex justify-between items-center mb-1">
-              <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-1">Unit of Measure</label>
+              <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-1">Unit of Measure <span className="text-rose-500">*</span></label>
               <button 
                 type="button" 
                 onClick={() => setIsQuickUnitOpen(!isQuickUnitOpen)}
@@ -243,7 +259,7 @@ const ItemForm: React.FC<ItemFormProps> = ({ initialData, unitMeasures, taxGroup
 
           <div className="space-y-2">
             <div className="flex justify-between items-center mb-1">
-              <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-1">HSN/SAC Code</label>
+              <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-1">HSN/SAC Code <span className="text-rose-500">*</span></label>
               <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${formData.hsnCode.length >= 2 && formData.hsnCode.length <= 8 ? 'bg-indigo-50 text-indigo-600' : 'bg-slate-100 text-slate-400'}`}>
                 {formData.hsnCode.length} / 8 Digits
               </span>
@@ -290,7 +306,6 @@ const ItemForm: React.FC<ItemFormProps> = ({ initialData, unitMeasures, taxGroup
           </div>
         </div>
 
-        {/* Dynamic Statutory Block */}
         <div className="bg-slate-900 rounded-[2.5rem] p-10 text-white relative overflow-hidden shadow-2xl border-b-8 border-indigo-600">
            <div className="relative z-10 space-y-8">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">

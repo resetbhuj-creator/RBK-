@@ -6,10 +6,11 @@ import * as XLSX from 'xlsx';
 interface DayBookProps {
   vouchers: Voucher[];
   onClone?: (v: Voucher) => void;
+  onDelete?: (id: string) => void;
   onViewVoucher?: (id: string) => void;
 }
 
-const DayBook: React.FC<DayBookProps> = ({ vouchers, onClone, onViewVoucher }) => {
+const DayBook: React.FC<DayBookProps> = ({ vouchers, onClone, onDelete, onViewVoucher }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('All');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -76,10 +77,15 @@ const DayBook: React.FC<DayBookProps> = ({ vouchers, onClone, onViewVoucher }) =
     { 
       label: 'Purge Context', 
       icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>,
-      onClick: () => alert('Voucher purge initialized.'),
+      onClick: () => onDelete?.(v.id),
       variant: 'danger'
     }
   ];
+
+  const toggleSelection = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
 
   return (
     <div className="space-y-10 animate-in fade-in duration-500 pb-20">
@@ -92,7 +98,7 @@ const DayBook: React.FC<DayBookProps> = ({ vouchers, onClone, onViewVoucher }) =
            { label: 'Unit Efficiency', value: `$${stats.avg.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, color: 'text-emerald-600', bg: 'bg-emerald-50' }
          ].map((s, i) => (
            <div key={i} className={`p-8 rounded-[2.5rem] border border-slate-200 shadow-sm group hover:-translate-y-1 transition-all ${s.bg}`}>
-              <div className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2 group-hover:text-indigo-600">{s.label}</div>
+              <div className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2 group-hover:text-indigo-600 transition-colors">{s.label}</div>
               <div className={`text-4xl font-black italic tracking-tighter tabular-nums ${s.color}`}>{s.value}</div>
            </div>
          ))}
@@ -105,7 +111,7 @@ const DayBook: React.FC<DayBookProps> = ({ vouchers, onClone, onViewVoucher }) =
                <div className="relative flex-1 group">
                   <input 
                     type="text" 
-                    placeholder="Search Reconciled Stream (Party, Hash, Type)..." 
+                    placeholder="Query Reconciled Stream (Party, Hash, Type)..." 
                     value={searchTerm} 
                     onChange={(e) => setSearchTerm(e.target.value)} 
                     className="w-full pl-16 pr-8 py-5 rounded-3xl border border-slate-200 bg-white text-sm font-bold shadow-inner outline-none focus:ring-8 focus:ring-indigo-500/5 transition-all italic" 
@@ -171,13 +177,13 @@ const DayBook: React.FC<DayBookProps> = ({ vouchers, onClone, onViewVoucher }) =
             </thead>
             <tbody className="divide-y divide-slate-50 bg-white">
               {filtered.map((v) => (
-                <tr key={v.id} onClick={() => setSelectedIds(prev => prev.includes(v.id) ? prev.filter(x => x !== v.id) : [...prev, v.id])} className={`hover:bg-indigo-50/20 transition-all group cursor-pointer border-b border-slate-50 ${selectedIds.includes(v.id) ? 'bg-indigo-50/50' : ''}`}>
+                <tr key={v.id} onClick={() => onViewVoucher?.(v.id)} className={`hover:bg-indigo-50/20 transition-all group cursor-pointer border-b border-slate-50 ${selectedIds.includes(v.id) ? 'bg-indigo-50/50' : ''}`}>
                   <td className="px-12 py-8">
-                     <div className={`w-6 h-6 rounded-lg border-2 transition-all flex items-center justify-center ${selectedIds.includes(v.id) ? 'bg-indigo-600 border-indigo-600 text-white scale-110 shadow-lg' : 'border-slate-200 group-hover:border-indigo-300'}`}>
+                     <div onClick={(e) => toggleSelection(v.id, e)} className={`w-6 h-6 rounded-lg border-2 transition-all flex items-center justify-center ${selectedIds.includes(v.id) ? 'bg-indigo-600 border-indigo-600 text-white scale-110 shadow-lg' : 'border-slate-200 group-hover:border-indigo-300'}`}>
                         {selectedIds.includes(v.id) && <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={4}><path d="M5 13l4 4L19 7" /></svg>}
                      </div>
                   </td>
-                  <td className="px-12 py-8" onClick={(e) => { e.stopPropagation(); onViewVoucher?.(v.id); }}>
+                  <td className="px-12 py-8">
                     <div className="font-black text-slate-800 text-base tracking-tighter italic group-hover:text-indigo-600 transition-colors underline decoration-transparent group-hover:decoration-indigo-200 underline-offset-8">#{v.id}</div>
                     <div className="text-[10px] text-slate-400 uppercase font-black mt-2 tracking-widest">{v.date}</div>
                   </td>
@@ -186,22 +192,21 @@ const DayBook: React.FC<DayBookProps> = ({ vouchers, onClone, onViewVoucher }) =
                        <span className={`px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] border self-start shadow-sm transition-transform group-hover:scale-105 ${
                          v.type === 'Sales' || v.type === 'Receipt' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
                          v.type === 'Purchase' || v.type === 'Payment' ? 'bg-rose-50 text-rose-600 border-rose-100' : 
-                         v.type === 'Sales Return' || v.type === 'Purchase Return' ? 'bg-amber-50 text-amber-600 border-amber-100' :
                          'bg-indigo-50 text-indigo-600 border-indigo-100'
                        }`}>{v.type}</span>
-                       <span className="text-[9px] font-black text-slate-300 uppercase tracking-[0.3em] ml-1">{v.supplyType || 'Internal Node'}</span>
+                       <span className={`text-[9px] font-black uppercase tracking-[0.3em] ml-1 ${v.status === 'Pending Approval' ? 'text-rose-500' : 'text-slate-300'}`}>{v.status}</span>
                     </div>
                   </td>
                   <td className="px-12 py-8">
                     <span className="text-sm font-black text-slate-900 uppercase italic tracking-tight">{v.party}</span>
                     <div className="flex items-center space-x-3 mt-2">
                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981] animate-pulse"></div>
-                       <span className="text-[9px] text-slate-400 font-black uppercase tracking-widest">Verified • {v.items?.length || v.entries?.length || 0} Data Points</span>
+                       <span className="text-[9px] text-slate-400 font-black uppercase tracking-widest">Verified Integrity</span>
                     </div>
                   </td>
                   <td className="px-12 py-8 text-right">
                     <div className="font-black text-slate-900 tabular-nums text-xl italic tracking-tighter">${v.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
-                    <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">Confirmed Volume</div>
+                    <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">{v.currency || 'USD'} Net</div>
                   </td>
                   <td className="px-12 py-8 text-right" onClick={e => e.stopPropagation()}>
                     <ActionMenu actions={getVoucherActions(v)} />

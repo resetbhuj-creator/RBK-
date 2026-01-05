@@ -28,11 +28,25 @@ const Dashboard: React.FC<DashboardProps> = ({ activeCompany, vouchers, tasks, s
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [newTaskDueDate, setNewTaskDueDate] = useState(new Date().toISOString().split('T')[0]);
   const [priorityFilter, setPriorityFilter] = useState<'All' | TaskPriority>('All');
+  const [isSortedByPriority, setIsSortedByPriority] = useState(false);
+
+  const priorityWeight: Record<string, number> = {
+    'High': 3,
+    'Medium': 2,
+    'Low': 1
+  };
 
   const filteredTasks = useMemo(() => {
-    if (priorityFilter === 'All') return tasks;
-    return tasks.filter(t => t.priority === priorityFilter);
-  }, [tasks, priorityFilter]);
+    let result = priorityFilter === 'All' 
+      ? [...tasks] 
+      : tasks.filter(t => t.priority === priorityFilter);
+
+    if (isSortedByPriority) {
+      result.sort((a, b) => priorityWeight[b.priority] - priorityWeight[a.priority]);
+    }
+    
+    return result;
+  }, [tasks, priorityFilter, isSortedByPriority]);
 
   const financialHealth = useMemo(() => {
     const revenue = vouchers.filter(v => v.type === 'Sales').reduce((acc, v) => acc + v.amount, 0);
@@ -230,7 +244,16 @@ const Dashboard: React.FC<DashboardProps> = ({ activeCompany, vouchers, tasks, s
                  <div className="w-1.5 h-4 bg-indigo-600 rounded-full mr-3"></div>
                  Mission Control
                </h3>
-               <span className="text-[10px] font-black text-slate-400 bg-slate-100 px-3 py-1 rounded-xl">{tasks.filter(t => t.status === 'Pending').length} Pending</span>
+               <div className="flex items-center space-x-2">
+                  <button 
+                    onClick={() => setIsSortedByPriority(!isSortedByPriority)}
+                    className={`p-1.5 rounded-lg transition-all border ${isSortedByPriority ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-slate-50 border-slate-200 text-slate-400 hover:text-indigo-500'}`}
+                    title="Sort by Priority"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" /></svg>
+                  </button>
+                  <span className="text-[10px] font-black text-slate-400 bg-slate-100 px-3 py-1 rounded-xl">{tasks.filter(t => t.status === 'Pending').length} Pending</span>
+               </div>
             </div>
 
             <div className="flex space-x-1 mb-8 bg-slate-100 p-1.5 rounded-[1.5rem] border border-slate-200">
