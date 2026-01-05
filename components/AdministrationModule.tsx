@@ -117,10 +117,16 @@ const AdministrationModule: React.FC<AdministrationModuleProps> = ({
       // Deep link to batches if it's an item
       if (activeTab === 'ITEMS' && row.isBatchTracked) {
         actions.push({
-          label: 'Manage Batches',
-          icon: <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>,
+          label: 'View Batches',
+          icon: <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>,
           onClick: () => { setItemFilterId(row.id); setActiveTab('BATCHES'); },
           variant: 'primary'
+        });
+        actions.push({
+          label: 'Add Batch',
+          icon: <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>,
+          onClick: () => { setItemFilterId(row.id); setEditingId(null); setActiveTab('BATCHES'); setIsModalOpen(true); },
+          variant: 'success'
         });
       }
 
@@ -346,6 +352,7 @@ const AdministrationModule: React.FC<AdministrationModuleProps> = ({
                {activeTab === 'BATCHES' && (
                   <BatchForm
                     initialData={editingRecord as Batch}
+                    defaultItemId={itemFilterId || undefined}
                     items={items}
                     onCancel={() => setIsModalOpen(false)}
                     onSubmit={(data) => { if (editingId) setBatches(prev => prev.map(b => b.id === editingId ? { ...data, id: editingId } : b)); else setBatches(prev => [...prev, { ...data, id: `b-${Date.now()}` }]); setIsModalOpen(false); }}

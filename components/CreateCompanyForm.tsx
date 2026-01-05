@@ -51,16 +51,11 @@ const ISO_CURRENCIES: Record<string, { symbol: string, name: string }> = {
   'PHP': { symbol: '₱', name: 'Philippine Peso' }
 };
 
-const INDIAN_STATE_CODES: Record<string, string> = {
-  "Maharashtra": "27", "Delhi": "07", "Karnataka": "29", "Tamil Nadu": "33", 
-  "Gujarat": "24", "Uttar Pradesh": "09", "West Bengal": "19", "Haryana": "06"
-};
-
 const COUNTRY_DATA: Record<string, { currency: string; taxLaw: string; states: string[]; defaultFYStart: string; zipHint: string; taxLabel: string; taxHint: string }> = {
   "India": {
     currency: "INR (₹)",
     taxLaw: "Indian GST",
-    states: Object.keys(INDIAN_STATE_CODES),
+    states: ["Maharashtra", "Delhi", "Karnataka", "Tamil Nadu", "Gujarat", "Uttar Pradesh", "West Bengal", "Haryana"],
     defaultFYStart: "04-01",
     zipHint: "6-digit Pincode",
     taxLabel: "GSTIN",
@@ -92,6 +87,51 @@ const COUNTRY_DATA: Record<string, { currency: string; taxLaw: string; states: s
     zipHint: "P.O. Box",
     taxLabel: "TRN",
     taxHint: "15-digit number"
+  },
+  "Canada": {
+    currency: "CAD ($)",
+    taxLaw: "Canada GST/HST",
+    states: ["Ontario", "Quebec", "British Columbia", "Alberta", "Manitoba"],
+    defaultFYStart: "01-01",
+    zipHint: "Postal Code (A1B 2C3)",
+    taxLabel: "Business Number",
+    taxHint: "e.g. 12345 6789 RT0001"
+  },
+  "Australia": {
+    currency: "AUD ($)",
+    taxLaw: "Australia GST",
+    states: ["New South Wales", "Victoria", "Queensland", "Western Australia"],
+    defaultFYStart: "07-01",
+    zipHint: "4-digit code",
+    taxLabel: "ABN",
+    taxHint: "11-digit number"
+  },
+  "Singapore": {
+    currency: "SGD ($)",
+    taxLaw: "Singapore GST",
+    states: ["Central", "North", "North-East", "East", "West"],
+    defaultFYStart: "01-01",
+    zipHint: "6-digit code",
+    taxLabel: "UEN",
+    taxHint: "Unique Entity Number"
+  },
+  "Japan": {
+    currency: "JPY (¥)",
+    taxLaw: "Japan Consumption Tax",
+    states: ["Tokyo", "Osaka", "Kanagawa", "Aichi", "Hokkaido"],
+    defaultFYStart: "04-01",
+    zipHint: "7-digit (123-4567)",
+    taxLabel: "Corporate Number",
+    taxHint: "13-digit number"
+  },
+  "Germany": {
+    currency: "EUR (€)",
+    taxLaw: "German VAT (MwSt)",
+    states: ["Bavaria", "Berlin", "Hamburg", "Hesse", "Saxony"],
+    defaultFYStart: "01-01",
+    zipHint: "5-digit code",
+    taxLabel: "USt-IdNr.",
+    taxHint: "e.g. DE123456789"
   }
 };
 
@@ -121,7 +161,6 @@ const CreateCompanyForm: React.FC<CreateCompanyFormProps> = ({ onCancel, onSubmi
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
-  // Logic to suggest default data paths based on company name and country
   useEffect(() => {
     if (!isDataPathManual) {
       const sanitizedName = formData.name.trim().replace(/[^a-z0-9]/gi, '_') || 'NewCompany';

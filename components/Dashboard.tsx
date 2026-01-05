@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Voucher, Task, TaskPriority } from '../types';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell, PieChart, Pie } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } from 'recharts';
 
 const data = [
   { name: 'Mon', revenue: 4000, expenses: 2400 },
@@ -22,13 +22,15 @@ interface DashboardProps {
   onViewVoucher: (id: string) => void;
 }
 
+type SortMode = 'PRIORITY_DESC' | 'DUE_DATE' | 'NEWEST';
+
 const Dashboard: React.FC<DashboardProps> = ({ activeCompany, vouchers, tasks, setTasks, onViewVoucher }) => {
   const symbol = activeCompany?.currencyConfig?.symbol || '$';
   
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [newTaskDueDate, setNewTaskDueDate] = useState(new Date().toISOString().split('T')[0]);
   const [priorityFilter, setPriorityFilter] = useState<'All' | TaskPriority>('All');
-  const [isSortedByPriority, setIsSortedByPriority] = useState(false);
+  const [sortMode, setSortMode] = useState<SortMode>('PRIORITY_DESC');
 
   const priorityWeight: Record<string, number> = {
     'High': 3,
@@ -41,19 +43,29 @@ const Dashboard: React.FC<DashboardProps> = ({ activeCompany, vouchers, tasks, s
       ? [...tasks] 
       : tasks.filter(t => t.priority === priorityFilter);
 
-    if (isSortedByPriority) {
-      result.sort((a, b) => priorityWeight[b.priority] - priorityWeight[a.priority]);
-    }
+    result.sort((a, b) => {
+      if (sortMode === 'PRIORITY_DESC') {
+        const weightDiff = priorityWeight[b.priority] - priorityWeight[a.priority];
+        if (weightDiff !== 0) return weightDiff;
+        return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+      }
+      if (sortMode === 'DUE_DATE') {
+        return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+      }
+      if (sortMode === 'NEWEST') {
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      }
+      return 0;
+    });
     
     return result;
-  }, [tasks, priorityFilter, isSortedByPriority]);
+  }, [tasks, priorityFilter, sortMode]);
 
   const financialHealth = useMemo(() => {
     const revenue = vouchers.filter(v => v.type === 'Sales').reduce((acc, v) => acc + v.amount, 0);
     const expenses = vouchers.filter(v => v.type === 'Purchase' || v.type === 'Payment').reduce((acc, v) => acc + v.amount, 0);
     const cash = vouchers.filter(v => v.type === 'Receipt').reduce((acc, v) => acc + v.amount, 0);
     
-    // Quick ratio calculation (mocked based on available data)
     const ratio = expenses > 0 ? (cash / (expenses * 0.4)).toFixed(2) : '1.00';
     return { revenue, expenses, ratio };
   }, [vouchers]);
@@ -238,25 +250,34 @@ const Dashboard: React.FC<DashboardProps> = ({ activeCompany, vouchers, tasks, s
             <div className="absolute top-0 right-0 w-48 h-48 bg-indigo-600 rounded-full blur-[100px] opacity-10 -mr-24 -mt-24 group-hover:opacity-20 transition-opacity"></div>
           </div>
 
-          <div className="bg-white p-10 rounded-[3rem] border border-slate-200 shadow-sm flex flex-col h-[500px]">
+          <div className="bg-white p-10 rounded-[3rem] border border-slate-200 shadow-sm flex flex-col h-[600px]">
             <div className="flex justify-between items-center mb-8">
                <h3 className="text-xs font-black text-slate-800 uppercase tracking-[0.3em] flex items-center">
                  <div className="w-1.5 h-4 bg-indigo-600 rounded-full mr-3"></div>
                  Mission Control
                </h3>
                <div className="flex items-center space-x-2">
-                  <button 
-                    onClick={() => setIsSortedByPriority(!isSortedByPriority)}
-                    className={`p-1.5 rounded-lg transition-all border ${isSortedByPriority ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-slate-50 border-slate-200 text-slate-400 hover:text-indigo-500'}`}
-                    title="Sort by Priority"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" /></svg>
-                  </button>
                   <span className="text-[10px] font-black text-slate-400 bg-slate-100 px-3 py-1 rounded-xl">{tasks.filter(t => t.status === 'Pending').length} Pending</span>
                </div>
             </div>
 
-            <div className="flex space-x-1 mb-8 bg-slate-100 p-1.5 rounded-[1.5rem] border border-slate-200">
+            {/* Sorting Controls */}
+            <div className="flex space-x-1 mb-4 bg-slate-100 p-1 rounded-xl border border-slate-200">
+               {(['PRIORITY_DESC', 'DUE_DATE', 'NEWEST'] as SortMode[]).map((mode) => (
+                 <button
+                   key={mode}
+                   onClick={() => setSortMode(mode)}
+                   className={`flex-1 py-1.5 text-[8px] font-black uppercase tracking-tighter rounded-lg transition-all ${
+                     sortMode === mode ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                   }`}
+                 >
+                   {mode.replace('_DESC', '').replace('_', ' ')}
+                 </button>
+               ))}
+            </div>
+
+            {/* Filtering Controls */}
+            <div className="flex space-x-1 mb-8 bg-slate-50 p-1.5 rounded-[1.5rem] border border-slate-100">
               {(['All', 'High', 'Medium', 'Low'] as const).map((filter) => (
                 <button
                   key={filter}
@@ -275,10 +296,17 @@ const Dashboard: React.FC<DashboardProps> = ({ activeCompany, vouchers, tasks, s
             <div className="flex-1 overflow-auto custom-scrollbar space-y-4 pr-2">
               {filteredTasks.length > 0 ? filteredTasks.map((task) => {
                 const overdue = isOverdue(task.dueDate) && task.status === 'Pending';
+                const pColor = task.priority === 'High' ? 'rose' : task.priority === 'Medium' ? 'amber' : 'slate';
+                
                 return (
                   <div 
                     key={task.id} 
-                    className={`p-6 rounded-[2rem] border transition-all relative group ${task.status === 'Completed' ? 'bg-slate-50 border-slate-100 opacity-60' : 'bg-white border-slate-200 hover:border-indigo-200 hover:shadow-xl'}`}
+                    className={`p-6 rounded-[2rem] border-2 transition-all relative group ${
+                      task.status === 'Completed' 
+                        ? 'bg-slate-50 border-slate-100 opacity-60' 
+                        : `bg-white border-white hover:border-${pColor}-100 hover:shadow-xl hover:bg-${pColor}-50/10`
+                    }`}
+                    style={{ borderLeftWidth: '8px', borderLeftColor: task.status === 'Completed' ? '#e2e8f0' : (task.priority === 'High' ? '#f43f5e' : task.priority === 'Medium' ? '#f59e0b' : '#64748b') }}
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex items-start space-x-4">
@@ -307,8 +335,9 @@ const Dashboard: React.FC<DashboardProps> = ({ activeCompany, vouchers, tasks, s
                 );
               }) : (
                 <div className="h-full flex flex-col items-center justify-center text-center opacity-30">
-                  <div className="w-16 h-16 bg-slate-100 rounded-[2rem] flex items-center justify-center mb-6 grayscale">🏙️</div>
+                  <div className="w-16 h-16 bg-slate-100 rounded-[2.5rem] flex items-center justify-center mb-6 grayscale">🏙️</div>
                   <p className="text-[10px] font-black uppercase tracking-[0.3em]">No matching tasks in buffer</p>
+                  <button onClick={() => setPriorityFilter('All')} className="mt-4 text-[9px] font-black text-indigo-600 uppercase underline">Reset Filter</button>
                 </div>
               )}
             </div>

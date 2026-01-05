@@ -1,5 +1,5 @@
-import React from 'react';
-import { Voucher } from '../types';
+import React, { useMemo } from 'react';
+import { Voucher, VoucherItem } from '../types';
 
 interface PrintLayoutProps {
   voucher: Voucher;
@@ -47,9 +47,10 @@ const PrintLayout: React.FC<PrintLayoutProps> = ({
 
   const { width, height, label: dimLabel } = getNativeDimensions();
 
-  // Layout-specific styling logic
   const isCompact = layout === 'COMPACT';
   const isGst = layout === 'GST_TAX_INVOICE';
+  const hasItems = voucher.items && voucher.items.length > 0;
+  const hasEntries = voucher.entries && voucher.entries.length > 0;
 
   const containerPadding = isCompact ? 'p-6' : 'p-12';
   const headerSpacing = isCompact ? 'pb-6 mb-6' : 'pb-10 mb-10';
@@ -57,9 +58,30 @@ const PrintLayout: React.FC<PrintLayoutProps> = ({
   const sectionSpacing = isCompact ? 'mb-6' : 'mb-12';
   const tableCellPadding = isCompact ? 'p-2' : 'p-4';
 
+  const hsnSummary = useMemo(() => {
+    if (!hasItems || !isGst) return [];
+    const map: Record<string, { hsn: string, taxable: number, cgst: number, sgst: number, igst: number, total: number }> = {};
+    
+    voucher.items!.forEach(item => {
+      const code = item.hsn || 'N/A';
+      if (!map[code]) {
+        map[code] = { hsn: code, taxable: 0, cgst: 0, sgst: 0, igst: 0, total: 0 };
+      }
+      const tax = item.taxAmount || 0;
+      map[code].taxable += item.amount;
+      if (voucher.supplyType === 'Local') {
+        map[code].cgst += tax / 2;
+        map[code].sgst += tax / 2;
+      } else {
+        map[code].igst += tax;
+      }
+      map[code].total += tax;
+    });
+    return Object.values(map);
+  }, [voucher.items, voucher.supplyType, isGst]);
+
   return (
     <div className="relative group">
-      {/* Physical Dimension Helper (Visual Only) */}
       <div className="absolute -top-8 left-0 text-[10px] font-black uppercase text-white/30 tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">
         {dimLabel} • {width}px × {height}px • Layout: {layout}
       </div>
@@ -99,7 +121,7 @@ const PrintLayout: React.FC<PrintLayoutProps> = ({
            </div>
            <div className="text-right flex flex-col items-end">
               <div className={`${isCompact ? 'text-2xl' : 'text-4xl'} font-black italic uppercase tracking-tighter text-indigo-600 mb-6 underline decoration-indigo-200 underline-offset-8`}>
-                {voucher.type === 'Purchase Order' ? 'PURCHASE ORDER' : (isGst ? 'TAX INVOICE' : voucher.type === 'Sales' ? 'SALES INVOICE' : 'FINANCIAL VOUCHER')}
+                {voucher.type === 'Purchase Order' ? 'PURCHASE ORDER' : (isGst ? 'TAX INVOICE' : voucher.type === 'Sales' ? 'SALES INVOICE' : `${voucher.type.toUpperCase()} VOUCHER`)}
               </div>
               <div className={`space-y-2 bg-slate-50 ${isCompact ? 'p-2' : 'p-4'} rounded-2xl border border-slate-100`}>
                 <div className={`flex justify-between ${isCompact ? 'w-40 text-[10px]' : 'w-56 text-xs'} font-black border-b border-slate-200 pb-1`}>
@@ -118,60 +140,93 @@ const PrintLayout: React.FC<PrintLayoutProps> = ({
         <div className={`grid grid-cols-2 gap-12 ${sectionSpacing} relative z-10`}>
            <div className={`${isCompact ? 'p-4' : 'p-6'} bg-slate-50 rounded-[2rem] border border-slate-200`}>
               <div className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.3em] mb-2 border-b border-indigo-100 pb-2">
-                {(voucher.type === 'Sales' || voucher.type === 'Delivery Note') ? 'Billed To' : 'Supplier Details'}
+                {(voucher.type === 'Sales' || voucher.type === 'Delivery Note') ? 'Billed To' : 'Counterparty Node'}
               </div>
               <div className={`${isCompact ? 'text-lg' : 'text-xl'} font-black text-slate-900 uppercase italic mb-1`}>
                 {voucher.party}
               </div>
-              {!isCompact && <p className="text-[10px] font-black text-slate-400 mt-4 uppercase tracking-widest">Identity Verified ✓</p>}
+              {!isCompact && <p className="text-[10px] font-black text-slate-400 mt-4 uppercase tracking-widest">Master Identity Verified ✓</p>}
            </div>
            <div className={`${isCompact ? 'p-4' : 'p-6'} bg-slate-50 rounded-[2rem] border border-slate-200`}>
-              <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mb-2 border-b border-slate-200 pb-2">Context</div>
+              <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mb-2 border-b border-slate-200 pb-2">Audit Context</div>
               <div className={`${isCompact ? 'text-[10px]' : 'text-xs'} font-black text-slate-600 space-y-1`}>
-                <p className="flex justify-between"><span>Supply:</span> <span className="text-slate-900">{voucher.supplyType || 'Standard'}</span></p>
-                <p className="flex justify-between"><span>Ref:</span> <span className="text-slate-900 uppercase">{voucher.reference || 'N/A'}</span></p>
+                <p className="flex justify-between"><span>Voucher Class:</span> <span className="text-slate-900">{voucher.type}</span></p>
+                <p className="flex justify-between"><span>Ref Document:</span> <span className="text-slate-900 uppercase">{voucher.reference || 'N/A'}</span></p>
               </div>
            </div>
         </div>
 
-        {/* Items Table */}
+        {/* Dynamic Table Architecture */}
         <div className="flex-1 relative z-10">
            <table className={`w-full text-left border-collapse border-2 ${isGst ? 'border-slate-900' : 'border-slate-200'}`}>
               <thead className="bg-slate-900 text-white">
                  <tr className="text-[10px] font-black uppercase tracking-widest">
                     <th className={`${tableCellPadding} border-r border-slate-700 w-12 text-center`}>#</th>
-                    <th className={tableCellPadding}>Description</th>
-                    {isGst && <th className={`${tableCellPadding} border-r border-slate-700 text-center`}>HSN/SAC</th>}
-                    <th className={`${tableCellPadding} text-center`}>Qty</th>
-                    <th className={`${tableCellPadding} text-right`}>Rate</th>
-                    <th className={`${tableCellPadding} text-right`}>Value</th>
+                    <th className={tableCellPadding}>{hasEntries && !hasItems ? 'Account Particulars' : 'Description'}</th>
+                    {hasItems && isGst && <th className={`${tableCellPadding} border-r border-slate-700 text-center`}>HSN/SAC</th>}
+                    {hasItems && <th className={`${tableCellPadding} border-r border-slate-700 text-center`}>Batch No</th>}
+                    {hasItems ? (
+                      <>
+                        <th className={`${tableCellPadding} text-center`}>Qty</th>
+                        <th className={`${tableCellPadding} text-right`}>Rate</th>
+                        <th className={`${tableCellPadding} text-right`}>Value</th>
+                      </>
+                    ) : (
+                      <>
+                        <th className={`${tableCellPadding} text-center border-l border-slate-700`}>Type</th>
+                        <th className={`${tableCellPadding} text-right border-l border-slate-700`}>Debit</th>
+                        <th className={`${tableCellPadding} text-right border-l border-slate-700`}>Credit</th>
+                      </>
+                    )}
                  </tr>
               </thead>
               <tbody>
-                 {voucher.items && voucher.items.length > 0 ? (
-                   voucher.items.map((item, i) => (
+                 {hasItems ? (
+                   voucher.items!.map((item, i) => (
                       <tr key={i} className={`${tableFontSize} font-black border-b border-slate-200 hover:bg-slate-50 transition-colors`}>
                          <td className={`${tableCellPadding} border-r border-slate-200 text-center text-slate-400 font-mono`}>{i + 1}</td>
                          <td className={`${tableCellPadding} border-r border-slate-200 italic`}>{item.name}</td>
                          {isGst && <td className={`${tableCellPadding} border-r border-slate-200 text-center font-mono text-slate-500`}>{item.hsn}</td>}
+                         <td className={`${tableCellPadding} border-r border-slate-200 text-center font-mono text-indigo-600`}>{item.batchNo || '-'}</td>
                          <td className={`${tableCellPadding} border-r border-slate-200 text-center text-slate-900`}>{item.qty} {item.unit}</td>
                          <td className={`${tableCellPadding} border-r border-slate-200 text-right tabular-nums`}>${item.rate.toLocaleString()}</td>
                          <td className={`${tableCellPadding} text-right tabular-nums font-bold`}>${item.amount.toLocaleString()}</td>
                       </tr>
                    ))
+                 ) : hasEntries ? (
+                    voucher.entries!.map((entry, i) => (
+                      <tr key={i} className={`${tableFontSize} font-black border-b border-slate-200 hover:bg-slate-50 transition-colors`}>
+                         <td className={`${tableCellPadding} border-r border-slate-200 text-center text-slate-400 font-mono`}>{i + 1}</td>
+                         <td className={`${tableCellPadding} border-r border-slate-200 italic uppercase tracking-tight`}>
+                           {entry.ledgerName}
+                         </td>
+                         <td className={`${tableCellPadding} border-r border-slate-200 text-center`}>
+                           <span className={`px-2 py-0.5 rounded text-[8px] font-black ${entry.type === 'Dr' ? 'bg-indigo-50 text-indigo-600' : 'bg-rose-50 text-rose-600'}`}>
+                             {entry.type === 'Dr' ? 'DEBIT' : 'CREDIT'}
+                           </span>
+                         </td>
+                         <td className={`${tableCellPadding} border-r border-slate-200 text-right tabular-nums ${entry.type === 'Dr' ? 'text-indigo-600' : 'text-slate-200'}`}>
+                           {entry.type === 'Dr' ? `$${(entry.amount + (entry.taxAmount || 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}` : '-'}
+                         </td>
+                         <td className={`${tableCellPadding} text-right tabular-nums ${entry.type === 'Cr' ? 'text-rose-600' : 'text-slate-200'}`}>
+                           {entry.type === 'Cr' ? `$${(entry.amount + (entry.taxAmount || 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}` : '-'}
+                         </td>
+                      </tr>
+                    ))
                  ) : (
                    <tr className={`${tableFontSize} font-black border-b border-slate-200`}>
                       <td className={`${tableCellPadding} border-r border-slate-200 text-center text-slate-400 font-mono`}>1</td>
-                      <td className={`${tableCellPadding} border-r border-slate-200 italic`} colSpan={isGst ? 4 : 3}>As per Journal: {voucher.narration}</td>
+                      <td className={`${tableCellPadding} border-r border-slate-200 italic`} colSpan={hasItems ? (isGst ? 4 : 3) : 3}>As per Journal: {voucher.narration}</td>
                       <td className={`${tableCellPadding} text-right tabular-nums font-bold`}>${voucher.amount.toLocaleString()}</td>
                    </tr>
                  )}
-                 {/* Decorative padding rows for standard/gst layouts */}
-                 {!isCompact && [...Array(Math.max(0, 5 - (voucher.items?.length || 1)))].map((_, i) => (
+                 {/* Fill empty space */}
+                 {!isCompact && [...Array(Math.max(0, 5 - (voucher.items?.length || voucher.entries?.length || 1)))].map((_, i) => (
                    <tr key={`pad-${i}`} className="border-b border-slate-100 h-10">
                      <td className="p-4 border-r border-slate-100"></td>
                      <td className="p-4 border-r border-slate-100"></td>
-                     {isGst && <td className="p-4 border-r border-slate-100"></td>}
+                     {hasItems && isGst && <td className="p-4 border-r border-slate-100"></td>}
+                     {hasItems && <td className="p-4 border-r border-slate-100"></td>}
                      <td className="p-4 border-r border-slate-100"></td>
                      <td className="p-4 border-r border-slate-100"></td>
                      <td className="p-4"></td>
@@ -183,43 +238,82 @@ const PrintLayout: React.FC<PrintLayoutProps> = ({
            <div className={`flex border-2 border-t-0 ${isGst ? 'border-slate-900' : 'border-slate-200'}`}>
               <div className={`flex-1 ${isCompact ? 'p-4' : 'p-8'} space-y-6`}>
                  <div className="space-y-2">
-                    <span className="text-[9px] font-black uppercase text-slate-400 tracking-[0.3em] block">Total Amount in Words</span>
+                    <span className="text-[9px] font-black uppercase text-slate-400 tracking-[0.3em] block">Resolved Amount in Words</span>
                     <span className={`${isCompact ? 'text-[10px]' : 'text-xs'} font-black italic text-slate-800 uppercase leading-none border-b border-slate-200 pb-2 block`}>{amountInWords(voucher.amount)}</span>
                  </div>
                  {voucher.narration && (
                     <div className="space-y-1">
-                      <span className="text-[9px] font-black uppercase text-slate-400 tracking-[0.3em] block">Narration</span>
+                      <span className="text-[9px] font-black uppercase text-slate-400 tracking-[0.3em] block">Audit Narration</span>
                       <p className={`${isCompact ? 'text-[9px]' : 'text-[10px]'} text-slate-600 italic leading-tight`}>{voucher.narration}</p>
                     </div>
                  )}
               </div>
               <div className={`${isCompact ? 'w-64' : 'w-80'} border-l-2 ${isGst ? 'border-slate-900' : 'border-slate-200'} divide-y divide-slate-100`}>
-                 <div className={`flex justify-between ${isCompact ? 'px-4 py-2' : 'px-6 py-3'} text-xs font-black`}>
-                    <span className="text-slate-400 uppercase tracking-widest">Sub Total</span>
-                    <span>${(voucher.subTotal || voucher.amount).toLocaleString()}</span>
-                 </div>
-                 {voucher.adjustments?.map((adj, i) => (
-                    <div key={i} className={`flex justify-between ${isCompact ? 'px-4 py-2' : 'px-6 py-3'} text-xs font-black ${adj.type === 'Less' ? 'text-rose-600' : 'text-emerald-600'}`}>
-                      <span className="uppercase tracking-widest">{adj.label}</span>
-                      <span>{adj.type === 'Less' ? '-' : '+'}${adj.amount.toLocaleString()}</span>
+                 {hasItems ? (
+                   <>
+                    <div className={`flex justify-between ${isCompact ? 'px-4 py-2' : 'px-6 py-3'} text-xs font-black`}>
+                        <span className="text-slate-400 uppercase tracking-widest">Sub Total</span>
+                        <span>${(voucher.subTotal || voucher.amount).toLocaleString()}</span>
                     </div>
-                 ))}
-                 <div className={`flex justify-between ${isCompact ? 'px-4 py-2 text-indigo-500' : 'px-6 py-3 text-indigo-600'} text-xs font-black`}>
-                    <span className="uppercase tracking-widest">Tax Total</span>
-                    <span>${(voucher.taxTotal || 0).toLocaleString()}</span>
-                 </div>
+                    {voucher.adjustments?.map((adj, i) => (
+                        <div key={i} className={`flex justify-between ${isCompact ? 'px-4 py-2' : 'px-6 py-3'} text-xs font-black ${adj.type === 'Less' ? 'text-rose-600' : 'text-emerald-600'}`}>
+                        <span className="uppercase tracking-widest">{adj.label}</span>
+                        <span>{adj.type === 'Less' ? '-' : '+'}${adj.amount.toLocaleString()}</span>
+                        </div>
+                    ))}
+                    <div className={`flex justify-between ${isCompact ? 'px-4 py-2 text-indigo-500' : 'px-6 py-3 text-indigo-600'} text-xs font-black`}>
+                        <span className="uppercase tracking-widest">Tax Total</span>
+                        <span>${(voucher.taxTotal || 0).toLocaleString()}</span>
+                    </div>
+                   </>
+                 ) : (
+                   <div className={`flex justify-between ${isCompact ? 'px-4 py-4' : 'px-6 py-6'} text-[10px] font-black text-slate-400 uppercase tracking-widest text-center italic`}>
+                      Dual-Ledger Proof Verified
+                   </div>
+                 )}
                  <div className={`flex justify-between ${isCompact ? 'px-4 py-4 text-lg' : 'px-6 py-6 text-xl'} bg-slate-900 text-white font-black italic`}>
                     <span className="uppercase tracking-tighter text-sm self-center">Grand Total</span>
-                    <span className="tabular-nums">${voucher.amount.toLocaleString()}</span>
+                    <span className="tabular-nums">${voucher.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                  </div>
               </div>
            </div>
         </div>
 
+        {/* HSN Summary Statutory Table */}
+        {isGst && hsnSummary.length > 0 && (
+           <div className={`mt-8 relative z-10 animate-in fade-in duration-700`}>
+              <div className="text-[10px] font-black uppercase text-slate-400 tracking-[0.4em] mb-4 border-b border-slate-100 pb-2">HSN / SAC Aggregate Summary</div>
+              <table className="w-full text-left border-collapse border border-slate-200 bg-slate-50/50">
+                 <thead className="bg-slate-100 text-[8px] font-black uppercase text-slate-500 border-b border-slate-200">
+                    <tr>
+                       <th className="p-3 border-r border-slate-200">HSN/SAC</th>
+                       <th className="p-3 border-r border-slate-200 text-right">Taxable Value</th>
+                       <th className="p-3 border-r border-slate-200 text-right">CGST</th>
+                       <th className="p-3 border-r border-slate-200 text-right">SGST</th>
+                       <th className="p-3 border-r border-slate-200 text-right">IGST</th>
+                       <th className="p-3 text-right">Tax Amount</th>
+                    </tr>
+                 </thead>
+                 <tbody className="text-[9px] font-bold">
+                    {hsnSummary.map((h, i) => (
+                       <tr key={i} className="border-b border-slate-200">
+                          <td className="p-3 border-r border-slate-200 font-mono">{h.hsn}</td>
+                          <td className="p-3 border-r border-slate-200 text-right font-mono">${h.taxable.toLocaleString()}</td>
+                          <td className="p-3 border-r border-slate-200 text-right font-mono">${h.cgst.toLocaleString()}</td>
+                          <td className="p-3 border-r border-slate-200 text-right font-mono">${h.sgst.toLocaleString()}</td>
+                          <td className="p-3 border-r border-slate-200 text-right font-mono">${h.igst.toLocaleString()}</td>
+                          <td className="p-3 text-right font-black text-indigo-600 font-mono">${h.total.toLocaleString()}</td>
+                       </tr>
+                    ))}
+                 </tbody>
+              </table>
+           </div>
+        )}
+
         {/* Footer */}
         <div className={`mt-auto ${isCompact ? 'pt-6' : 'pt-12'} border-t-4 border-slate-900 flex justify-between items-end relative z-10`}>
            <div className="space-y-8">
-              <div className="text-[9px] text-slate-300 font-black uppercase tracking-[0.5em]">NEXUS ENTERPRISE CORE • VALID AUDIT DOC</div>
+              <div className="text-[9px] text-slate-300 font-black uppercase tracking-[0.5em]">NEXUS CORE ERP • STATUTORY VERIFIED • {new Date().getFullYear()}</div>
            </div>
            <div className={`${isCompact ? 'w-56' : 'w-80'} text-center space-y-4`}>
               <div className={`${isCompact ? 'text-[10px]' : 'text-xs'} font-black uppercase text-slate-900 tracking-widest italic`}>For {activeCompany.name}</div>

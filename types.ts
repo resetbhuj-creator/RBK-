@@ -145,6 +145,8 @@ export interface VoucherItem {
   igstRate?: number;
   taxAmount?: number;
   batchNo?: string;
+  currency?: string;
+  exchangeRate?: number;
 }
 
 export interface Adjustment {
@@ -162,9 +164,14 @@ export interface LedgerEntry {
   amount: number;
   taxRate?: number;
   taxAmount?: number;
+  cgst?: number;
+  sgst?: number;
+  igst?: number;
+  currency?: string;
+  exchangeRate?: number;
 }
 
-export type VoucherType = 'Sales' | 'Purchase' | 'Sales Return' | 'Purchase Return' | 'Payment' | 'Receipt' | 'Journal' | 'Contra' | 'Delivery Note' | 'Goods Receipt Note (GRN)' | 'Stock Adjustment' | 'Purchase Order';
+export type VoucherType = 'Sales' | 'Purchase' | 'Sales Return' | 'Purchase Return' | 'Payment' | 'Receipt' | 'Journal' | 'Contra' | 'Delivery Note' | 'Goods Receipt Note (GRN)' | 'Stock Adjustment' | 'Purchase Order' | 'Credit Note' | 'Debit Note';
 
 export interface Voucher {
   id: string;

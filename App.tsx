@@ -132,6 +132,47 @@ const App: React.FC = () => {
     setAuditLogs(prev => [newLog, ...prev]);
   }, []);
 
+  const generateVoucherId = useCallback((type: string) => {
+    const prefixMap: Record<string, string> = {
+      'Sales': 'SL', 'Purchase': 'PR', 'Sales Return': 'SR', 'Purchase Return': 'PR-RET',
+      'Payment': 'PY', 'Receipt': 'RC', 'Contra': 'CN', 'Journal': 'JR',
+      'Delivery Note': 'DN', 'Goods Receipt Note (GRN)': 'GRN', 'Stock Adjustment': 'SA', 'Purchase Order': 'PO',
+      'Credit Note': 'CRN', 'Debit Note': 'DRN'
+    };
+    const prefix = prefixMap[type] || 'VCH';
+    const yearParts = currentFY.split(' - ').map(y => y.trim().slice(-2));
+    const yearPart = yearParts.join('-');
+    const yearIdentifier = `/${yearPart}/`;
+    
+    const relevantVouchers = vouchers.filter(v => v.type === type && v.id.includes(yearIdentifier));
+    
+    let maxNum = 0;
+    relevantVouchers.forEach(v => {
+      const parts = v.id.split('/');
+      const serialPart = parts[parts.length - 1];
+      const num = parseInt(serialPart);
+      if (!isNaN(num) && num > maxNum) maxNum = num;
+    });
+
+    const nextNum = (maxNum + 1).toString().padStart(5, '0');
+    return `${prefix}/${yearPart}/${nextNum}`;
+  }, [vouchers, currentFY]);
+
+  const handlePostVoucher = (data: Omit<Voucher, 'id' | 'status'> & { status?: Voucher['status'] }) => {
+    let assignedId = generateVoucherId(data.type);
+    
+    let attempts = 0;
+    while (vouchers.some(v => v.id === assignedId) && attempts < 10) {
+      const parts = assignedId.split('/');
+      const nextNum = (parseInt(parts[parts.length - 1]) + 1).toString().padStart(5, '0');
+      assignedId = `${parts[0]}/${parts[1]}/${nextNum}`;
+      attempts++;
+    }
+
+    const newVch: Voucher = { ...data, id: assignedId, status: data.status || 'Posted' };
+    setVouchers(prev => [newVch, ...prev]);
+  };
+
   const activeCompany = companies.find((c: any) => c.id === currentCompanyId) || { name: 'None Selected' };
   const voucherToView = viewingVoucherId ? vouchers.find(v => v.id === viewingVoucherId) : null;
 
@@ -175,14 +216,15 @@ const App: React.FC = () => {
         return (
           <DisplayModule 
             activeCompany={activeCompany} activeSubAction={activeDisplaySubMenu} setActiveSubAction={setActiveDisplaySubMenu}
-            ledgers={ledgers} vouchers={vouchers} items={items} taxes={[]} taxGroups={[]}
+            ledgers={ledgers} vouchers={vouchers} items={items} batches={batches} taxes={[]} taxGroups={[]}
             onViewVoucher={setViewingVoucherId}
+            onPostVoucher={handlePostVoucher}
           />
         );
       case MainMenuType.COMMUNICATION:
         return <CommunicationModule activeCompany={activeCompany} activeSubAction={activeCommSubMenu} setActiveSubAction={setActiveCommSubMenu} vouchers={vouchers} ledgers={ledgers} onViewVoucher={setViewingVoucherId} />;
       case MainMenuType.HOUSE_KEEPING:
-        return <HouseKeepingModule activeCompany={activeCompany} activeSubAction={activeHouseKeepingSubMenu} setActiveSubAction={setActiveHouseKeepingSubMenu} auditLogs={auditLogs} ledgers={ledgers} vouchers={vouchers} setVouchers={setVouchers} />;
+        return <HouseKeepingModule activeCompany={activeCompany} activeSubAction={activeHouseKeepingSubMenu} setActiveHouseKeepingSubMenu={setActiveHouseKeepingSubMenu} auditLogs={auditLogs} ledgers={ledgers} vouchers={vouchers} setVouchers={setVouchers} />;
       default:
         return <ModulePlaceholder type={activeMenu} />;
     }
@@ -190,7 +232,6 @@ const App: React.FC = () => {
 
   const handleSidebarMenuChange = (menu: MainMenuType) => {
     setActiveMenu(menu);
-    // Reset sub-menus when parent changes via sidebar
     setActiveAdminSubMenu(null);
     setActiveTransactionSubMenu(null);
     setActiveDisplaySubMenu(null);

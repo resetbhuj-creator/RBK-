@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { DisplaySubMenu, Ledger, Voucher, Item, Tax, TaxGroup } from '../types';
+import { DisplaySubMenu, Ledger, Voucher, Item, Tax, TaxGroup, Batch } from '../types';
 import { DISPLAY_SUB_MENUS } from '../constants';
 import BalanceSheet from './BalanceSheet';
 import ProfitAndLoss from './ProfitAndLoss';
@@ -17,13 +17,15 @@ interface DisplayModuleProps {
   ledgers: Ledger[];
   vouchers: Voucher[];
   items: Item[];
+  batches: Batch[];
   taxes: Tax[];
   taxGroups: TaxGroup[];
   onViewVoucher: (id: string) => void;
+  onPostVoucher: (data: Omit<Voucher, 'id' | 'status'>) => void;
 }
 
 const DisplayModule: React.FC<DisplayModuleProps> = ({ 
-  activeCompany, activeSubAction, setActiveSubAction, ledgers, vouchers, items, taxes, taxGroups, onViewVoucher 
+  activeCompany, activeSubAction, setActiveSubAction, ledgers, vouchers, items, batches, taxes, taxGroups, onViewVoucher, onPostVoucher 
 }) => {
 
   const renderContent = () => {
@@ -39,7 +41,15 @@ const DisplayModule: React.FC<DisplayModuleProps> = ({
       case DisplaySubMenu.CASH_FLOW:
         return <CashFlow ledgers={ledgers} vouchers={vouchers} />;
       case DisplaySubMenu.INVENTORY_SUMMARY:
-        return <InventorySummary items={items} vouchers={vouchers} />;
+        return (
+          <InventorySummary 
+            items={items} 
+            vouchers={vouchers} 
+            batches={batches} 
+            onAdjustStock={onPostVoucher} 
+            onViewVoucher={onViewVoucher}
+          />
+        );
       case DisplaySubMenu.GST_REPORTS:
         return <GstReportSystem vouchers={vouchers} activeCompany={activeCompany} taxes={taxes} taxGroups={taxGroups} onViewVoucher={onViewVoucher} />;
       case DisplaySubMenu.GSTR_1:
