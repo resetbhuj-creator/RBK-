@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { MainMenuType, Role, User, AuditLog, AdminSubMenu, TransactionSubMenu, DisplaySubMenu, CommunicationSubMenu, HouseKeepingSubMenu, Ledger, Item, Voucher, Tax, TaxGroup, Company, Task } from './types';
+import { MainMenuType, Role, User, AuditLog, AdminSubMenu, TransactionSubMenu, DisplaySubMenu, CommunicationSubMenu, HouseKeepingSubMenu, Ledger, Item, Voucher, Tax, TaxGroup, Company, Task, AccountGroup, Batch } from './types';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import RibbonMenu from './components/RibbonMenu';
@@ -44,6 +44,14 @@ const INITIAL_COMPANIES = [
   }
 ];
 
+const INITIAL_ACCOUNT_GROUPS: AccountGroup[] = [
+  { id: 'ag1', name: 'Bank Accounts', nature: 'Assets', isSystem: true },
+  { id: 'ag2', name: 'Cash-in-hand', nature: 'Assets', isSystem: true },
+  { id: 'ag3', name: 'Indirect Expenses', nature: 'Expenses', isSystem: true },
+  { id: 'ag4', name: 'Sundry Debtors', nature: 'Assets', isSystem: true },
+  { id: 'ag5', name: 'Sundry Creditors', nature: 'Liabilities', isSystem: true }
+];
+
 const INITIAL_LEDGERS: Ledger[] = [
   { id: 'l1', name: 'HDFC Bank - 0012', group: 'Bank Accounts', openingBalance: 54000, type: 'Debit' },
   { id: 'l2', name: 'Cash-in-hand', group: 'Cash-in-hand', openingBalance: 1200, type: 'Debit' },
@@ -53,13 +61,19 @@ const INITIAL_LEDGERS: Ledger[] = [
 ];
 
 const INITIAL_ITEMS: Item[] = [
-  { id: 'i1', name: 'MacBook Pro M3', category: 'Electronics', unit: 'Nos', salePrice: 2400, costPrice: 1800, hsnCode: '8471', gstRate: 18, currentStock: 45 },
-  { id: 'i2', name: 'iPhone 15 Pro', category: 'Electronics', unit: 'Nos', salePrice: 1100, costPrice: 750, hsnCode: '8517', gstRate: 18, currentStock: 120 },
-  { id: 'i3', name: 'Leather Messenger Bag', category: 'Consumables', unit: 'Nos', salePrice: 150, costPrice: 45, hsnCode: '4202', gstRate: 12, currentStock: 12 }
+  { id: 'i1', name: 'MacBook Pro M3', category: 'Electronics', unit: 'Nos', salePrice: 2400, costPrice: 1800, hsnCode: '8471', gstRate: 18, currentStock: 45, isBatchTracked: true },
+  { id: 'i2', name: 'iPhone 15 Pro', category: 'Electronics', unit: 'Nos', salePrice: 1100, costPrice: 750, hsnCode: '8517', gstRate: 18, currentStock: 120, isBatchTracked: true },
+  { id: 'i3', name: 'Leather Messenger Bag', category: 'Consumables', unit: 'Nos', salePrice: 150, costPrice: 45, hsnCode: '4202', gstRate: 12, currentStock: 12, isBatchTracked: false }
+];
+
+const INITIAL_BATCHES: Batch[] = [
+  { id: 'b1', itemId: 'i1', batchNo: 'MBP-2023-001', mfgDate: '2023-10-01', expiryDate: '2025-10-01', currentStock: 25 },
+  { id: 'b2', itemId: 'i1', batchNo: 'MBP-2023-002', mfgDate: '2023-11-15', expiryDate: '2025-11-15', currentStock: 20 },
+  { id: 'b3', itemId: 'i2', batchNo: 'IP15-Batch-A', mfgDate: '2023-09-20', expiryDate: '2026-09-20', currentStock: 120 }
 ];
 
 const INITIAL_VOUCHERS: Voucher[] = [
-  { id: 'SL/23-24/00001', type: 'Sales', date: '2023-11-20', party: 'Acme Retailers', amount: 12500, status: 'Posted', narration: 'Bulk sale of laptops', subTotal: 10593.22, taxTotal: 1906.78, items: [{ id: 'vi1', itemId: 'i1', name: 'MacBook Pro M3', hsn: '8471', qty: 5, unit: 'Nos', rate: 2118.64, amount: 10593.22, igstRate: 18, taxAmount: 1906.78 }] }
+  { id: 'SL/23-24/00001', type: 'Sales', date: '2023-11-20', party: 'Acme Retailers', amount: 12500, status: 'Posted', narration: 'Bulk sale of laptops', subTotal: 10593.22, taxTotal: 1906.78, items: [{ id: 'vi1', itemId: 'i1', name: 'MacBook Pro M3', hsn: '8471', qty: 5, unit: 'Nos', rate: 2118.64, amount: 10593.22, igstRate: 18, taxAmount: 1906.78, batchNo: 'MBP-2023-001' }] }
 ];
 
 const App: React.FC = () => {
@@ -76,8 +90,10 @@ const App: React.FC = () => {
 
   // Core Data State
   const [companies, setCompanies] = useState<Company[]>(() => JSON.parse(localStorage.getItem('nexus_erp_companies') || JSON.stringify(INITIAL_COMPANIES)));
+  const [accountGroups, setAccountGroups] = useState<AccountGroup[]>(() => JSON.parse(localStorage.getItem('nexus_erp_account_groups') || JSON.stringify(INITIAL_ACCOUNT_GROUPS)));
   const [ledgers, setLedgers] = useState<Ledger[]>(() => JSON.parse(localStorage.getItem('nexus_erp_ledgers') || JSON.stringify(INITIAL_LEDGERS)));
   const [items, setItems] = useState<Item[]>(() => JSON.parse(localStorage.getItem('nexus_erp_items') || JSON.stringify(INITIAL_ITEMS)));
+  const [batches, setBatches] = useState<Batch[]>(() => JSON.parse(localStorage.getItem('nexus_erp_batches') || JSON.stringify(INITIAL_BATCHES)));
   const [vouchers, setVouchers] = useState<Voucher[]>(() => JSON.parse(localStorage.getItem('nexus_erp_vouchers') || JSON.stringify(INITIAL_VOUCHERS)));
   
   // IAM State
@@ -93,8 +109,10 @@ const App: React.FC = () => {
   // Persistence Sync
   useEffect(() => {
     localStorage.setItem('nexus_erp_companies', JSON.stringify(companies));
+    localStorage.setItem('nexus_erp_account_groups', JSON.stringify(accountGroups));
     localStorage.setItem('nexus_erp_ledgers', JSON.stringify(ledgers));
     localStorage.setItem('nexus_erp_items', JSON.stringify(items));
+    localStorage.setItem('nexus_erp_batches', JSON.stringify(batches));
     localStorage.setItem('nexus_erp_vouchers', JSON.stringify(vouchers));
     localStorage.setItem('nexus_erp_users', JSON.stringify(users));
     localStorage.setItem('nexus_erp_roles', JSON.stringify(roles));
@@ -102,7 +120,7 @@ const App: React.FC = () => {
     localStorage.setItem('nexus_erp_current_company_id', currentCompanyId);
     localStorage.setItem('nexus_erp_current_fy', currentFY);
     localStorage.setItem('nexus_erp_fy_locked', String(isFYLocked));
-  }, [companies, ledgers, items, vouchers, users, roles, auditLogs, currentCompanyId, currentFY, isFYLocked]);
+  }, [companies, accountGroups, ledgers, items, batches, vouchers, users, roles, auditLogs, currentCompanyId, currentFY, isFYLocked]);
 
   const addAuditLog = useCallback((logData: Omit<AuditLog, 'id' | 'timestamp' | 'actor'> & { actor?: string }) => {
     const newLog: AuditLog = {
@@ -137,7 +155,10 @@ const App: React.FC = () => {
             activeCompany={activeCompany} currentFY={currentFY} 
             activeSubAction={activeAdminSubMenu} setActiveSubAction={setActiveAdminSubMenu} 
             setCurrentFY={handleSetCurrentFY}
-            companies={companies} ledgers={ledgers} setLedgers={setLedgers} items={items} setItems={setItems}
+            companies={companies} ledgers={ledgers} setLedgers={setLedgers} 
+            accountGroups={accountGroups} setAccountGroups={setAccountGroups}
+            items={items} setItems={setItems}
+            batches={batches} setBatches={setBatches}
             taxes={[]} setTaxes={() => {}} taxGroups={[]} setTaxGroups={() => {}} vouchers={vouchers} setVouchers={setVouchers}
             unitMeasures={unitMeasures} setUnitMeasures={setUnitMeasures}
             isFYLocked={isFYLocked}
@@ -147,7 +168,7 @@ const App: React.FC = () => {
         return (
           <TransactionModule 
             activeCompany={activeCompany} currentFY={currentFY} isReadOnly={isFYLocked} activeSubAction={activeTransactionSubMenu} setActiveSubAction={setActiveTransactionSubMenu}
-            ledgers={ledgers} items={items} vouchers={vouchers} setVouchers={setVouchers} onViewVoucher={setViewingVoucherId}
+            ledgers={ledgers} items={items} batches={batches} vouchers={vouchers} setVouchers={setVouchers} onViewVoucher={setViewingVoucherId}
           />
         );
       case MainMenuType.DISPLAY:

@@ -110,7 +110,6 @@ const YearChangeModule: React.FC<YearChangeModuleProps> = ({
       setShowClosingWizard(false);
       setWizardStep(1);
       alert("Financial Year Finalized: All balances have been successfully carried forward and the previous period is now LOCKED.");
-      // Automatically lock the old year if we were "closing" it
       toggleYearLock(currentFY);
     }
   };
@@ -119,7 +118,7 @@ const YearChangeModule: React.FC<YearChangeModuleProps> = ({
   const selectedMeta = yearStates[selectedYear];
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-8 animate-in fade-in duration-500 pb-10">
       {/* Dynamic Header Section */}
       <div className="bg-slate-900 rounded-[2.5rem] p-10 text-white relative overflow-hidden shadow-2xl border-b-8 border-rose-600/20">
         <div className="relative z-10 flex flex-col xl:flex-row xl:items-center justify-between gap-10">
@@ -130,8 +129,8 @@ const YearChangeModule: React.FC<YearChangeModuleProps> = ({
               </svg>
             </div>
             <div>
-              <h2 className="text-4xl font-black tracking-tighter uppercase italic">Cycle Management</h2>
-              <div className="flex items-center space-x-4 mt-2">
+              <h2 className="text-4xl font-black tracking-tighter uppercase italic leading-none">Working Session Shift</h2>
+              <div className="flex items-center space-x-4 mt-4">
                 <span className="bg-rose-500/20 text-rose-400 px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border border-rose-500/30 flex items-center">
                   <div className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse mr-2"></div>
                   Entity: {activeCompany?.name}
@@ -149,7 +148,7 @@ const YearChangeModule: React.FC<YearChangeModuleProps> = ({
               className="group flex items-center space-x-3 px-8 py-5 bg-white text-slate-900 rounded-[1.5rem] font-black text-xs uppercase tracking-widest hover:bg-rose-500 hover:text-white transition-all transform active:scale-95 shadow-2xl"
             >
               <svg className="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
-              <span>Execute Period Closing</span>
+              <span>Initialize Year-End Closing</span>
             </button>
           </div>
         </div>
@@ -164,7 +163,7 @@ const YearChangeModule: React.FC<YearChangeModuleProps> = ({
               </div>
               <div>
                  <h4 className="text-sm font-black uppercase tracking-widest">Context Shift Successful</h4>
-                 <p className="text-[10px] font-medium opacity-80">All modules have been synchronized to {currentFY}.</p>
+                 <p className="text-[10px] font-medium opacity-80">All data modules have been synchronized to {currentFY}.</p>
               </div>
            </div>
            <button onClick={() => setShowSuccess(false)} className="text-white/50 hover:text-white transition-colors">
@@ -178,8 +177,8 @@ const YearChangeModule: React.FC<YearChangeModuleProps> = ({
           <div className="bg-white rounded-[3rem] border border-slate-200 p-12 shadow-sm relative overflow-hidden">
             <div className="flex items-center justify-between mb-12">
                <div>
-                 <h3 className="text-2xl font-black text-slate-800 tracking-tight">Active Cycle Registry</h3>
-                 <p className="text-sm text-slate-400 font-medium">Toggle between historical audits and the active working period.</p>
+                 <h3 className="text-2xl font-black text-slate-800 tracking-tight italic uppercase">Active Cycle Registry</h3>
+                 <p className="text-sm text-slate-400 font-medium">Select a period to load associated ledger partitions and audit history.</p>
                </div>
             </div>
             
@@ -210,27 +209,27 @@ const YearChangeModule: React.FC<YearChangeModuleProps> = ({
                         </div>
                         <div>
                           <div className="flex items-center space-x-4 mb-2">
-                            <h4 className={`text-2xl font-black tracking-tighter ${isSelected ? 'text-rose-900' : 'text-slate-800'}`}>
+                            <h4 className={`text-2xl font-black tracking-tighter uppercase italic ${isSelected ? 'text-rose-900' : 'text-slate-800'}`}>
                               FY {year}
                             </h4>
                             {isActive && (
                               <div className="flex items-center space-x-2 px-3 py-1 bg-emerald-500 text-white rounded-lg shadow-lg shadow-emerald-500/20">
                                 <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></div>
-                                <span className="text-[9px] font-black uppercase tracking-widest">ACTIVE</span>
+                                <span className="text-[9px] font-black uppercase tracking-widest">ACTIVE SESSION</span>
                               </div>
                             )}
                             {isLocked && !isActive && (
-                               <div className="px-3 py-1 bg-slate-900 text-white rounded-lg text-[9px] font-black uppercase tracking-widest">LOCKED</div>
+                               <div className="px-3 py-1 bg-slate-900 text-white rounded-lg text-[9px] font-black uppercase tracking-widest">AUDIT LOCKED</div>
                             )}
                           </div>
                           <div className="flex items-center space-x-6">
                             <div className="flex items-center text-[11px] font-bold text-slate-400 uppercase tracking-widest">
                                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
-                               {meta.vouchers.toLocaleString()} Postings
+                               {meta.vouchers.toLocaleString()} Vouchers
                             </div>
                             <div className="flex items-center text-[11px] font-bold text-slate-400 uppercase tracking-widest border-l border-slate-200 pl-6">
                                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                               {meta.turnover} Volume
+                               {meta.turnover} Est. Turnover
                             </div>
                           </div>
                         </div>
@@ -242,7 +241,7 @@ const YearChangeModule: React.FC<YearChangeModuleProps> = ({
                             onClick={(e) => { e.stopPropagation(); handleSwitch(year); }}
                             className="px-6 py-3 bg-rose-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg hover:bg-rose-500 transition-all transform active:scale-95"
                           >
-                            Easy Switch
+                            Switch Workspace
                           </button>
                         )}
                         <button 
@@ -252,7 +251,7 @@ const YearChangeModule: React.FC<YearChangeModuleProps> = ({
                               ? 'bg-rose-50 text-rose-700 border-rose-100 hover:bg-rose-100 shadow-sm' 
                               : 'bg-emerald-50 text-emerald-700 border-emerald-100 hover:bg-emerald-100 shadow-sm'
                           }`}
-                          title={meta.status === 'Locked' ? 'Unlock Period' : 'Lock Period'}
+                          title={meta.status === 'Locked' ? 'Release Audit Lock' : 'Enable Audit Lock'}
                         >
                           <svg className={`w-5 h-5 ${meta.status === 'Locked' ? 'text-rose-500' : 'text-emerald-500'}`} fill="currentColor" viewBox="0 0 20 20">
                              {meta.status === 'Locked' 
@@ -269,10 +268,10 @@ const YearChangeModule: React.FC<YearChangeModuleProps> = ({
             </div>
 
             {isUpdating && (
-              <div className="mt-12 bg-slate-900 rounded-[2.5rem] p-10 border-4 border-slate-800 animate-in zoom-in-95 duration-500">
+              <div className="mt-12 bg-slate-900 rounded-[2.5rem] p-10 border-4 border-slate-800 animate-in zoom-in-95 duration-500 shadow-inner">
                  <div className="flex items-center space-x-4 mb-8">
                     <div className="w-3 h-3 rounded-full bg-rose-500 animate-ping shadow-[0_0_12px_rgba(244,63,94,0.6)]"></div>
-                    <span className="text-xs font-black text-rose-400 uppercase tracking-[0.3em]">Remapping Terminal Active</span>
+                    <span className="text-xs font-black text-rose-400 uppercase tracking-[0.3em]">Remapping Database Shards</span>
                  </div>
                  <div ref={scrollRef} className="h-48 overflow-y-auto font-mono text-[11px] leading-relaxed text-slate-500 space-y-2 custom-scrollbar pr-6">
                     {shiftLogs.map((l, i) => (
@@ -291,13 +290,13 @@ const YearChangeModule: React.FC<YearChangeModuleProps> = ({
           <div className="bg-white rounded-[3rem] border border-slate-200 p-12 shadow-sm relative overflow-hidden group">
             <h3 className="text-xs font-black uppercase tracking-[0.3em] text-slate-400 mb-10 flex items-center">
               <svg className="w-5 h-5 mr-3 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-              Period Analysis
+              Sector Statistics
             </h3>
             {selectedMeta ? (
               <div className="space-y-10">
                 <div className="p-8 bg-slate-50 rounded-[2.5rem] border border-slate-100 transition-all group-hover:border-rose-200">
-                   <div className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2 group-hover:text-rose-500 transition-colors">Transaction Volume</div>
-                   <div className="text-4xl font-black text-slate-800 tracking-tighter">{selectedMeta.turnover}</div>
+                   <div className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2 group-hover:text-rose-500 transition-colors">Cumulative Volume</div>
+                   <div className="text-4xl font-black text-slate-800 tracking-tighter italic">{selectedMeta.turnover}</div>
                    <div className="mt-6 w-full h-2 bg-slate-200 rounded-full overflow-hidden shadow-inner p-0.5">
                       <div className="h-full bg-rose-500 w-[72%] shadow-[0_0_12px_#f43f5e] rounded-full"></div>
                    </div>
@@ -305,17 +304,22 @@ const YearChangeModule: React.FC<YearChangeModuleProps> = ({
                 
                 <div className="grid grid-cols-2 gap-6">
                   <div className="p-6 bg-slate-50 rounded-[1.5rem] border border-slate-100 text-center shadow-sm">
-                     <div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-1">Vouchers</div>
+                     <div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-1">Voucher Flux</div>
                      <div className="text-2xl font-black text-slate-700">{selectedMeta.vouchers}</div>
                   </div>
                   <div className="p-6 bg-slate-50 rounded-[1.5rem] border border-slate-100 text-center shadow-sm">
-                     <div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-1">Snapshot</div>
-                     <div className="text-2xl font-black text-emerald-600 uppercase italic tracking-tighter">Verified</div>
+                     <div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-1">Snapshot State</div>
+                     <div className="text-xl font-black text-emerald-600 uppercase italic tracking-tighter">Verified</div>
                   </div>
+                </div>
+
+                <div className="p-6 border-t border-slate-100 flex flex-col items-center">
+                   <span className="text-[8px] font-bold text-slate-300 uppercase tracking-widest">Last Verified Sync</span>
+                   <span className="text-[10px] font-black text-slate-500 mt-1">{selectedMeta.lastSynced}</span>
                 </div>
               </div>
             ) : (
-              <div className="text-center py-20 text-slate-400 italic text-sm font-medium border-2 border-dashed border-slate-100 rounded-[2.5rem]">Select a period to load context.</div>
+              <div className="text-center py-20 text-slate-400 italic text-sm font-medium border-2 border-dashed border-slate-100 rounded-[2.5rem]">Select a period to load context analysis.</div>
             )}
           </div>
 
@@ -328,6 +332,7 @@ const YearChangeModule: React.FC<YearChangeModuleProps> = ({
                 <p className="text-sm text-rose-200/80 leading-relaxed font-medium mb-10">
                   Nexus automatically triggers <span className="text-white font-black underline underline-offset-4 decoration-rose-500">AUDIT LOCK</span> for closed cycles. This prevents historical data corruption during external reviews.
                 </p>
+                <button className="text-[10px] font-black text-white/50 uppercase tracking-widest hover:text-white transition-colors border-b border-white/10 pb-1">View Governance Policy</button>
              </div>
              <div className="absolute -right-16 -bottom-16 opacity-5 group-hover:opacity-10 transition-all scale-150 rotate-12 pointer-events-none">
                 <svg className="w-64 h-64" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14.5v-9l6 4.5-6 4.5z"/></svg>
@@ -346,8 +351,8 @@ const YearChangeModule: React.FC<YearChangeModuleProps> = ({
                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
                     </div>
                     <div>
-                       <h3 className="text-xl font-black uppercase tracking-tight italic">Closing Protocol</h3>
-                       <p className="text-[10px] text-rose-400 font-bold uppercase tracking-widest">Target: {currentFY}</p>
+                       <h3 className="text-xl font-black uppercase tracking-tight italic">Finalization Protocol</h3>
+                       <p className="text-[10px] text-rose-400 font-bold uppercase tracking-widest">Target Cycle: {currentFY}</p>
                     </div>
                  </div>
                  <button onClick={() => setShowClosingWizard(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors"><svg className="w-6 h-6 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>

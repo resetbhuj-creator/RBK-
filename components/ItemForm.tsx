@@ -22,7 +22,14 @@ const CATEGORIES = [
   'Digital Assets'
 ];
 
-const GST_SLABS = [0, 5, 12, 18, 28];
+const GST_SLABS = [
+  { label: '0% (Exempt)', value: 0 },
+  { label: '3% (Composition)', value: 3 },
+  { label: '5% (Essential)', value: 5 },
+  { label: '12% (Standard)', value: 12 },
+  { label: '18% (Standard+)', value: 18 },
+  { label: '28% (Luxury)', value: 28 }
+];
 
 const ItemForm: React.FC<ItemFormProps> = ({ initialData, unitMeasures, taxGroups = [], taxes = [], onQuickUnitAdd, onCancel, onSubmit }) => {
   const [formData, setFormData] = useState<Omit<Item, 'id'> & { isTaxInclusive: boolean }>({
@@ -33,7 +40,8 @@ const ItemForm: React.FC<ItemFormProps> = ({ initialData, unitMeasures, taxGroup
     hsnCode: '',
     gstRate: 18, 
     taxGroupId: '',
-    isTaxInclusive: false
+    isTaxInclusive: false,
+    isBatchTracked: false
   });
 
   const [isQuickUnitOpen, setIsQuickUnitOpen] = useState(false);
@@ -48,10 +56,11 @@ const ItemForm: React.FC<ItemFormProps> = ({ initialData, unitMeasures, taxGroup
         category: initialData.category,
         unit: initialData.unit,
         salePrice: initialData.salePrice,
-        hsnCode: initialData.hsnCode,
+        hsnCode: initialData.hsnCode || '',
         gstRate: initialData.gstRate || 0,
         taxGroupId: initialData.taxGroupId || '',
-        isTaxInclusive: false
+        isTaxInclusive: false,
+        isBatchTracked: initialData.isBatchTracked || false
       });
     }
   }, [initialData]);
@@ -62,22 +71,18 @@ const ItemForm: React.FC<ItemFormProps> = ({ initialData, unitMeasures, taxGroup
     if (!currentData.category) newErrors.category = 'Product category is required';
     if (!currentData.unit) newErrors.unit = 'Unit of Measure is mandatory';
     if (currentData.salePrice < 0) newErrors.salePrice = 'Sale price cannot be negative';
-    if (currentData.gstRate < 0 || currentData.gstRate > 100) newErrors.gstRate = 'Invalid tax rate (0-100%)';
     
-    if (currentData.gstRate > 0 && !currentData.taxGroupId) {
-      newErrors.taxGroupId = 'Tax Group is required for taxable items';
-    }
-
+    // HSN/SAC Validation: Numerical 2-8 digits
     const hsn = currentData.hsnCode.trim();
     if (!hsn) {
       newErrors.hsnCode = 'HSN/SAC code is mandatory';
     } else if (!/^\d+$/.test(hsn)) {
-      newErrors.hsnCode = 'Only numerical digits allowed';
-    } else if (hsn.length < 2) {
-      newErrors.hsnCode = 'HSN/SAC must be at least 2 digits';
-    } else if (hsn.length > 8) {
-      newErrors.hsnCode = 'HSN/SAC cannot exceed 8 digits';
+      newErrors.hsnCode = 'Must contain only numerical digits';
+    } else if (hsn.length < 2 || hsn.length > 8) {
+      newErrors.hsnCode = 'Code must be between 2 and 8 digits';
     }
+
+    if (currentData.gstRate < 0 || currentData.gstRate > 100) newErrors.gstRate = 'Invalid tax rate';
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -108,12 +113,6 @@ const ItemForm: React.FC<ItemFormProps> = ({ initialData, unitMeasures, taxGroup
       }
     }
     setFormData(prev => ({ ...prev, taxGroupId: groupId, gstRate: newRate }));
-    if (groupId && errors.taxGroupId) {
-      setErrors(prev => {
-        const { taxGroupId, ...rest } = prev;
-        return rest;
-      });
-    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -168,8 +167,9 @@ const ItemForm: React.FC<ItemFormProps> = ({ initialData, unitMeasures, taxGroup
         </button>
       </div>
 
-      <form onSubmit={handleSubmit} className="p-8 space-y-10">
+      <form onSubmit={handleSubmit} className="p-8 space-y-8">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {/* Name Field */}
           <div className="md:col-span-2 space-y-2">
             <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-1">Official Item Name <span className="text-rose-500">*</span></label>
             <input 
@@ -182,6 +182,7 @@ const ItemForm: React.FC<ItemFormProps> = ({ initialData, unitMeasures, taxGroup
             {touched.name && errors.name && <p className="text-[10px] text-rose-500 font-bold mt-1 ml-1">{errors.name}</p>}
           </div>
 
+          {/* Category & UoM */}
           <div className="space-y-2">
             <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-1">Category <span className="text-rose-500">*</span></label>
             <select 
@@ -192,26 +193,6 @@ const ItemForm: React.FC<ItemFormProps> = ({ initialData, unitMeasures, taxGroup
             >
               {CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
             </select>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-[10px] font-black uppercase text-indigo-600 tracking-[0.2em] ml-1">
-              Tax Group Association {formData.gstRate > 0 && <span className="text-rose-500">*</span>}
-            </label>
-            <select 
-              value={formData.taxGroupId} 
-              onChange={e => handleTaxGroupChange(e.target.value)}
-              onBlur={() => handleBlur('taxGroupId')}
-              className={inputClass('taxGroupId')}
-            >
-              <option value="">-- No Group (Manual Slab) --</option>
-              {taxGroups.map(tg => <option key={tg.id} value={tg.id}>{tg.name}</option>)}
-            </select>
-            {touched.taxGroupId && errors.taxGroupId ? (
-              <p className="text-[10px] text-rose-500 font-bold mt-1 ml-1">{errors.taxGroupId}</p>
-            ) : (
-              <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-1 ml-1">Required for items with statutory rates.</p>
-            )}
           </div>
 
           <div className="space-y-2">
@@ -257,9 +238,10 @@ const ItemForm: React.FC<ItemFormProps> = ({ initialData, unitMeasures, taxGroup
             {touched.unit && errors.unit && <p className="text-[10px] text-rose-500 font-bold mt-1 ml-1">{errors.unit}</p>}
           </div>
 
+          {/* HSN Code & GST Rate */}
           <div className="space-y-2">
             <div className="flex justify-between items-center mb-1">
-              <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-1">HSN/SAC Code <span className="text-rose-500">*</span></label>
+              <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-1">HSN/SAC Code <span className="text-rose-500">*</span></label>
               <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${formData.hsnCode.length >= 2 && formData.hsnCode.length <= 8 ? 'bg-indigo-50 text-indigo-600' : 'bg-slate-100 text-slate-400'}`}>
                 {formData.hsnCode.length} / 8 Digits
               </span>
@@ -271,18 +253,33 @@ const ItemForm: React.FC<ItemFormProps> = ({ initialData, unitMeasures, taxGroup
               onBlur={() => handleBlur('hsnCode')}
               placeholder="e.g. 8471" 
               className={inputClass('hsnCode')}
-              aria-describedby="hsn-error"
             />
             {touched.hsnCode && errors.hsnCode ? (
-              <p id="hsn-error" className="text-[10px] text-rose-500 font-bold mt-1 ml-1">{errors.hsnCode}</p>
+              <p className="text-[10px] text-rose-500 font-bold mt-1 ml-1">{errors.hsnCode}</p>
             ) : (
-              <p className="text-[9px] text-slate-400 font-medium mt-1 ml-1 italic">Enter 2 to 8 numerical digits.</p>
+              <p className="text-[8px] text-slate-400 font-medium mt-1 ml-1 italic">Enter numerical digits (2-8).</p>
             )}
           </div>
 
           <div className="space-y-2">
+            <label className="text-[10px] font-black uppercase text-indigo-600 tracking-[0.2em] ml-1">Statutory GST Rate <span className="text-rose-500">*</span></label>
+            <select 
+              value={formData.gstRate} 
+              onChange={e => setFormData({...formData, gstRate: parseFloat(e.target.value)})} 
+              onBlur={() => handleBlur('gstRate')}
+              disabled={!!formData.taxGroupId}
+              className={inputClass('gstRate') + (formData.taxGroupId ? ' cursor-not-allowed opacity-60' : '')}
+            >
+              {GST_SLABS.map(slab => (
+                <option key={slab.value} value={slab.value}>{slab.label} ({slab.value}%)</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Pricing & Batch */}
+          <div className="space-y-2">
             <div className="flex justify-between items-center mb-1">
-               <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-1">Listed Price</label>
+               <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.2em] ml-1">Unit Price (Sale)</label>
                <label className="flex items-center space-x-2 cursor-pointer group">
                   <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter group-hover:text-indigo-600 transition-colors">Tax Incl?</span>
                   <div 
@@ -293,94 +290,49 @@ const ItemForm: React.FC<ItemFormProps> = ({ initialData, unitMeasures, taxGroup
                   </div>
                </label>
             </div>
-            <div className="relative">
-              <input 
-                type="number"
-                step="0.01"
-                value={formData.salePrice} 
-                onChange={e => setFormData({...formData, salePrice: parseFloat(e.target.value) || 0})} 
-                onBlur={() => handleBlur('salePrice')}
-                className={inputClass('salePrice') + " font-black text-slate-900"}
-              />
+            <input 
+              type="number"
+              step="0.01"
+              value={formData.salePrice} 
+              onChange={e => setFormData({...formData, salePrice: parseFloat(e.target.value) || 0})} 
+              onBlur={() => handleBlur('salePrice')}
+              className={inputClass('salePrice') + " font-black text-slate-900"}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-[10px] font-black uppercase text-indigo-600 tracking-[0.2em] ml-1">Batch Management</label>
+            <div className="flex items-center space-x-4 p-3 bg-slate-50 rounded-xl border border-slate-200">
+               <button type="button" onClick={() => setFormData({...formData, isBatchTracked: !formData.isBatchTracked})} className={`w-12 h-7 rounded-full relative transition-all ${formData.isBatchTracked ? 'bg-indigo-600' : 'bg-slate-300'}`}>
+                  <div className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow-md transition-all ${formData.isBatchTracked ? 'right-1' : 'left-1'}`}></div>
+               </button>
+               <span className="text-[10px] font-black uppercase text-slate-500 tracking-widest">{formData.isBatchTracked ? 'Batch Tracking Enabled' : 'Serialized/Standard'}</span>
             </div>
           </div>
         </div>
 
-        <div className="bg-slate-900 rounded-[2.5rem] p-10 text-white relative overflow-hidden shadow-2xl border-b-8 border-indigo-600">
-           <div className="relative z-10 space-y-8">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                 <div>
-                    <h4 className="text-[11px] font-black uppercase tracking-[0.4em] text-indigo-400 mb-2">Statutory Reconciliation</h4>
-                    <p className="text-[10px] text-slate-400 font-medium leading-relaxed max-w-xs">
-                      {formData.taxGroupId 
-                        ? "Sovereign rate inherited from active group policy." 
-                        : "Define a manual tax percentage for this item catalogue entry."}
-                    </p>
-                 </div>
-                 
-                 <div className="text-right">
-                    <div className="flex items-center justify-end space-x-3">
-                       {formData.taxGroupId && (
-                         <span className="px-2 py-1 bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 rounded-lg text-[8px] font-black uppercase tracking-widest animate-pulse">Inherited</span>
-                       )}
-                       <div className="text-5xl font-black italic tracking-tighter text-indigo-500">{formData.gstRate}%</div>
-                    </div>
-                    <div className="text-[9px] font-black uppercase tracking-widest text-slate-500 mt-1">Sovereign Combined Rate</div>
-                 </div>
+        {/* Pricing Summary Visualization */}
+        <div className="bg-slate-900 rounded-[2.5rem] p-8 text-white relative overflow-hidden shadow-2xl border-b-8 border-indigo-600">
+           <div className="relative z-10 grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="p-4 bg-white/5 rounded-2xl border border-white/10">
+                 <span className="text-[8px] font-black text-slate-500 uppercase block mb-1">Base Price</span>
+                 <span className="text-lg font-black text-white">${priceMetrics.base.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
               </div>
-
-              {!formData.taxGroupId ? (
-                <div className="animate-in fade-in slide-in-from-top-2">
-                   <div className="flex bg-white/5 p-1.5 rounded-2xl border border-white/10 backdrop-blur-md">
-                      {GST_SLABS.map(slab => (
-                        <button
-                          key={slab}
-                          type="button"
-                          onClick={() => setFormData({...formData, gstRate: slab})}
-                          className={`flex-1 py-4 text-[11px] font-black uppercase rounded-xl transition-all ${formData.gstRate === slab ? 'bg-white text-slate-900 shadow-xl scale-105' : 'text-slate-400 hover:text-white'}`}
-                        >
-                          {slab}%
-                        </button>
-                      ))}
-                      <div className="w-px bg-white/10 mx-2 self-center h-8"></div>
-                      <div className="relative flex-1">
-                          <input 
-                            type="number" 
-                            placeholder="Custom"
-                            onChange={(e) => setFormData({...formData, gstRate: parseFloat(e.target.value) || 0})}
-                            className="w-full h-full bg-transparent border-none text-[11px] font-black text-center text-white placeholder-slate-600 outline-none"
-                          />
-                      </div>
-                   </div>
-                </div>
-              ) : (
-                <div className="p-6 bg-indigo-600/10 rounded-2xl border border-indigo-500/20 text-center italic text-xs text-indigo-300">
-                  Manual overrides are disabled while linked to a Tax Group.
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                 <div className="p-5 bg-white/5 rounded-2xl border border-white/10 group hover:bg-white/10 transition-colors">
-                    <span className="text-[8px] font-black text-slate-500 uppercase block mb-1">Derived Base Value</span>
-                    <span className="text-lg font-black text-white">${priceMetrics.base.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                 </div>
-                 <div className="p-5 bg-white/5 rounded-2xl border border-white/10 group hover:bg-white/10 transition-colors">
-                    <span className="text-[8px] font-black text-slate-500 uppercase block mb-1">{priceMetrics.label}</span>
-                    <span className="text-lg font-black text-indigo-400">${priceMetrics.tax.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                 </div>
-                 <div className="p-5 bg-indigo-600/10 rounded-2xl border border-indigo-500/20 group hover:bg-indigo-600/20 transition-colors">
-                    <span className="text-[8px] font-black text-indigo-400 uppercase block mb-1">Derived Grand Total</span>
-                    <span className="text-lg font-black text-indigo-200">${priceMetrics.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                 </div>
+              <div className="p-4 bg-white/5 rounded-2xl border border-white/10">
+                 <span className="text-[8px] font-black text-slate-500 uppercase block mb-1">{priceMetrics.label} ({formData.gstRate}%)</span>
+                 <span className="text-lg font-black text-indigo-400">${priceMetrics.tax.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+              </div>
+              <div className="p-4 bg-indigo-600/10 rounded-2xl border border-indigo-500/20">
+                 <span className="text-[8px] font-black text-indigo-400 uppercase block mb-1">Grand Total</span>
+                 <span className="text-lg font-black text-indigo-200">${priceMetrics.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
               </div>
            </div>
-           <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-600 rounded-full blur-[120px] opacity-10 -mr-32 -mt-32"></div>
         </div>
 
-        <div className="pt-8 border-t border-slate-100 flex justify-end space-x-4">
+        <div className="pt-6 border-t border-slate-100 flex justify-end space-x-4">
           <button type="button" onClick={onCancel} className="px-10 py-4 rounded-2xl text-slate-400 font-black text-[10px] uppercase tracking-widest hover:bg-slate-50 transition-all">Discard</button>
           <button type="submit" className="px-14 py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-2xl shadow-slate-200 hover:bg-indigo-600 transition-all transform active:scale-95">
-            {initialData ? 'Update Master' : 'Initialize Identity'}
+            {initialData ? 'Update Master Record' : 'Authorize Master Record'}
           </button>
         </div>
       </form>

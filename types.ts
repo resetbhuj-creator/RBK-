@@ -144,6 +144,7 @@ export interface VoucherItem {
   sgstRate?: number;
   igstRate?: number;
   taxAmount?: number;
+  batchNo?: string;
 }
 
 export interface Adjustment {
@@ -217,6 +218,16 @@ export interface Item {
   gstRate: number;
   taxGroupId?: string;
   currentStock?: number;
+  isBatchTracked?: boolean;
+}
+
+export interface Batch {
+  id: string;
+  itemId: string;
+  batchNo: string;
+  mfgDate: string;
+  expiryDate: string;
+  currentStock: number;
 }
 
 export interface MenuItem {

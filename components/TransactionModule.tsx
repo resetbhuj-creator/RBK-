@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { TransactionSubMenu, Voucher, Ledger, Item, VoucherType } from '../types';
+import { TransactionSubMenu, Voucher, Ledger, Item, VoucherType, Batch } from '../types';
 import { TRANSACTION_SUB_MENUS } from '../constants';
 import VoucherEntryForm from './VoucherEntryForm';
 import InventoryVoucherForm from './InventoryVoucherForm';
@@ -14,13 +14,14 @@ interface TransactionModuleProps {
   setActiveSubAction: (sub: TransactionSubMenu | null) => void;
   ledgers: Ledger[];
   items: Item[];
+  batches: Batch[];
   vouchers: Voucher[];
   setVouchers: React.Dispatch<React.SetStateAction<Voucher[]>>;
   onViewVoucher: (id: string) => void;
 }
 
 const TransactionModule: React.FC<TransactionModuleProps> = ({ 
-  activeCompany, currentFY, isReadOnly, activeSubAction, setActiveSubAction, ledgers, items, vouchers, setVouchers, onViewVoucher 
+  activeCompany, currentFY, isReadOnly, activeSubAction, setActiveSubAction, ledgers, items, batches, vouchers, setVouchers, onViewVoucher 
 }) => {
 
   const generateVoucherId = useCallback((type: string) => {
@@ -102,6 +103,7 @@ const TransactionModule: React.FC<TransactionModuleProps> = ({
           <InventoryVoucherForm 
             isReadOnly={isReadOnly} 
             items={items} 
+            batches={batches}
             ledgers={ledgers} 
             activeCompany={activeCompany}
             onSubmit={handlePostVoucher} 

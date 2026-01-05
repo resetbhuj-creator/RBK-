@@ -1,9 +1,10 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Item, Ledger, Voucher, VoucherItem, Adjustment, VoucherType } from '../types';
+import { Item, Ledger, Voucher, VoucherItem, Adjustment, VoucherType, Batch } from '../types';
 
 interface InventoryVoucherFormProps {
   isReadOnly?: boolean;
   items: Item[];
+  batches: Batch[];
   ledgers: Ledger[];
   onSubmit: (data: Omit<Voucher, 'id' | 'status'>) => void;
   onCancel: () => void;
@@ -21,7 +22,7 @@ const CURRENCIES = [
   { code: 'JPY', symbol: '¥', name: 'Japanese Yen' }
 ];
 
-const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly, items, ledgers, onSubmit, onCancel, getNextId, activeCompany }) => {
+const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly, items, batches, ledgers, onSubmit, onCancel, getNextId, activeCompany }) => {
   const [vchType, setVchType] = useState<InvType>('Sales');
   const [supplyType, setSupplyType] = useState<'Local' | 'Central'>('Local');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -81,7 +82,8 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
       discountAmount: 0,
       amount: 0,
       igstRate: 0,
-      taxAmount: 0
+      taxAmount: 0,
+      batchNo: ''
     };
     setVchItems(prev => [...prev, newItem]);
     setSearchIdx(vchItems.length);
@@ -102,7 +104,8 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
           unit: item.unit,
           amount: gross,
           igstRate: fullRate,
-          taxAmount: gross * (fullRate / 100)
+          taxAmount: gross * (fullRate / 100),
+          batchNo: '' // Reset batch on item change
         };
       }
       return vi;
@@ -234,6 +237,7 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
             <thead className="bg-slate-900 text-[9px] font-black uppercase text-slate-400 tracking-widest">
               <tr>
                 <th className="px-8 py-7 w-64">Product Resource</th>
+                <th className="px-6 py-7 text-center w-32">Batch No</th>
                 <th className="px-6 py-7 text-center w-24">Qty</th>
                 <th className="px-6 py-7 text-right w-32">Rate</th>
                 <th className="px-6 py-7 text-center w-24 bg-indigo-950/30">Disc%</th>
@@ -245,6 +249,7 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
             <tbody className="divide-y divide-slate-50 bg-white">
               {vchItems.map((item, idx) => {
                 const master = items.find(i => i.id === item.itemId);
+                const itemBatches = batches.filter(b => b.itemId === item.itemId);
                 const margin = master?.costPrice ? ((item.rate - master.costPrice) / item.rate) * 100 : null;
                 
                 return (
@@ -292,6 +297,16 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
                         )}
                     </td>
                     <td className="px-6 py-6">
+                      {master?.isBatchTracked ? (
+                        <select value={item.batchNo} onChange={e => updateItemField(item.id, 'batchNo', e.target.value)} className="w-full bg-slate-100 border border-slate-200 rounded-xl py-3 px-2 text-xs font-black outline-none focus:bg-white">
+                          <option value="">-- Batch --</option>
+                          {itemBatches.map(b => <option key={b.id} value={b.batchNo}>{b.batchNo} (Stock: {b.currentStock})</option>)}
+                        </select>
+                      ) : (
+                        <span className="text-[9px] font-bold text-slate-300 uppercase block text-center italic">N/A</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-6 text-center">
                       <input type="number" value={item.qty} onChange={e => updateItemField(item.id, 'qty', parseFloat(e.target.value) || 0)} className="w-20 bg-slate-100 border border-slate-200 rounded-xl py-3 px-2 text-center text-sm font-black outline-none focus:bg-white" />
                       <div className="text-center text-[8px] font-black text-slate-300 uppercase mt-2">{item.unit}</div>
                     </td>

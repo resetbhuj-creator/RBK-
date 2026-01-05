@@ -17,7 +17,8 @@ const PERM_LEVEL_INFO = {
     color: 'text-slate-400', 
     bg: 'bg-slate-100',
     border: 'border-slate-200',
-    icon: '🔒'
+    icon: '🔒',
+    summary: 'Total Isolation'
   },
   read: { 
     label: 'VIEW ONLY', 
@@ -25,7 +26,8 @@ const PERM_LEVEL_INFO = {
     color: 'text-sky-600', 
     bg: 'bg-sky-50',
     border: 'border-sky-200',
-    icon: '👁️'
+    icon: '👁️',
+    summary: 'Read Access'
   },
   write: { 
     label: 'OPERATOR', 
@@ -33,7 +35,8 @@ const PERM_LEVEL_INFO = {
     color: 'text-indigo-600', 
     bg: 'bg-indigo-50',
     border: 'border-indigo-200',
-    icon: '✏️'
+    icon: '✏️',
+    summary: 'Data Input'
   },
   all: { 
     label: 'ADMINISTRATOR', 
@@ -41,13 +44,14 @@ const PERM_LEVEL_INFO = {
     color: 'text-emerald-600', 
     bg: 'bg-emerald-50',
     border: 'border-emerald-200',
-    icon: '⭐'
+    icon: '⭐',
+    summary: 'Master Node'
   }
 };
 
 const MODULE_CONTEXTS = {
   company: {
-    label: "Company Module",
+    label: "Corporate Domain",
     icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>,
     none: "Zero access to profile or FY settings.",
     read: "Can audit company profile and periods.",
@@ -174,8 +178,8 @@ const UserForm: React.FC<UserFormProps> = ({ initialData, availableRoles, onCanc
 
   const PermissionRow = ({ label, module, icon }: { label: string, module: keyof UserPermissions, icon: React.ReactNode }) => {
     const currentVal = formData.permissions[module];
-    const activeInfo = PERM_LEVEL_INFO[currentVal];
-    const moduleCtx = MODULE_CONTEXTS[module];
+    const activeInfo = (PERM_LEVEL_INFO as any)[currentVal];
+    const moduleCtx = (MODULE_CONTEXTS as any)[module];
 
     return (
       <div className={`p-6 rounded-3xl border-2 transition-all relative bg-white ${activeInfo.border} shadow-sm group hover:shadow-md`}>
@@ -210,7 +214,6 @@ const UserForm: React.FC<UserFormProps> = ({ initialData, availableRoles, onCanc
               >
                 {level}
                 
-                {/* Visual Level Tooltip */}
                 <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-48 p-3 bg-slate-900 text-white rounded-xl shadow-2xl opacity-0 invisible group-hover/btn:opacity-100 group-hover/btn:visible transition-all z-50 pointer-events-none border border-white/10 normal-case font-medium text-[10px]">
                   <div className="font-black uppercase tracking-widest text-indigo-400 text-[8px] mb-1">Impact:</div>
                   {(moduleCtx as any)[level]}
@@ -325,37 +328,51 @@ const UserForm: React.FC<UserFormProps> = ({ initialData, availableRoles, onCanc
             )}
           </div>
 
-          {/* Global Preset Bar */}
-          <div className="bg-slate-900 rounded-[2.5rem] p-8 text-white relative overflow-hidden shadow-xl border-t-8 border-indigo-600 mb-8">
-            <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
+          {/* Global Preset Bar - The Tier Orchestrator */}
+          <div className="bg-slate-900 rounded-[2.5rem] p-10 text-white relative overflow-hidden shadow-2xl border-t-8 border-indigo-600 mb-12">
+            <div className="relative z-10 space-y-8">
               <div className="flex items-center space-x-6">
-                <div className="w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center text-3xl shadow-xl shadow-indigo-900/40">🎯</div>
+                <div className="w-16 h-16 bg-indigo-600 rounded-3xl flex items-center justify-center text-4xl shadow-2xl shadow-indigo-900/40">🎯</div>
                 <div>
-                  <h4 className="text-[11px] font-black uppercase tracking-widest text-indigo-400 mb-1">Global Authority Presets</h4>
-                  <p className="text-[11px] text-slate-400 font-medium italic leading-relaxed max-w-sm">Synchronize all modules to a standard tier instantly. High visibility over multiple domains.</p>
+                  <h4 className="text-xl font-black uppercase tracking-tight italic text-white">Global Authority Preset</h4>
+                  <p className="text-[11px] text-indigo-300 font-medium italic leading-relaxed max-w-lg mt-1">Instantly synchronize all four core modules to a standardized access tier. This acts as a master switch for user capabilities.</p>
                 </div>
               </div>
-              <div className="flex bg-white/5 p-1 rounded-2xl border border-white/10 backdrop-blur-md">
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {PERM_LEVELS.map((level) => {
                   const isActive = currentGlobalLevel === level;
+                  const info = (PERM_LEVEL_INFO as any)[level];
                   return (
                     <button
                       key={level}
                       type="button"
                       onClick={() => handleGlobalApply(level)}
-                      className={`px-6 py-3 text-[10px] font-black uppercase tracking-tighter rounded-xl transition-all ${
+                      className={`p-6 rounded-[1.8rem] border-2 transition-all flex flex-col items-center text-center group/card ${
                         isActive 
-                          ? 'bg-indigo-600 text-white shadow-xl scale-[1.05]' 
-                          : 'text-indigo-200 hover:bg-white/5 hover:text-white'
+                          ? 'bg-indigo-600 border-indigo-400 shadow-[0_20px_40px_rgba(79,70,229,0.3)] scale-105 z-10' 
+                          : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-indigo-500/50'
                       }`}
                     >
-                      {level}
+                      <span className={`text-3xl mb-3 transition-transform group-hover/card:scale-110 ${isActive ? 'drop-shadow-[0_0_10px_rgba(255,255,255,0.5)]' : ''}`}>
+                        {info.icon}
+                      </span>
+                      <span className={`text-[10px] font-black uppercase tracking-widest ${isActive ? 'text-white' : 'text-indigo-400'}`}>
+                        {info.label}
+                      </span>
+                      <p className={`text-[9px] font-bold uppercase mt-1.5 ${isActive ? 'text-indigo-200' : 'text-slate-500'}`}>
+                        {info.summary}
+                      </p>
+                      
+                      {isActive && (
+                         <div className="mt-4 w-12 h-1 bg-white rounded-full animate-pulse shadow-[0_0_8px_#fff]"></div>
+                      )}
                     </button>
                   );
                 })}
               </div>
             </div>
-            <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-600 rounded-full blur-[100px] opacity-10 -mr-32 -mt-32 pointer-events-none"></div>
+            <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-600 rounded-full blur-[150px] opacity-20 -mr-40 -mt-40 pointer-events-none"></div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
