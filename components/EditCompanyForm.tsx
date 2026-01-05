@@ -89,7 +89,7 @@ const EditCompanyForm: React.FC<EditCompanyFormProps> = ({ initialData, onCancel
   const getInputClass = (fieldName: string) => {
     const baseClass = "w-full px-5 py-3.5 rounded-2xl border outline-none transition-all text-sm font-bold shadow-sm";
     return (touched[fieldName] && errors[fieldName]) 
-      ? `${baseClass} border-rose-500 bg-rose-50/30 text-rose-900` 
+      ? `${baseClass} border-rose-500 bg-rose-50/20 text-rose-900` 
       : `${baseClass} border-slate-200 focus:ring-4 focus:ring-indigo-500/10 bg-white focus:border-indigo-400`;
   };
 
@@ -109,7 +109,7 @@ const EditCompanyForm: React.FC<EditCompanyFormProps> = ({ initialData, onCancel
   );
 
   return (
-    <div className="bg-white rounded-[3.5rem] border border-slate-200 shadow-2xl overflow-hidden max-w-7xl mx-auto animate-in zoom-in-95 duration-500 flex flex-col md:flex-row min-h-[700px]">
+    <div className="bg-white rounded-[3.5rem] border border-slate-200 shadow-2xl overflow-hidden max-w-7xl mx-auto animate-in zoom-in-95 duration-300 flex flex-col md:flex-row min-h-[700px]">
       {/* Settings Navigation Sidebar */}
       <aside className="w-full md:w-72 bg-slate-50 p-8 border-r border-slate-100 space-y-10 shrink-0">
         <div className="space-y-6">
@@ -343,9 +343,12 @@ const EditCompanyForm: React.FC<EditCompanyFormProps> = ({ initialData, onCancel
 
               <div className="space-y-8">
                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Database Shard Context (Data Path)</label>
-                    <input name="dataPath" value={formData.dataPath} onChange={handleChange} className={getInputClass('dataPath') + " font-mono text-xs"} />
-                    <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tighter mt-2 ml-1">Absolute filesystem URI for organizational relational storage.</p>
+                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1 flex items-center">
+                      <svg className="w-3 h-3 mr-2 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
+                      Database Shard Context (Data Path)
+                    </label>
+                    <input name="dataPath" value={formData.dataPath} onChange={handleChange} className={getInputClass('dataPath') + " font-mono text-xs text-indigo-600"} />
+                    <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tighter mt-2 ml-1 italic">Absolute filesystem URI for organizational relational storage.</p>
                  </div>
 
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">

@@ -5,6 +5,7 @@ import VoucherEntryForm from './VoucherEntryForm';
 import InventoryVoucherForm from './InventoryVoucherForm';
 import BankReconciliation from './BankReconciliation';
 import DayBook from './DayBook';
+import ActionMenu, { ActionItem } from './ActionMenu';
 
 interface TransactionModuleProps {
   activeCompany: any;
@@ -28,7 +29,8 @@ const TransactionModule: React.FC<TransactionModuleProps> = ({
     const prefixMap: Record<string, string> = {
       'Sales': 'SL', 'Purchase': 'PR', 'Sales Return': 'SR', 'Purchase Return': 'PR-RET',
       'Payment': 'PY', 'Receipt': 'RC', 'Contra': 'CN', 'Journal': 'JR',
-      'Delivery Note': 'DN', 'Goods Receipt Note (GRN)': 'GRN', 'Stock Adjustment': 'SA', 'Purchase Order': 'PO'
+      'Delivery Note': 'DN', 'Goods Receipt Note (GRN)': 'GRN', 'Stock Adjustment': 'SA', 'Purchase Order': 'PO',
+      'Credit Note': 'CRN', 'Debit Note': 'DRN'
     };
     const prefix = prefixMap[type] || 'VCH';
     const yearParts = currentFY.split(' - ').map(y => y.trim().slice(-2));
@@ -79,6 +81,107 @@ const TransactionModule: React.FC<TransactionModuleProps> = ({
     }
   };
 
+  const PurchaseOrderManager = () => {
+    const [view, setView] = useState<'LIST' | 'CREATE'>('LIST');
+    
+    const purchaseOrders = useMemo(() => 
+      vouchers.filter(v => v.type === 'Purchase Order').sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    , [vouchers]);
+
+    const getPoActions = (v: Voucher): ActionItem[] => [
+      { label: 'Inspect PO', icon: '👁️', onClick: () => onViewVoucher(v.id), variant: 'primary' },
+      { label: 'Approve PO', icon: '✅', onClick: () => approveVoucher(v.id), variant: 'success' },
+      { label: 'Purge PO', icon: '🗑️', onClick: () => deleteVoucher(v.id), variant: 'danger' }
+    ];
+
+    if (view === 'CREATE') {
+      return (
+        <InventoryVoucherForm 
+          isReadOnly={isReadOnly}
+          items={items}
+          batches={batches}
+          ledgers={ledgers}
+          activeCompany={activeCompany}
+          onSubmit={(data) => {
+             handlePostVoucher({ ...data, status: 'Pending Approval' });
+             setView('LIST');
+          }}
+          onCancel={() => setView('LIST')}
+          getNextId={generateVoucherId}
+        />
+      );
+    }
+
+    return (
+      <div className="space-y-8 animate-in fade-in duration-500">
+        <div className="flex justify-between items-center bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
+           <div>
+              <h3 className="text-2xl font-black italic text-slate-800 uppercase tracking-tighter">Purchase Order Registry</h3>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2">Manage procurement lifecycle and authorization flows.</p>
+           </div>
+           <button 
+             onClick={() => setView('CREATE')}
+             className="px-10 py-4 bg-rose-600 text-white rounded-[1.5rem] font-black text-xs uppercase tracking-widest shadow-xl hover:bg-rose-700 transition-all transform active:scale-95 border-b-4 border-rose-900/40"
+           >
+             + Generate New PO
+           </button>
+        </div>
+
+        <div className="bg-white rounded-[3.5rem] border border-slate-200 shadow-sm overflow-hidden">
+           <table className="w-full text-left">
+              <thead className="bg-slate-950 text-[10px] font-black uppercase text-slate-500 tracking-widest border-b border-slate-900">
+                 <tr>
+                    <th className="px-10 py-7">PO Hash / Date</th>
+                    <th className="px-10 py-7">Supplier Node</th>
+                    <th className="px-10 py-7 text-right">Commitment Value</th>
+                    <th className="px-10 py-7 text-center">Status</th>
+                    <th className="px-10 py-7 text-right">Operations</th>
+                 </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                 {purchaseOrders.map(v => (
+                   <tr key={v.id} className="hover:bg-rose-50/20 transition-all group cursor-pointer" onClick={() => onViewVoucher(v.id)}>
+                      <td className="px-10 py-6">
+                         <div className="text-sm font-black text-indigo-600 italic">#{v.id}</div>
+                         <div className="text-[9px] font-bold text-slate-400 uppercase mt-1">{v.date}</div>
+                      </td>
+                      <td className="px-10 py-6">
+                         <div className="text-sm font-black text-slate-800 uppercase italic group-hover:text-rose-600 transition-colors">{v.party}</div>
+                      </td>
+                      <td className="px-10 py-6 text-right font-black text-slate-900 tabular-nums italic text-base">
+                         ${v.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </td>
+                      <td className="px-10 py-6 text-center">
+                         <span className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase border shadow-sm ${
+                           v.status === 'Pending Approval' ? 'bg-amber-50 text-amber-600 border-amber-100 animate-pulse' : 
+                           v.status === 'Posted' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
+                           'bg-slate-50 text-slate-400 border-slate-200'
+                         }`}>
+                           {v.status}
+                         </span>
+                      </td>
+                      <td className="px-10 py-6 text-right" onClick={e => e.stopPropagation()}>
+                         <ActionMenu actions={getPoActions(v)} label="Lifecycle" />
+                      </td>
+                   </tr>
+                 ))}
+                 {purchaseOrders.length === 0 && (
+                   <tr>
+                      <td colSpan={5} className="py-40 text-center">
+                         <div className="w-24 h-24 bg-slate-50 rounded-[3rem] flex items-center justify-center mx-auto mb-8 border border-slate-100">
+                            <span className="text-4xl grayscale opacity-30">📦</span>
+                         </div>
+                         <h4 className="text-xl font-black uppercase tracking-[0.4em] text-slate-300 italic">No PO Shards found</h4>
+                      </td>
+                   </tr>
+                 )}
+              </tbody>
+           </table>
+        </div>
+      </div>
+    );
+  };
+
   const stats = useMemo(() => {
     const today = new Date().toISOString().split('T')[0];
     const posted = vouchers.filter(v => v.status === 'Posted').length;
@@ -115,6 +218,8 @@ const TransactionModule: React.FC<TransactionModuleProps> = ({
             getNextId={generateVoucherId}
           />
         );
+      case TransactionSubMenu.PURCHASE_ORDER:
+        return <PurchaseOrderManager />;
       case TransactionSubMenu.BANK_RECONCILIATION:
         return (
           <BankReconciliation 

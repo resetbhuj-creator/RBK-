@@ -33,6 +33,7 @@ const DisplayModule: React.FC<DisplayModuleProps> = ({
   const [drillDownLedgerId, setDrillDownLedgerId] = useState<string | undefined>(undefined);
 
   const handleDrillDown = (id: string) => {
+    // If id is a ledgerId, set it. If it's a category from P&L, try to find a representative ledger or just switch to Ledger Statement
     setDrillDownLedgerId(id);
     setActiveSubAction(DisplaySubMenu.LEDGER_REPORT);
   };
@@ -40,9 +41,13 @@ const DisplayModule: React.FC<DisplayModuleProps> = ({
   const renderContent = () => {
     switch (activeSubAction) {
       case DisplaySubMenu.BALANCE_SHEET:
-        return <BalanceSheet ledgers={ledgers} vouchers={vouchers} />;
+        return <BalanceSheet ledgers={ledgers} vouchers={vouchers} onDrillDown={handleDrillDown} />;
       case DisplaySubMenu.PROFIT_LOSS:
-        return <ProfitAndLoss ledgers={ledgers} vouchers={vouchers} />;
+        return <ProfitAndLoss ledgers={ledgers} vouchers={vouchers} onDrillDown={(field) => {
+          // If a category is clicked, we could potentially filter LedgerReport by multiple ledgers, 
+          // but for now we'll just open the general Ledger Statement view.
+          setActiveSubAction(DisplaySubMenu.LEDGER_REPORT);
+        }} />;
       case DisplaySubMenu.BUDGET_VARIANCE:
         return <BudgetVariance ledgers={ledgers} vouchers={vouchers} />;
       case DisplaySubMenu.TRIAL_BALANCE:

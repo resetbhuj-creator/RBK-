@@ -33,6 +33,7 @@ const STEPS = [
 const CreateCompanyForm: React.FC<CreateCompanyFormProps> = ({ onCancel, onSubmit }) => {
   const currentYear = new Date().getFullYear();
   const [currentStep, setCurrentStep] = useState(1);
+  const [isPathManuallyEdited, setIsPathManuallyEdited] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     businessType: 'Private Limited Company',
@@ -54,12 +55,15 @@ const CreateCompanyForm: React.FC<CreateCompanyFormProps> = ({ onCancel, onSubmi
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    const sanitizedName = formData.name.trim().replace(/[^a-z0-9]/gi, '_') || 'NewCompany';
-    setFormData(prev => ({
-      ...prev,
-      dataPath: `C:\\NexusERP\\Data\\${sanitizedName}`
-    }));
-  }, [formData.name]);
+    // Only auto-update the path if the user hasn't manually customized it
+    if (!isPathManuallyEdited) {
+      const sanitizedName = formData.name.trim().replace(/[^a-z0-9]/gi, '_') || 'NewCompany';
+      setFormData(prev => ({
+        ...prev,
+        dataPath: `C:\\NexusERP\\Data\\${sanitizedName}`
+      }));
+    }
+  }, [formData.name, isPathManuallyEdited]);
 
   const validateStep = (step: number) => {
     const newErrors: Record<string, string> = {};
@@ -72,6 +76,7 @@ const CreateCompanyForm: React.FC<CreateCompanyFormProps> = ({ onCancel, onSubmi
     }
     if (step === 3) {
       if (!formData.taxId.trim()) newErrors.taxId = 'Statutory Tax ID is required';
+      if (!formData.dataPath.trim()) newErrors.dataPath = 'Data persistence path is required';
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -119,10 +124,10 @@ const CreateCompanyForm: React.FC<CreateCompanyFormProps> = ({ onCancel, onSubmi
         <div className="hidden lg:flex items-center space-x-4 bg-white/5 p-4 rounded-[2rem] border border-white/10">
           {STEPS.map((s, idx) => (
             <React.Fragment key={s.id}>
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xs font-black transition-all ${currentStep === s.id ? 'bg-indigo-600 text-white scale-110 shadow-lg' : currentStep > s.id ? 'bg-emerald-500 text-white' : 'bg-slate-800 text-slate-500'}`}>
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xs font-black transition-all ${currentStep === s.id ? 'bg-indigo-600 text-white scale-110 shadow-lg' : currentStep > s.id ? 'bg-emerald-50 text-white' : 'bg-slate-800 text-slate-500'}`}>
                 {currentStep > s.id ? '✓' : s.id}
               </div>
-              {idx < STEPS.length - 1 && <div className={`w-6 h-0.5 rounded-full ${currentStep > s.id ? 'bg-emerald-500' : 'bg-slate-800'}`} />}
+              {idx < STEPS.length - 1 && <div className={`w-6 h-0.5 rounded-full ${currentStep > s.id ? 'bg-emerald-50' : 'bg-slate-800'}`} />}
             </React.Fragment>
           ))}
         </div>
@@ -203,14 +208,30 @@ const CreateCompanyForm: React.FC<CreateCompanyFormProps> = ({ onCancel, onSubmi
                 <input type="date" name="booksBeginDate" value={formData.booksBeginDate} onChange={handleChange} className={getInputClass('booksBeginDate')} />
               </div>
               <div className="md:col-span-2 space-y-2 pt-4">
-                <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-2">Database Shard Path (Persistence)</label>
-                <input name="dataPath" value={formData.dataPath} readOnly className={getInputClass('dataPath') + " bg-slate-50 font-mono text-xs cursor-not-allowed"} />
+                <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-2 flex items-center">
+                  <svg className="w-3 h-3 mr-2 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
+                  Custom Database Shard Path (Persistence)
+                </label>
+                <input 
+                  name="dataPath" 
+                  value={formData.dataPath} 
+                  onChange={(e) => {
+                    setIsPathManuallyEdited(true);
+                    handleChange(e);
+                  }}
+                  className={getInputClass('dataPath') + " font-mono text-xs"} 
+                  placeholder="e.g. D:\Accounting\Project_Alpha"
+                />
+                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-2 ml-2">
+                  {isPathManuallyEdited ? '✓ CUSTOM PATH ACTIVE' : '⚠ AUTO-GENERATED BASE ON COMPANY NAME'}
+                </p>
+                {errors.dataPath && <p className="text-[10px] text-rose-500 font-black mt-1 ml-2">{errors.dataPath}</p>}
               </div>
             </div>
           </div>
         )}
 
-        {/* Step 4: Verification Review */}
+        {/* Step 4: Review */}
         {currentStep === 4 && (
           <div className="space-y-12 animate-in zoom-in-95 duration-500">
             <div className="bg-slate-900 rounded-[3rem] p-12 text-white shadow-2xl relative overflow-hidden">
@@ -246,7 +267,7 @@ const CreateCompanyForm: React.FC<CreateCompanyFormProps> = ({ onCancel, onSubmi
                     <p className="flex justify-between border-b border-slate-200 pb-2"><span>Books Start:</span> <span className="text-indigo-600">{formData.booksBeginDate}</span></p>
                     <div className="pt-2">
                        <span className="text-slate-400 uppercase text-[9px] block mb-1">Database Shard URI:</span>
-                       <code className="block bg-white p-3 rounded-xl border border-slate-200 text-[10px] font-mono font-black text-slate-400 break-all">{formData.dataPath}</code>
+                       <code className="block bg-white p-3 rounded-xl border border-slate-200 text-[10px] font-mono font-black text-indigo-600 break-all">{formData.dataPath}</code>
                     </div>
                   </div>
                </div>

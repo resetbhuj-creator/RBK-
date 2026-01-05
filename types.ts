@@ -32,6 +32,7 @@ export enum AdminSubMenu {
 export enum TransactionSubMenu {
   ACCOUNTING_VOUCHERS = 'Accounting Vouchers',
   INVENTORY_VOUCHERS = 'Inventory Vouchers',
+  PURCHASE_ORDER = 'Purchase Orders',
   BANK_RECONCILIATION = 'Bank Reconciliation',
   DAY_BOOK = 'Day Book'
 }
