@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { ADMINISTRATION_SUB_MENUS } from '../constants';
-import { AdminSubMenu, User, Role, AccountGroup, Tax, TaxGroup, Ledger, Item, AuditLog, Voucher, Company } from '../types';
-import LedgerForm from './LedgerForm';
+// Added missing Item import from types
+import { AdminSubMenu, User, Role, AccountGroup, Tax, TaxGroup, Ledger, AuditLog, Voucher, Company, Item } from '../types';
+import LedgerManager from './LedgerManager';
 import UsersModule from './UsersModule';
 import BackupModule from './BackupModule';
 import ImportExportModule from './ImportExportModule';
@@ -65,7 +66,7 @@ const AdministrationModule: React.FC<AdministrationModuleProps> = ({
 
     const filteredData = useMemo(() => {
       let data: any[] = [];
-      if (activeTab === 'LEDGERS') data = ledgers;
+      if (activeTab === 'LEDGERS') return []; // Managed by LedgerManager
       else if (activeTab === 'ITEMS') data = items;
       else if (activeTab === 'GROUPS') data = accountGroups;
       else if (activeTab === 'TAX_CONFIGS') data = taxes;
@@ -78,17 +79,25 @@ const AdministrationModule: React.FC<AdministrationModuleProps> = ({
         const hsnMatch = activeTab === 'ITEMS' && x.hsnCode?.toLowerCase().includes(term);
         return nameMatch || descMatch || hsnMatch;
       });
-    }, [activeTab, ledgers, items, accountGroups, taxes, taxGroups, searchTerm]);
+    }, [activeTab, items, accountGroups, taxes, taxGroups, searchTerm]);
 
     const editingRecord = useMemo(() => {
         if (!editingId) return undefined;
         if (activeTab === 'TAX_CONFIGS') return taxes.find(t => t.id === editingId);
         if (activeTab === 'TAX_GROUPS') return taxGroups.find(tg => tg.id === editingId);
-        if (activeTab === 'LEDGERS') return ledgers.find(l => l.id === editingId);
         if (activeTab === 'ITEMS') return items.find(i => i.id === editingId);
         if (activeTab === 'GROUPS') return accountGroups.find(ag => ag.id === editingId);
         return undefined;
-    }, [editingId, activeTab, taxes, taxGroups, ledgers, items, accountGroups]);
+    }, [editingId, activeTab, taxes, taxGroups, items, accountGroups]);
+
+    const handleQuickGroupAdd = (groupData: Omit<AccountGroup, 'id' | 'isSystem'>) => {
+      const newGroup: AccountGroup = {
+        ...groupData,
+        id: `ag-${Date.now()}`,
+        isSystem: false
+      };
+      setAccountGroups(prev => [...prev, newGroup]);
+    };
 
     const getRowActions = (row: any): ActionItem[] => {
       const actions: ActionItem[] = [
@@ -112,7 +121,6 @@ const AdministrationModule: React.FC<AdministrationModuleProps> = ({
             if(confirm(msg)) {
                 if (activeTab === 'TAX_CONFIGS') setTaxes(prev => prev.filter(t => t.id !== row.id));
                 else if (activeTab === 'TAX_GROUPS') setTaxGroups(prev => prev.filter(tg => tg.id !== row.id));
-                else if (activeTab === 'LEDGERS') setLedgers(prev => prev.filter(l => l.id !== row.id));
                 else if (activeTab === 'ITEMS') setItems(prev => prev.filter(i => i.id !== row.id));
                 else if (activeTab === 'GROUPS') setAccountGroups(prev => prev.filter(ag => ag.id !== row.id));
             }
@@ -138,12 +146,14 @@ const AdministrationModule: React.FC<AdministrationModuleProps> = ({
                 <span>Bulk Import</span>
               </button>
             )}
-            <button 
-              onClick={() => { setEditingId(null); setIsModalOpen(true); }} 
-              className="px-5 py-2 bg-indigo-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:bg-indigo-700 transition-all"
-            >
-              Add {activeTab === 'ITEMS' ? 'Catalogue' : activeTab.split('_')[0].slice(0, -1)}
-            </button>
+            {activeTab !== 'LEDGERS' && (
+              <button 
+                onClick={() => { setEditingId(null); setIsModalOpen(true); }} 
+                className="px-5 py-2 bg-indigo-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:bg-indigo-700 transition-all"
+              >
+                Add {activeTab === 'ITEMS' ? 'Catalogue' : activeTab.split('_')[0].slice(0, -1)}
+              </button>
+            )}
           </div>
         </div>
 
@@ -157,7 +167,7 @@ const AdministrationModule: React.FC<AdministrationModuleProps> = ({
           ].map(tab => (
             <button 
               key={tab.id} 
-              onClick={() => { setActiveTab(tab.id as any); setEditingId(null); }} 
+              onClick={() => { setActiveTab(tab.id as any); setEditingId(null); setSearchTerm(''); }} 
               className={`px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-all rounded-t-xl border-b-2 ${activeTab === tab.id ? 'border-indigo-600 text-indigo-600 bg-indigo-50/50' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
             >
                 {tab.label}
@@ -165,93 +175,117 @@ const AdministrationModule: React.FC<AdministrationModuleProps> = ({
           ))}
         </div>
 
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-[400px]">
-          <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/30">
-            <div className="relative flex-1 max-w-xs">
-                <input 
-                  type="text" 
-                  placeholder={`Search ${activeTab.replace('_', ' ').toLowerCase()} by name or code...`} 
-                  value={searchTerm} 
-                  onChange={(e) => setSearchTerm(e.target.value)} 
-                  className="w-full pl-8 pr-4 py-1.5 rounded-lg border border-slate-200 text-[11px] font-bold shadow-inner outline-none focus:ring-2 focus:ring-indigo-500/20" 
-                />
-                <svg className="w-3.5 h-3.5 text-slate-300 absolute left-2.5 top-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+        {activeTab === 'LEDGERS' ? (
+          <LedgerManager 
+            ledgers={ledgers} 
+            setLedgers={setLedgers} 
+            accountGroups={accountGroups} 
+            onQuickGroupAdd={handleQuickGroupAdd}
+          />
+        ) : (
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-[400px]">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/30">
+              <div className="relative flex-1 max-w-md group">
+                  <input 
+                    type="text" 
+                    placeholder={activeTab === 'ITEMS' ? "Search by Name or HSN/SAC Code..." : `Search ${activeTab.replace('_', ' ').toLowerCase()} by name or code...`}
+                    value={searchTerm} 
+                    onChange={(e) => setSearchTerm(e.target.value)} 
+                    className="w-full pl-10 pr-10 py-3 rounded-xl border border-slate-200 text-xs font-black shadow-inner outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-400 transition-all placeholder-slate-400 italic" 
+                  />
+                  <svg className="w-5 h-5 text-slate-300 absolute left-3 top-2.5 group-focus-within:text-indigo-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                  {searchTerm && (
+                    <button 
+                      onClick={() => setSearchTerm('')}
+                      className="absolute right-3 top-2.5 p-0.5 text-slate-300 hover:text-rose-500 transition-colors rounded-full hover:bg-rose-50"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                  )}
+              </div>
+              <div className="text-[9px] font-black uppercase text-slate-400 tracking-widest bg-white border border-slate-200 px-3 py-1.5 rounded-lg shadow-sm">
+                {filteredData.length} Matches in Registry
+              </div>
             </div>
-            <div className="text-[9px] font-black uppercase text-slate-400 tracking-widest">{filteredData.length} entries</div>
-          </div>
-          <div className="overflow-x-auto custom-scrollbar">
-             <table className="w-full text-left">
-               <thead className="bg-slate-50 text-[9px] font-black uppercase text-slate-400 border-b border-slate-100">
-                 <tr>
-                    <th className="px-6 py-3">Identity / Designation</th>
-                    <th className="px-6 py-3">Classification</th>
-                    {activeTab === 'ITEMS' && <th className="px-6 py-3 text-center">Unit</th>}
-                    {activeTab === 'TAX_CONFIGS' && <th className="px-6 py-3">Rate</th>}
-                    {activeTab === 'TAX_GROUPS' && <th className="px-6 py-3 text-center">Components</th>}
-                    <th className="px-6 py-3 text-right">Actions</th>
-                 </tr>
-               </thead>
-               <tbody className="divide-y divide-slate-50">
-                 {filteredData.map(row => {
-                   const componentCount = activeTab === 'TAX_GROUPS' ? taxes.filter(t => t.groupId === row.id).length : 0;
-                   const associatedGroupName = activeTab === 'TAX_CONFIGS' ? taxGroups.find(tg => tg.id === row.groupId)?.name : null;
+            <div className="overflow-x-auto custom-scrollbar">
+               <table className="w-full text-left">
+                 <thead className="bg-slate-50 text-[9px] font-black uppercase text-slate-400 border-b border-slate-100">
+                   <tr>
+                      <th className="px-6 py-3">Identity / Designation</th>
+                      <th className="px-6 py-3">Classification</th>
+                      {activeTab === 'ITEMS' && <th className="px-6 py-3 text-center">Unit</th>}
+                      {activeTab === 'TAX_CONFIGS' && <th className="px-6 py-3">Rate</th>}
+                      {activeTab === 'TAX_GROUPS' && <th className="px-6 py-3 text-center">Components</th>}
+                      <th className="px-6 py-3 text-right">Actions</th>
+                   </tr>
+                 </thead>
+                 <tbody className="divide-y divide-slate-50">
+                   {filteredData.map(row => {
+                     const componentCount = activeTab === 'TAX_GROUPS' ? taxes.filter(t => t.groupId === row.id).length : 0;
+                     const associatedGroupName = activeTab === 'TAX_CONFIGS' ? taxGroups.find(tg => tg.id === row.groupId)?.name : null;
 
-                   return (
-                     <tr key={row.id} className="hover:bg-indigo-50/20 transition-colors group">
-                       <td className="px-6 py-3.5">
-                          <div className="font-black text-slate-800 italic uppercase tracking-tight text-xs flex items-center">
-                            {row.name}
-                            {row.isSystem && (
-                              <svg className="w-2.5 h-2.5 ml-2 text-slate-300" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" /></svg>
-                            )}
-                          </div>
-                          {row.hsnCode && <div className="text-[8px] font-bold text-slate-300 uppercase mt-0.5">HSN: {row.hsnCode}</div>}
-                          {associatedGroupName && <div className="text-[8px] font-black text-indigo-400 uppercase mt-0.5 italic">Group: {associatedGroupName}</div>}
-                          {activeTab === 'TAX_GROUPS' && row.description && (
-                            <div className="text-[9px] text-slate-400 font-medium italic mt-1 max-w-xs truncate" title={row.description}>
-                              {row.description}
+                     return (
+                       <tr key={row.id} className="hover:bg-indigo-50/20 transition-colors group">
+                         <td className="px-6 py-3.5">
+                            <div className="font-black text-slate-800 italic uppercase tracking-tight text-xs flex items-center">
+                              {row.name}
+                              {row.isSystem && (
+                                <svg className="w-2.5 h-2.5 ml-2 text-slate-300" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" /></svg>
+                              )}
                             </div>
-                          )}
-                       </td>
-                       <td className="px-6 py-3.5">
-                          <span className="px-2 py-0.5 bg-indigo-50 text-indigo-500 rounded text-[9px] font-black uppercase tracking-tighter border border-indigo-100">
-                              {row.group || row.category || row.nature || row.type || 'Consolidated'}
-                          </span>
-                       </td>
-                       {activeTab === 'ITEMS' && (
-                          <td className="px-6 py-3.5 text-center">
-                             <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-[8px] font-black uppercase tracking-widest border border-slate-200">{row.unit}</span>
-                          </td>
-                       )}
-                       {activeTab === 'TAX_CONFIGS' && (
-                          <td className="px-6 py-3.5">
-                             <span className="text-xs font-black text-slate-900">{row.rate}%</span>
-                          </td>
-                       )}
-                       {activeTab === 'TAX_GROUPS' && (
-                          <td className="px-6 py-3.5 text-center">
-                             <span className={`px-2 py-1 rounded-lg text-[10px] font-black shadow-sm ${componentCount > 0 ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-400'}`}>
-                                {componentCount} Ledgers
-                             </span>
-                          </td>
-                       )}
-                       <td className="px-6 py-3.5 text-right">
-                          <ActionMenu actions={getRowActions(row)} label={row.isSystem ? 'LOCKED' : 'ACTION'} />
-                       </td>
-                     </tr>
-                   );
-                 })}
-               </tbody>
-             </table>
+                            {row.hsnCode && <div className="text-[8px] font-bold text-slate-300 uppercase mt-0.5">HSN/SAC: {row.hsnCode}</div>}
+                            {associatedGroupName && <div className="text-[8px] font-black text-indigo-400 uppercase mt-0.5 italic">Group: {associatedGroupName}</div>}
+                            {activeTab === 'TAX_GROUPS' && row.description && (
+                              <div className="text-[9px] text-slate-400 font-medium italic mt-1 max-w-xs truncate" title={row.description}>
+                                {row.description}
+                              </div>
+                            )}
+                         </td>
+                         <td className="px-6 py-3.5">
+                            <span className="px-2 py-0.5 bg-indigo-50 text-indigo-500 rounded text-[9px] font-black uppercase tracking-tighter border border-indigo-100">
+                                {row.group || row.category || row.nature || row.type || 'Consolidated'}
+                            </span>
+                         </td>
+                         {activeTab === 'ITEMS' && (
+                            <td className="px-6 py-3.5 text-center">
+                               <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-[8px] font-black uppercase tracking-widest border border-slate-200">{row.unit}</span>
+                            </td>
+                         )}
+                         {activeTab === 'TAX_CONFIGS' && (
+                            <td className="px-6 py-3.5">
+                               <span className="text-xs font-black text-slate-900">{row.rate}%</span>
+                            </td>
+                         )}
+                         {activeTab === 'TAX_GROUPS' && (
+                            <td className="px-6 py-3.5 text-center">
+                               <span className={`px-2 py-1 rounded-lg text-[10px] font-black shadow-sm ${componentCount > 0 ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-400'}`}>
+                                  {componentCount} Ledgers
+                               </span>
+                            </td>
+                         )}
+                         <td className="px-6 py-3.5 text-right">
+                            <ActionMenu actions={getRowActions(row)} label={row.isSystem ? 'LOCKED' : 'ACTION'} />
+                         </td>
+                       </tr>
+                     );
+                   })}
+                 </tbody>
+               </table>
+               {filteredData.length === 0 && (
+                 <div className="py-20 text-center opacity-30 italic animate-pulse">
+                    <div className="w-12 h-12 mx-auto bg-slate-100 rounded-full flex items-center justify-center mb-4">
+                       <svg className="w-6 h-6 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                    </div>
+                    <p className="text-xs font-black uppercase tracking-widest">No matching master record found.</p>
+                 </div>
+               )}
+            </div>
           </div>
-        </div>
+        )}
 
-        {isModalOpen && (
+        {isModalOpen && activeTab !== 'LEDGERS' && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-300">
              <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto custom-scrollbar">
-               {activeTab === 'LEDGERS' && (
-                  <LedgerForm initialData={editingRecord as Ledger} accountGroups={accountGroups} onCancel={() => setIsModalOpen(false)} onSubmit={(data) => { if (editingId) setLedgers(prev => prev.map(l => l.id === editingId ? { ...data, id: editingId } : l)); else setLedgers(prev => [...prev, { ...data, id: `l-${Date.now()}` }]); setIsModalOpen(false); }} />
-               )}
                {activeTab === 'GROUPS' && (
                   <GroupForm initialData={editingRecord as AccountGroup} onCancel={() => setIsModalOpen(false)} onSubmit={(data) => { if (editingId) setAccountGroups(prev => prev.map(ag => ag.id === editingId ? { ...data, id: editingId } : ag)); else setAccountGroups(prev => [...prev, { ...data, id: `ag-${Date.now()}` }]); setIsModalOpen(false); }} />
                )}

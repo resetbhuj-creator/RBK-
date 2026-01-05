@@ -137,7 +137,9 @@ export interface VoucherItem {
   qty: number;
   unit: string;
   rate: number;
-  amount: number;
+  discountRate?: number;
+  discountAmount?: number;
+  amount: number; // Taxable value after discount
   cgstRate?: number;
   sgstRate?: number;
   igstRate?: number;
@@ -180,6 +182,7 @@ export interface Voucher {
   items?: VoucherItem[];
   adjustments?: Adjustment[];
   subTotal?: number;
+  discountTotal?: number;
   taxTotal?: number;
   supplyType?: 'Local' | 'Central';
   gstClassification?: 'Input' | 'Output';
@@ -209,9 +212,11 @@ export interface Item {
   category: string;
   unit: string;
   salePrice: number;
+  costPrice?: number;
   hsnCode: string;
   gstRate: number;
   taxGroupId?: string;
+  currentStock?: number;
 }
 
 export interface MenuItem {

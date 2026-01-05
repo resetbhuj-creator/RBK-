@@ -40,7 +40,15 @@ const ISO_CURRENCIES: Record<string, { symbol: string, name: string }> = {
   'NZD': { symbol: '$', name: 'New Zealand Dollar' },
   'MXN': { symbol: '$', name: 'Mexican Peso' },
   'HKD': { symbol: '$', name: 'Hong Kong Dollar' },
-  'ZAR': { symbol: 'R', name: 'South African Rand' }
+  'ZAR': { symbol: 'R', name: 'South African Rand' },
+  'BRL': { symbol: 'R$', name: 'Brazilian Real' },
+  'KRW': { symbol: '₩', name: 'South Korean Won' },
+  'RUB': { symbol: '₽', name: 'Russian Ruble' },
+  'TRY': { symbol: '₺', name: 'Turkish Lira' },
+  'THB': { symbol: '฿', name: 'Thai Baht' },
+  'IDR': { symbol: 'Rp', name: 'Indonesian Rupiah' },
+  'MYR': { symbol: 'RM', name: 'Malaysian Ringgit' },
+  'PHP': { symbol: '₱', name: 'Philippine Peso' }
 };
 
 const INDIAN_STATE_CODES: Record<string, string> = {
@@ -109,8 +117,21 @@ const CreateCompanyForm: React.FC<CreateCompanyFormProps> = ({ onCancel, onSubmi
     dataPath: 'C:\\NexusERP\\Data\\NewCompany'
   });
 
+  const [isDataPathManual, setIsDataPathManual] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
+
+  // Logic to suggest default data paths based on company name and country
+  useEffect(() => {
+    if (!isDataPathManual) {
+      const sanitizedName = formData.name.trim().replace(/[^a-z0-9]/gi, '_') || 'NewCompany';
+      const countryPart = formData.country ? `${formData.country.replace(/[^a-z0-9]/gi, '_')}\\` : '';
+      setFormData(prev => ({
+        ...prev,
+        dataPath: `C:\\NexusERP\\Data\\${countryPart}${sanitizedName}`
+      }));
+    }
+  }, [formData.name, formData.country, isDataPathManual]);
 
   useEffect(() => {
     if (formData.country && COUNTRY_DATA[formData.country]) {
@@ -141,25 +162,22 @@ const CreateCompanyForm: React.FC<CreateCompanyFormProps> = ({ onCancel, onSubmi
   };
 
   const formatCurrencyValue = (val: string): string => {
-    const clean = val.trim().toUpperCase();
+    const clean = val.trim().split(' ')[0].toUpperCase();
     
-    // Check if it's a known ISO code
     if (ISO_CURRENCIES[clean]) {
       return `${clean} (${ISO_CURRENCIES[clean].symbol})`;
     }
     
-    // Check if it matches a symbol
     const matchBySymbol = Object.entries(ISO_CURRENCIES).find(([_, data]) => data.symbol === val.trim());
     if (matchBySymbol) {
       return `${matchBySymbol[0]} (${matchBySymbol[1].symbol})`;
     }
 
-    // Attempt to parse format like "USD ($)" and keep it if it looks valid
-    if (/^[A-Z]{3}\s\(.+\)$/.test(clean)) {
-      return clean;
+    if (/^[A-Z]{3}\s\(.+\)$/.test(val.trim().toUpperCase())) {
+      return val.trim().toUpperCase();
     }
 
-    return val; // Degrade gracefully to literal input
+    return val; 
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -167,11 +185,14 @@ const CreateCompanyForm: React.FC<CreateCompanyFormProps> = ({ onCancel, onSubmi
     
     if (name === 'currency') {
       const clean = value.trim().toUpperCase();
-      // Auto-append if exactly matches a known ISO key as user types
-      if (clean.length === 3 && ISO_CURRENCIES[clean]) {
+      if (clean.length === 3 && ISO_CURRENCIES[clean] && !formData.currency.includes('(')) {
         setFormData(prev => ({ ...prev, currency: `${clean} (${ISO_CURRENCIES[clean].symbol})` }));
         return;
       }
+    }
+
+    if (name === 'dataPath') {
+      setIsDataPathManual(true);
     }
 
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -195,7 +216,7 @@ const CreateCompanyForm: React.FC<CreateCompanyFormProps> = ({ onCancel, onSubmi
         {label} {required && <span className="text-rose-500 ml-1">*</span>}
         <div className="group relative ml-2">
           <svg className="w-3 h-3 text-slate-300 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-          <div className="absolute bottom-full left-0 mb-2 w-56 p-3 bg-slate-900 text-white text-[9px] rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 normal-case font-medium leading-relaxed">
+          <div className="absolute bottom-full left-0 mb-2 w-56 p-3 bg-slate-900 text-white text-[9px] rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 normal-case font-medium leading-relaxed border border-white/10">
             {FIELD_GUIDE[id] || "Institutional data field."}
           </div>
         </div>
@@ -207,17 +228,22 @@ const CreateCompanyForm: React.FC<CreateCompanyFormProps> = ({ onCancel, onSubmi
     const baseClass = "w-full px-5 py-3 rounded-2xl border outline-none transition-all text-sm font-bold shadow-sm";
     return (touched[fieldName] && errors[fieldName]) 
       ? `${baseClass} border-rose-500 bg-rose-50/20 text-rose-900` 
-      : `${baseClass} border-slate-200 focus:ring-4 focus:ring-indigo-500/10 bg-white`;
+      : `${baseClass} border-slate-200 focus:ring-4 focus:ring-indigo-500/10 bg-white focus:border-indigo-400`;
   };
 
   const currentCountryInfo = formData.country ? COUNTRY_DATA[formData.country] : null;
+
+  const detectedCurrencyName = useMemo(() => {
+    const clean = formData.currency.split(' ')[0].toUpperCase();
+    return ISO_CURRENCIES[clean]?.name || null;
+  }, [formData.currency]);
 
   return (
     <div className="bg-white rounded-[3rem] border border-slate-200 shadow-2xl overflow-hidden max-w-6xl mx-auto animate-in fade-in duration-500 pb-10">
       <div className="px-10 py-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
         <div className="flex items-center space-x-6">
           <div className="w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-indigo-100 transform -rotate-3 transition-transform hover:rotate-0">
-            <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+            <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
           </div>
           <div>
             <h3 className="text-2xl font-black text-slate-800 tracking-tight uppercase italic leading-none">Initialize Identity Node</h3>
@@ -231,7 +257,6 @@ const CreateCompanyForm: React.FC<CreateCompanyFormProps> = ({ onCancel, onSubmi
 
       <form onSubmit={(e) => { e.preventDefault(); if (validate()) onSubmit(formData); }} className="p-10 space-y-12">
         
-        {/* Section 1: Core Identity */}
         <section className="space-y-8">
            <div className="flex items-center space-x-4">
               <div className="w-1 h-8 bg-indigo-600 rounded-full"></div>
@@ -277,7 +302,6 @@ const CreateCompanyForm: React.FC<CreateCompanyFormProps> = ({ onCancel, onSubmi
            </div>
         </section>
 
-        {/* Section 2: Contact Gateway */}
         <section className="space-y-8">
            <div className="flex items-center space-x-4">
               <div className="w-1 h-8 bg-indigo-600 rounded-full"></div>
@@ -300,7 +324,6 @@ const CreateCompanyForm: React.FC<CreateCompanyFormProps> = ({ onCancel, onSubmi
            </div>
         </section>
 
-        {/* Section 3: Statutory Config */}
         <section className="space-y-8">
            <div className="flex items-center space-x-4">
               <div className="w-1 h-8 bg-indigo-600 rounded-full"></div>
@@ -318,19 +341,21 @@ const CreateCompanyForm: React.FC<CreateCompanyFormProps> = ({ onCancel, onSubmi
                         value={formData.currency} 
                         onChange={handleChange} 
                         onBlur={handleCurrencyBlur}
-                        placeholder="USD, INR, £, etc."
-                        className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-sm font-black text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-inner placeholder-slate-600" 
+                        placeholder="Type ISO code (e.g. USD)"
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-sm font-black text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-inner placeholder-slate-600 transition-all" 
                       />
                       <datalist id="currency-suggestions">
                         {Object.entries(ISO_CURRENCIES).map(([code, data]) => (
                           <option key={code} value={`${code} (${data.symbol})`}>{data.name}</option>
                         ))}
                       </datalist>
-                      <div className="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 group-focus-within/currency:opacity-100 transition-opacity">
-                         <span className="text-[8px] font-black uppercase text-slate-500">ISO Matcher Active</span>
-                      </div>
+                      {detectedCurrencyName && (
+                        <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center space-x-2 animate-in fade-in slide-in-from-right-2 duration-300">
+                           <span className="text-[8px] font-black uppercase text-indigo-400 bg-indigo-50/10 px-2 py-1 rounded border border-indigo-500/20">{detectedCurrencyName}</span>
+                        </div>
+                      )}
                     </div>
-                    <p className="text-[8px] font-bold text-slate-500 uppercase tracking-tighter ml-1">Detected: <span className="text-indigo-400 italic">{formatCurrencyValue(formData.currency)}</span></p>
+                    <p className="text-[8px] font-bold text-slate-500 uppercase tracking-tighter ml-1">Detected: <span className="text-indigo-400 italic font-black">{formatCurrencyValue(formData.currency)}</span></p>
                  </div>
                  <div className="space-y-2">
                     <label className="text-[9px] font-black uppercase text-indigo-400 tracking-widest ml-1">Statutory Tax Regime</label>
@@ -343,11 +368,10 @@ const CreateCompanyForm: React.FC<CreateCompanyFormProps> = ({ onCancel, onSubmi
                     <p className="text-[8px] font-bold text-slate-500 uppercase tracking-tighter ml-1">Required for statutory compliant invoicing.</p>
                  </div>
               </div>
-              <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-600 rounded-full blur-[100px] opacity-10 -mr-32 -mt-32"></div>
+              <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-600 rounded-full blur-[100px] opacity-10 -mr-32 -mt-32 pointer-events-none"></div>
            </div>
         </section>
 
-        {/* Section 4: Corporate Branding */}
         <section className="space-y-8">
            <div className="flex items-center space-x-4">
               <div className="w-1 h-8 bg-indigo-600 rounded-full"></div>
@@ -365,7 +389,6 @@ const CreateCompanyForm: React.FC<CreateCompanyFormProps> = ({ onCancel, onSubmi
            </div>
         </section>
 
-        {/* Section 5: Fiscal Period */}
         <section className="space-y-8">
            <div className="flex items-center space-x-4">
               <div className="w-1 h-8 bg-indigo-600 rounded-full"></div>
@@ -382,8 +405,22 @@ const CreateCompanyForm: React.FC<CreateCompanyFormProps> = ({ onCancel, onSubmi
                  <input type="date" name="booksBeginDate" value={formData.booksBeginDate} onChange={handleChange} onBlur={() => handleBlur('booksBeginDate')} className={getInputClass('booksBeginDate')} />
               </div>
               <div className="md:col-span-2 space-y-1 pt-4">
-                 <LabelWithHelp id="dataPath" label="System Persistence Path" required />
+                 <div className="flex justify-between items-center mb-1">
+                    <LabelWithHelp id="dataPath" label="System Persistence Path" required />
+                    {isDataPathManual && (
+                      <button 
+                        type="button"
+                        onClick={() => setIsDataPathManual(false)}
+                        className="text-[9px] font-black text-indigo-600 uppercase hover:underline"
+                      >
+                        Reset to Auto
+                      </button>
+                    )}
+                 </div>
                  <input name="dataPath" value={formData.dataPath} onChange={handleChange} className={getInputClass('dataPath') + " font-mono text-[11px]"} />
+                 {!isDataPathManual && (
+                   <p className="text-[8px] font-bold text-slate-400 uppercase mt-1 tracking-tighter italic">Auto-suggested based on Entity name and Country.</p>
+                 )}
               </div>
            </div>
         </section>

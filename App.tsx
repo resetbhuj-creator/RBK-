@@ -46,15 +46,20 @@ const INITIAL_COMPANIES = [
 
 const INITIAL_LEDGERS: Ledger[] = [
   { id: 'l1', name: 'HDFC Bank - 0012', group: 'Bank Accounts', openingBalance: 54000, type: 'Debit' },
-  { id: 'l2', name: 'Cash-in-hand', group: 'Cash-in-hand', openingBalance: 1200, type: 'Debit' }
+  { id: 'l2', name: 'Cash-in-hand', group: 'Cash-in-hand', openingBalance: 1200, type: 'Debit' },
+  { id: 'l3', name: 'Office Rent', group: 'Indirect Expenses', openingBalance: 0, type: 'Debit' },
+  { id: 'l4', name: 'Acme Retailers', group: 'Sundry Debtors', openingBalance: 0, type: 'Debit' },
+  { id: 'l5', name: 'Global Suppliers', group: 'Sundry Creditors', openingBalance: 0, type: 'Credit' }
 ];
 
 const INITIAL_ITEMS: Item[] = [
-  { id: 'i1', name: 'MacBook Pro M3', category: 'Electronics', unit: 'Nos', salePrice: 2400, hsnCode: '8471', gstRate: 18 }
+  { id: 'i1', name: 'MacBook Pro M3', category: 'Electronics', unit: 'Nos', salePrice: 2400, costPrice: 1800, hsnCode: '8471', gstRate: 18, currentStock: 45 },
+  { id: 'i2', name: 'iPhone 15 Pro', category: 'Electronics', unit: 'Nos', salePrice: 1100, costPrice: 750, hsnCode: '8517', gstRate: 18, currentStock: 120 },
+  { id: 'i3', name: 'Leather Messenger Bag', category: 'Consumables', unit: 'Nos', salePrice: 150, costPrice: 45, hsnCode: '4202', gstRate: 12, currentStock: 12 }
 ];
 
 const INITIAL_VOUCHERS: Voucher[] = [
-  { id: 'SL/23-24/00001', type: 'Sales', date: '2023-11-20', party: 'Acme Retailers', amount: 12500, status: 'Posted', narration: 'Bulk sale of laptops', subTotal: 10593.22, taxTotal: 1906.78, items: [{ id: 'vi1', itemId: 'i1', name: 'MacBook Pro M3', hsn: '8471', qty: 5, unit: 'Nos', rate: 2118.64, amount: 10593.22 }] }
+  { id: 'SL/23-24/00001', type: 'Sales', date: '2023-11-20', party: 'Acme Retailers', amount: 12500, status: 'Posted', narration: 'Bulk sale of laptops', subTotal: 10593.22, taxTotal: 1906.78, items: [{ id: 'vi1', itemId: 'i1', name: 'MacBook Pro M3', hsn: '8471', qty: 5, unit: 'Nos', rate: 2118.64, amount: 10593.22, igstRate: 18, taxAmount: 1906.78 }] }
 ];
 
 const App: React.FC = () => {
@@ -162,11 +167,21 @@ const App: React.FC = () => {
     }
   };
 
+  const handleSidebarMenuChange = (menu: MainMenuType) => {
+    setActiveMenu(menu);
+    // Reset sub-menus when parent changes via sidebar
+    setActiveAdminSubMenu(null);
+    setActiveTransactionSubMenu(null);
+    setActiveDisplaySubMenu(null);
+    setActiveCommSubMenu(null);
+    setActiveHouseKeepingSubMenu(null);
+  };
+
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden font-sans">
       <Sidebar 
         activeMenu={activeMenu} 
-        setActiveMenu={setActiveMenu}
+        setActiveMenu={handleSidebarMenuChange}
         activeAdminSubMenu={activeAdminSubMenu} setActiveAdminSubMenu={setActiveAdminSubMenu}
         activeTransactionSubMenu={activeTransactionSubMenu} setActiveTransactionSubMenu={setActiveTransactionSubMenu}
         activeDisplaySubMenu={activeDisplaySubMenu} setActiveDisplaySubMenu={setActiveDisplaySubMenu}

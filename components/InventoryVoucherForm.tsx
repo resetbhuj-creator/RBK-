@@ -21,17 +21,12 @@ const CURRENCIES = [
   { code: 'JPY', symbol: '¥', name: 'Japanese Yen' }
 ];
 
-const COMMON_ADJUSTMENTS = ['Freight Charges', 'Insurance', 'Labor', 'Packaging', 'Rounding Off'];
-const RETURN_REASONS = ['Damaged Goods', 'Quality Discrepancy', 'Wrong Item Shipped', 'Order Cancelled', 'Shortage in Delivery', 'Excess Supply Return'];
-
 const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly, items, ledgers, onSubmit, onCancel, getNextId, activeCompany }) => {
   const [vchType, setVchType] = useState<InvType>('Sales');
   const [supplyType, setSupplyType] = useState<'Local' | 'Central'>('Local');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [partyId, setPartyId] = useState('');
   const [reference, setReference] = useState('');
-  const [sourceDocRef, setSourceDocRef] = useState('');
-  const [returnReason, setReturnReason] = useState('');
   const [narration, setNarration] = useState('');
   const [vchItems, setVchItems] = useState<VoucherItem[]>([]);
   const [adjustments, setAdjustments] = useState<Adjustment[]>([]);
@@ -48,31 +43,26 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
 
   const nextIdPreview = useMemo(() => getNextId(vchType), [vchType, getNextId]);
 
+  const isSales = vchType === 'Sales' || vchType === 'Sales Return' || vchType === 'Delivery Note';
   const isFinancial = ['Sales', 'Purchase', 'Purchase Order', 'Sales Return', 'Purchase Return'].includes(vchType);
-  const isReturn = vchType === 'Sales Return' || vchType === 'Purchase Return';
-  const isAdjustment = vchType === 'Stock Adjustment';
 
   const filteredParties = useMemo(() => {
-    if (isAdjustment) return [];
-    const group = (vchType === 'Sales' || vchType === 'Delivery Note' || vchType === 'Sales Return') ? 'Sundry Debtors' : 'Sundry Creditors';
+    const group = isSales ? 'Sundry Debtors' : 'Sundry Creditors';
     return ledgers.filter(l => l.group === group);
-  }, [vchType, ledgers, isAdjustment]);
+  }, [isSales, ledgers]);
 
   const searchResults = useMemo(() => {
-    if (!query.trim()) return items.slice(0, 8);
     const term = query.toLowerCase();
     return items.filter(i => 
       i.name.toLowerCase().includes(term) || 
       i.hsnCode.includes(term) ||
       i.category.toLowerCase().includes(term)
-    );
+    ).slice(0, 8);
   }, [items, query]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
-        setSearchIdx(null);
-      }
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) setSearchIdx(null);
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -87,9 +77,9 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
       qty: 1,
       unit: 'Nos',
       rate: 0,
+      discountRate: 0,
+      discountAmount: 0,
       amount: 0,
-      cgstRate: 0,
-      sgstRate: 0,
       igstRate: 0,
       taxAmount: 0
     };
@@ -98,30 +88,11 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
     setQuery('');
   };
 
-  const addAdjustment = (label: string = '') => {
-    if (!isFinancial) return;
-    const newAdj: Adjustment = {
-      id: `adj-${Date.now()}`,
-      label,
-      type: 'Add',
-      amount: 0
-    };
-    setAdjustments(prev => [...prev, newAdj]);
-  };
-
-  const updateAdjustment = (id: string, field: keyof Adjustment, value: any) => {
-    setAdjustments(prev => prev.map(adj => adj.id === id ? { ...adj, [field]: value } : adj));
-  };
-
-  const removeAdjustment = (id: string) => setAdjustments(prev => prev.filter(a => a.id !== id));
-
   const selectItem = (idx: number, item: Item) => {
     setVchItems(prev => prev.map((vi, i) => {
       if (i === idx) {
         const fullRate = item.gstRate || 0;
-        const amount = vi.qty * item.salePrice;
-        let taxAmount = isFinancial ? amount * (fullRate / 100) : 0;
-
+        const gross = vi.qty * item.salePrice;
         return {
           ...vi,
           itemId: item.id,
@@ -129,11 +100,9 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
           hsn: item.hsnCode,
           rate: item.salePrice,
           unit: item.unit,
-          amount,
+          amount: gross,
           igstRate: fullRate,
-          cgstRate: supplyType === 'Local' ? fullRate / 2 : 0,
-          sgstRate: supplyType === 'Local' ? fullRate / 2 : 0,
-          taxAmount
+          taxAmount: gross * (fullRate / 100)
         };
       }
       return vi;
@@ -141,402 +110,246 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
     setSearchIdx(null);
   };
 
-  const updateItemQty = (id: string, qty: number) => {
+  const updateItemField = (id: string, field: keyof VoucherItem, value: any) => {
     setVchItems(prev => prev.map(item => {
       if (item.id === id) {
-        const amount = qty * item.rate;
-        const taxAmount = isFinancial ? amount * (item.igstRate || 0) / 100 : 0;
-        return { ...item, qty, amount, taxAmount };
+        let updated = { ...item, [field]: value };
+        
+        // Recalculate logic chain: Gross -> Discount -> Taxable -> Tax -> Net
+        const gross = updated.qty * updated.rate;
+        if (field === 'discountRate') {
+          updated.discountAmount = (gross * (updated.discountRate || 0)) / 100;
+        } else if (field === 'discountAmount') {
+          updated.discountRate = gross > 0 ? (updated.discountAmount! / gross) * 100 : 0;
+        }
+        
+        updated.amount = gross - (updated.discountAmount || 0);
+        if (isFinancial) {
+          updated.taxAmount = (updated.amount * (updated.igstRate || 0)) / 100;
+        }
+        
+        return updated;
       }
       return item;
     }));
   };
 
-  const removeItem = (id: string) => setVchItems(prev => prev.filter(i => i.id !== id));
-
   const totals = useMemo(() => {
-    const itemsSubTotal = vchItems.reduce((acc, i) => acc + i.amount, 0);
+    const subTotal = vchItems.reduce((acc, i) => acc + (i.qty * i.rate), 0);
+    const discTotal = vchItems.reduce((acc, i) => acc + (i.discountAmount || 0), 0);
+    const taxableTotal = vchItems.reduce((acc, i) => acc + i.amount, 0);
     const taxTotal = vchItems.reduce((acc, i) => acc + (i.taxAmount || 0), 0);
-    const netAfterTax = itemsSubTotal + taxTotal;
 
-    const adjustmentsTotal = adjustments.reduce((acc, a) => {
-      return a.type === 'Add' ? acc + a.amount : acc - a.amount;
-    }, 0);
+    const adjTotal = adjustments.reduce((acc, a) => a.type === 'Add' ? acc + a.amount : acc - a.amount, 0);
+    const grandTotal = taxableTotal + taxTotal + adjTotal;
 
-    const grandTotal = netAfterTax + adjustmentsTotal;
-
-    return { subTotal: itemsSubTotal, taxTotal, netAfterTax, adjustmentsTotal, grandTotal };
-  }, [vchItems, adjustments, isFinancial]);
-
-  const baseGrandTotal = totals.grandTotal * exchangeRate;
+    return { subTotal, discTotal, taxableTotal, taxTotal, grandTotal };
+  }, [vchItems, adjustments]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (isReadOnly || vchItems.length === 0 || (!partyId && !isAdjustment)) {
-      alert("Validation Error: Please ensure counterparty and items are valid.");
+    if (isReadOnly || vchItems.length === 0 || !partyId) {
+      alert("Verification Failed: Valid party and items required.");
       return;
     }
-    
-    const partyName = isAdjustment ? 'INTERNAL STOCK NODE' : ledgers.find(l => l.id === partyId)?.name || 'Unknown';
     
     onSubmit({
       type: vchType,
       date,
-      party: partyName,
+      party: ledgers.find(l => l.id === partyId)?.name || 'Unknown',
       amount: totals.grandTotal,
       currency,
       exchangeRate,
       reference,
-      sourceDocRef,
-      returnReason,
       narration,
       items: vchItems,
       adjustments: adjustments,
       subTotal: totals.subTotal,
+      discountTotal: totals.discTotal,
       taxTotal: totals.taxTotal,
-      supplyType,
-      gstClassification: (vchType === 'Sales' || vchType === 'Delivery Note' || vchType === 'Sales Return') ? 'Output' : 'Input'
+      supplyType
     });
   };
 
-  const themeConfig: Record<string, { color: string, label: string, icon: string }> = {
-    'Sales': { color: 'emerald', label: 'Sales Invoice', icon: '📤' },
-    'Purchase': { color: 'indigo', label: 'Purchase Bill', icon: '📥' },
-    'Sales Return': { color: 'rose', label: 'Sales Return (Credit Note)', icon: '♻️' },
-    'Purchase Return': { color: 'violet', label: 'Purchase Return (Debit Note)', icon: '🔙' },
-    'Purchase Order': { color: 'sky', label: 'Purchase Order', icon: '📝' },
-    'Delivery Note': { color: 'amber', label: 'Delivery Note', icon: '🚚' },
-    'Goods Receipt Note (GRN)': { color: 'blue', label: 'Receipt Note (GRN)', icon: '📦' },
-    'Stock Adjustment': { color: 'slate', label: 'Stock Adjustment', icon: '⚖️' }
-  };
-
-  const activeTheme = themeConfig[vchType] || themeConfig['Sales'];
+  const activeColor = isSales ? 'emerald' : 'indigo';
 
   return (
     <div className="bg-white rounded-[3.5rem] border border-slate-200 shadow-2xl overflow-hidden max-w-7xl mx-auto animate-in zoom-in-95 duration-300">
-      <div className={`px-10 py-12 bg-${activeTheme.color}-600 text-white flex justify-between items-center transition-all duration-700 relative overflow-hidden`}>
+      <div className={`px-10 py-12 bg-${activeColor}-600 text-white flex justify-between items-center relative overflow-hidden`}>
         <div className="flex items-center space-x-8 relative z-10">
-          <div className="w-20 h-20 bg-white/20 rounded-[2rem] flex items-center justify-center text-4xl border border-white/10 backdrop-blur-md shadow-2xl transform -rotate-6 group-hover:rotate-0 transition-transform">
-            {activeTheme.icon}
+          <div className="w-20 h-20 bg-white/20 rounded-[2rem] flex items-center justify-center text-4xl border border-white/10 backdrop-blur-md shadow-2xl transform -rotate-6">
+            {isSales ? '📤' : '📥'}
           </div>
           <div>
             <div className="flex items-center space-x-5">
-              <h3 className="text-4xl font-black uppercase italic tracking-tighter leading-none">{activeTheme.label}</h3>
+              <h3 className="text-4xl font-black uppercase italic tracking-tighter leading-none">{vchType} Protocol</h3>
               <div className="px-5 py-1.5 bg-black/20 rounded-xl border border-white/10 flex items-center space-x-3">
-                 <div className={`w-2 h-2 rounded-full bg-emerald-400 animate-pulse`}></div>
-                 <span className="text-[11px] font-black uppercase tracking-widest text-emerald-400">Node Seq: {nextIdPreview}</span>
+                 <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
+                 <span className="text-[11px] font-black uppercase tracking-widest text-emerald-400">NODE: {nextIdPreview}</span>
               </div>
             </div>
-            <p className="text-xs font-black uppercase tracking-[0.4em] opacity-70 mt-3 italic flex items-center">
-               <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
-               Sovereign Inventory Stream • Verified Protocol
-            </p>
+            <p className="text-xs font-black uppercase tracking-[0.4em] opacity-70 mt-3 italic">Inventory Lifecycle Hub</p>
           </div>
         </div>
         <div className="flex items-center space-x-6 relative z-10">
-           <div className="bg-white/10 p-4 rounded-3xl backdrop-blur-xl border border-white/10 flex items-center space-x-6">
+           <div className="bg-white/10 p-4 rounded-3xl backdrop-blur-xl border border-white/10 flex items-center space-x-6 text-white">
               <div className="space-y-1">
-                 <label className="text-[8px] font-black uppercase tracking-widest text-white/60">Currency</label>
-                 <select 
-                   value={currency} 
-                   onChange={e => setCurrency(e.target.value)}
-                   className="bg-transparent border-none text-sm font-black text-white outline-none cursor-pointer"
-                 >
+                 <label className="text-[8px] font-black uppercase text-white/60">Currency</label>
+                 <select value={currency} onChange={e => setCurrency(e.target.value)} className="bg-transparent border-none text-sm font-black outline-none">
                    {CURRENCIES.map(c => <option key={c.code} value={c.code} className="bg-slate-900">{c.code}</option>)}
                  </select>
               </div>
               {isForeignCurrency && (
                 <div className="space-y-1 border-l border-white/10 pl-6">
-                   <label className="text-[8px] font-black uppercase tracking-widest text-white/60">Exch Rate</label>
-                   <input 
-                     type="number" 
-                     step="0.0001"
-                     value={exchangeRate} 
-                     onChange={e => setExchangeRate(parseFloat(e.target.value) || 1)}
-                     className="bg-transparent border-none text-sm font-black text-white outline-none w-20"
-                   />
+                   <label className="text-[8px] font-black uppercase text-white/60">Exch Rate</label>
+                   <input type="number" step="0.0001" value={exchangeRate} onChange={e => setExchangeRate(parseFloat(e.target.value) || 1)} className="bg-transparent border-none text-sm font-black outline-none w-20" />
                 </div>
               )}
            </div>
-           {!isAdjustment && (
-             <div className="flex p-1.5 bg-black/20 rounded-2xl backdrop-blur-md border border-white/10 shadow-lg">
-                {(['Local', 'Central'] as const).map(s => (
-                  <button key={s} type="button" onClick={() => setSupplyType(s)} className={`px-6 py-2.5 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${supplyType === s ? 'bg-white text-indigo-600 shadow-xl scale-105' : 'text-white/60 hover:text-white'}`}>{s}</button>
-                ))}
-             </div>
-           )}
-           <button type="button" onClick={onCancel} className="p-4 hover:bg-white/10 rounded-full transition-all border border-white/10 group"><svg className="w-8 h-8 group-hover:rotate-90 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg></button>
         </div>
         <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-white rounded-full blur-[180px] opacity-10 -mr-64 -mt-64"></div>
       </div>
 
       <form onSubmit={handleSubmit} className="p-12 space-y-12">
-        <div className="flex bg-slate-100 p-2 rounded-[3rem] border border-slate-200 shadow-inner max-w-7xl mx-auto overflow-x-auto no-scrollbar">
-          {(Object.keys(themeConfig) as InvType[]).map(t => (
-            <button 
-              key={t} 
-              type="button" 
-              onClick={() => { setVchType(t); setPartyId(''); setVchItems([]); setAdjustments([]); }} 
-              className={`flex-1 min-w-[160px] py-4 text-[10px] font-black uppercase tracking-[0.2em] rounded-[2.5rem] transition-all ${vchType === t ? 'bg-white shadow-2xl text-indigo-600 scale-[1.02] border border-slate-100' : 'text-slate-400 hover:text-slate-600'}`}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
-
         <div className="grid grid-cols-1 md:grid-cols-4 gap-10 bg-slate-50 p-10 rounded-[3.5rem] border border-slate-100 shadow-inner">
           <div className="space-y-2">
-            <label className="text-[10px] font-black uppercase text-slate-400 ml-2 tracking-[0.2em]">Transaction Date</label>
+            <label className="text-[10px] font-black uppercase text-slate-400 ml-2 tracking-widest">Post Date</label>
             <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full px-7 py-4 rounded-2xl border border-slate-200 text-sm font-black bg-white outline-none focus:ring-8 focus:ring-indigo-500/5 shadow-sm" />
           </div>
-          
           <div className="md:col-span-2 space-y-2">
-            <label className="text-[10px] font-black uppercase text-slate-400 ml-2 tracking-[0.2em]">
-              {isAdjustment ? 'Adjustment Classification' : 'Authorized Party Node'}
-            </label>
-            {isAdjustment ? (
-              <div className="px-7 py-4 rounded-2xl border border-slate-200 bg-slate-200 text-sm font-black text-slate-500 italic shadow-inner">
-                 INTERNAL WAREHOUSE MOVEMENT
-              </div>
-            ) : (
-              <select value={partyId} onChange={e => setPartyId(e.target.value)} className="w-full px-7 py-4 rounded-2xl border border-slate-200 text-sm font-black text-indigo-600 bg-white outline-none focus:ring-8 focus:ring-indigo-500/5 shadow-sm appearance-none cursor-pointer">
-                <option value="">-- Choose Master Record --</option>
-                {filteredParties.map(p => <option key={p.id} value={p.id}>{p.name} [{p.group}]</option>)}
-              </select>
-            )}
+            <label className="text-[10px] font-black uppercase text-slate-400 ml-2 tracking-widest">Authorized Party Node</label>
+            <select value={partyId} onChange={e => setPartyId(e.target.value)} className="w-full px-7 py-4 rounded-2xl border border-slate-200 text-sm font-black text-indigo-600 bg-white outline-none focus:ring-8 focus:ring-indigo-500/5 shadow-sm">
+              <option value="">-- Choose Master Ledger --</option>
+              {filteredParties.map(p => <option key={p.id} value={p.id}>{p.name} [{p.group}]</option>)}
+            </select>
           </div>
-
           <div className="space-y-2">
-            <label className="text-[10px] font-black uppercase text-slate-400 ml-2 tracking-[0.2em]">External Ref Hash</label>
-            <input value={reference} onChange={e => setReference(e.target.value)} placeholder="e.g. GRN-922-A" className="w-full px-7 py-4 rounded-2xl border border-slate-200 text-sm font-black bg-white outline-none focus:ring-8 focus:ring-indigo-500/5 shadow-sm" />
+            <label className="text-[10px] font-black uppercase text-slate-400 ml-2 tracking-widest">Ref Document</label>
+            <input value={reference} onChange={e => setReference(e.target.value)} placeholder="PO / GRN Hash" className="w-full px-7 py-4 rounded-2xl border border-slate-200 text-sm font-black bg-white outline-none" />
           </div>
-
-          {isReturn && (
-            <>
-              <div className="md:col-span-2 space-y-2 animate-in slide-in-from-top-2">
-                <label className="text-[10px] font-black uppercase text-indigo-600 ml-2 tracking-[0.2em]">Source Document Ref (Original Invoice)</label>
-                <input value={sourceDocRef} onChange={e => setSourceDocRef(e.target.value)} placeholder="e.g. SL/23-24/0012" className="w-full px-7 py-4 rounded-2xl border border-indigo-200 bg-white text-sm font-black outline-none focus:ring-8 focus:ring-indigo-500/5 shadow-sm" />
-              </div>
-              <div className="md:col-span-2 space-y-2 animate-in slide-in-from-top-2">
-                <label className="text-[10px] font-black uppercase text-indigo-600 ml-2 tracking-[0.2em]">Statutory Return Reason</label>
-                <select value={returnReason} onChange={e => setReturnReason(e.target.value)} className="w-full px-7 py-4 rounded-2xl border border-indigo-200 bg-white text-sm font-black outline-none focus:ring-8 focus:ring-indigo-500/5 shadow-sm appearance-none cursor-pointer">
-                  <option value="">-- Choose Reason --</option>
-                  {RETURN_REASONS.map(r => <option key={r} value={r}>{r}</option>)}
-                </select>
-              </div>
-            </>
-          )}
         </div>
 
-        <div className="space-y-6">
-           <div className="flex items-center justify-between px-4">
-              <div className="flex items-center space-x-4">
-                <div className="w-2 h-8 bg-indigo-500 rounded-full"></div>
-                <h4 className="text-[13px] font-black uppercase tracking-[0.3em] text-slate-800 italic">I. Product Allocation Shards</h4>
-              </div>
-              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{vchItems.length} Data Points Staged</div>
-           </div>
-
-           <div className="bg-white rounded-[3.5rem] border border-slate-200 overflow-hidden shadow-2xl relative min-h-[300px]">
-              <table className="w-full text-left border-collapse">
-                <thead className="bg-slate-900 text-[10px] font-black uppercase text-slate-400 tracking-[0.2em]">
-                  <tr>
-                    <th className="px-10 py-7">Catalogue Item Descriptor</th>
-                    <th className="px-10 py-7 text-center w-32">Volume</th>
-                    {isFinancial && (
-                      <>
-                        <th className="px-10 py-7 text-right w-44">Unit Price ({currency})</th>
-                        <th className="px-10 py-7 text-center w-36">GST Analysis</th>
-                      </>
-                    )}
-                    <th className="px-10 py-7 text-right w-56">Resolved Value ({currency})</th>
-                    <th className="px-8 py-7 w-20"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50 bg-white">
-                  {vchItems.map((item, idx) => (
-                    <tr key={item.id} className="animate-in fade-in slide-in-from-left-4 duration-500 group hover:bg-slate-50/50 transition-colors">
-                      <td className="px-10 py-6 relative" ref={searchIdx === idx ? searchRef : null}>
-                          {searchIdx === idx ? (
-                            <div className="absolute top-2 left-6 z-50 w-[420px] bg-white rounded-[2rem] shadow-[0_30px_100px_-12px_rgba(0,0,0,0.25)] border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-200">
-                                <div className="p-5 border-b border-slate-100 bg-slate-50 flex items-center space-x-4">
-                                  <svg className="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-                                  <input autoFocus value={query} onChange={e => setQuery(e.target.value)} placeholder="Query Item, HSN or Category..." className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 text-xs font-black outline-none focus:ring-4 focus:ring-indigo-500/5 transition-all" />
-                                </div>
-                                <div className="max-h-80 overflow-y-auto custom-scrollbar">
-                                  {searchResults.map(res => (
-                                    <div key={res.id} onClick={() => selectItem(idx, res)} className="p-6 hover:bg-indigo-50 cursor-pointer flex items-center justify-between border-b border-slate-50 last:border-0 group/res">
-                                        <div className="flex items-center space-x-4">
-                                           <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-xs font-black text-slate-400 group-hover/res:bg-indigo-600 group-hover/res:text-white transition-all">{res.name.charAt(0)}</div>
-                                           <div>
-                                              <div className="text-[12px] font-black text-slate-800 uppercase tracking-tight italic group-hover/res:text-indigo-700 transition-colors">{res.name}</div>
-                                              <div className="flex items-center space-x-2 mt-1">
-                                                 <span className="text-[8px] font-black bg-slate-200 text-slate-500 px-1.5 py-0.5 rounded uppercase">HSN: {res.hsnCode}</span>
-                                                 <span className="text-[8px] font-black bg-indigo-50 text-indigo-500 px-1.5 py-0.5 rounded uppercase">{res.category}</span>
-                                              </div>
-                                           </div>
-                                        </div>
-                                        <div className="text-right">
-                                          <div className="text-[11px] font-black text-slate-900 tabular-nums">{currency} {res.salePrice.toLocaleString()}</div>
-                                          <div className="text-[8px] font-bold text-slate-300 uppercase tracking-widest mt-1">Base Price</div>
-                                        </div>
-                                    </div>
-                                  ))}
-                                </div>
-                            </div>
-                          ) : (
-                            <div onClick={() => setSearchIdx(idx)} className="cursor-pointer group/desc">
-                              <div className={`text-base font-black italic tracking-tighter uppercase underline decoration-transparent group-hover/desc:decoration-indigo-200 underline-offset-8 transition-all ${item.name ? 'text-slate-800' : 'text-slate-300'}`}>
-                                {item.name || '--- Locate Resource Node ---'}
+        <div className="bg-white rounded-[3.5rem] border border-slate-200 overflow-hidden shadow-2xl min-h-[300px]">
+          <table className="w-full text-left border-collapse">
+            <thead className="bg-slate-900 text-[9px] font-black uppercase text-slate-400 tracking-widest">
+              <tr>
+                <th className="px-8 py-7 w-64">Product Resource</th>
+                <th className="px-6 py-7 text-center w-24">Qty</th>
+                <th className="px-6 py-7 text-right w-32">Rate</th>
+                <th className="px-6 py-7 text-center w-24 bg-indigo-950/30">Disc%</th>
+                <th className="px-6 py-7 text-center w-24 bg-indigo-950/30">Tax%</th>
+                <th className="px-6 py-7 text-right w-44">Net Value ({currency})</th>
+                <th className="px-6 py-7 w-12"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50 bg-white">
+              {vchItems.map((item, idx) => {
+                const master = items.find(i => i.id === item.itemId);
+                const margin = master?.costPrice ? ((item.rate - master.costPrice) / item.rate) * 100 : null;
+                
+                return (
+                  <tr key={item.id} className="animate-in fade-in transition-colors group hover:bg-slate-50/50">
+                    <td className="px-8 py-6 relative" ref={searchIdx === idx ? searchRef : null}>
+                        {searchIdx === idx ? (
+                          <div className="absolute top-2 left-6 z-50 w-[460px] bg-white rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden">
+                              <div className="p-5 border-b border-slate-100 bg-slate-50 flex items-center space-x-4">
+                                <input autoFocus value={query} onChange={e => setQuery(e.target.value)} placeholder="Query Catalogue Registry..." className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-xs font-black outline-none" />
                               </div>
-                              {item.hsn && <div className="text-[9px] font-bold text-slate-400 uppercase mt-2 tracking-widest">HSN: {item.hsn} • {item.unit}</div>}
-                            </div>
-                          )}
-                      </td>
-                      <td className="px-10 py-6">
-                          <div className="flex flex-col items-center">
-                            <input type="number" value={item.qty} onChange={e => updateItemQty(item.id, parseFloat(e.target.value) || 0)} className="w-24 bg-slate-100 border border-slate-200 rounded-xl py-3 px-4 text-center text-sm font-black outline-none focus:ring-4 focus:ring-indigo-500/10 focus:bg-white transition-all shadow-inner" />
-                            <span className="text-[9px] font-black text-slate-300 uppercase mt-2 tracking-widest">{item.unit} Unit</span>
-                          </div>
-                      </td>
-                      {isFinancial && (
-                        <>
-                          <td className="px-10 py-6 text-right font-black text-slate-700 tabular-nums text-sm italic underline decoration-slate-100 underline-offset-4">{item.rate.toLocaleString()}</td>
-                          <td className="px-10 py-6 text-center">
-                              <div className="group/tax-tip relative">
-                                <span className={`px-3 py-1.5 rounded-xl text-[10px] font-black border shadow-sm cursor-help ${supplyType === 'Local' ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
-                                   {item.igstRate}%
-                                </span>
-                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-40 p-3 bg-slate-900 text-white rounded-xl shadow-2xl opacity-0 invisible group-hover/tax-tip:opacity-100 group-hover/tax-tip:visible transition-all z-50">
-                                   <div className="text-[8px] font-black uppercase text-indigo-400 mb-2 border-b border-white/10 pb-1">Tax Breakdown</div>
-                                   {supplyType === 'Local' ? (
-                                      <div className="space-y-1">
-                                         <div className="flex justify-between text-[9px]"><span>CGST @ {item.cgstRate}%</span><span>{item.taxAmount! / 2}</span></div>
-                                         <div className="flex justify-between text-[9px]"><span>SGST @ {item.sgstRate}%</span><span>{item.taxAmount! / 2}</span></div>
+                              <div className="max-h-80 overflow-y-auto custom-scrollbar">
+                                {searchResults.map(res => (
+                                  <div key={res.id} onClick={() => selectItem(idx, res)} className="p-6 hover:bg-indigo-50 cursor-pointer flex items-center justify-between border-b border-slate-50 group/res">
+                                      <div className="flex items-center space-x-4">
+                                         <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center text-lg shadow-sm group-hover/res:bg-indigo-600 group-hover/res:text-white transition-all">{res.name.charAt(0)}</div>
+                                         <div>
+                                            <div className="text-xs font-black text-slate-800 uppercase italic group-hover/res:text-indigo-700">{res.name}</div>
+                                            <div className="flex items-center space-x-3 mt-1.5">
+                                               <span className="text-[8px] font-black bg-slate-200 text-slate-500 px-1.5 py-0.5 rounded uppercase">SOH: {res.currentStock || 0} {res.unit}</span>
+                                               <span className="text-[8px] font-black text-indigo-400 uppercase italic">{res.category}</span>
+                                            </div>
+                                         </div>
                                       </div>
-                                   ) : (
-                                      <div className="flex justify-between text-[9px]"><span>IGST @ {item.igstRate}%</span><span>{item.taxAmount}</span></div>
-                                   )}
-                                   <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-4 border-l-transparent border-r-4 border-r-transparent border-t-4 border-t-slate-900"></div>
-                                </div>
+                                      <span className="text-sm font-black text-slate-900">${res.salePrice.toLocaleString()}</span>
+                                  </div>
+                                ))}
                               </div>
-                          </td>
-                        </>
-                      )}
-                      <td className="px-10 py-6 text-right">
-                          <div className="text-lg font-black text-slate-900 tabular-nums italic tracking-tighter">
-                            {(isFinancial ? (item.amount + (item.taxAmount || 0)) : item.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                           </div>
-                          {isFinancial && <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Net Valuation</div>}
-                      </td>
-                      <td className="px-8 py-6 text-center">
-                          <button type="button" onClick={() => removeItem(item.id)} className="text-slate-200 hover:text-rose-600 transition-all p-3 rounded-2xl hover:bg-rose-50 transform hover:scale-110"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <button type="button" onClick={addItem} className="w-full py-6 bg-slate-50 text-[11px] font-black uppercase text-indigo-600 hover:bg-indigo-600 hover:text-white transition-all border-t border-slate-100 tracking-[0.4em] shadow-inner">+ APPEND PRODUCT SHARD</button>
-           </div>
+                        ) : (
+                          <div onClick={() => setSearchIdx(idx)} className="cursor-pointer">
+                            <div className={`text-base font-black italic tracking-tighter uppercase ${item.name ? 'text-slate-800' : 'text-slate-300'}`}>
+                              {item.name || '--- Locate Resource Node ---'}
+                            </div>
+                            {master && (
+                              <div className="flex items-center space-x-3 mt-1.5">
+                                <span className="text-[9px] font-black text-slate-400 uppercase">SOH: {master.currentStock || 0} {item.unit}</span>
+                                {isSales && margin !== null && (
+                                  <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full ${margin > 20 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                                    Margin: {margin.toFixed(1)}%
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                    </td>
+                    <td className="px-6 py-6">
+                      <input type="number" value={item.qty} onChange={e => updateItemField(item.id, 'qty', parseFloat(e.target.value) || 0)} className="w-20 bg-slate-100 border border-slate-200 rounded-xl py-3 px-2 text-center text-sm font-black outline-none focus:bg-white" />
+                      <div className="text-center text-[8px] font-black text-slate-300 uppercase mt-2">{item.unit}</div>
+                    </td>
+                    <td className="px-6 py-6 text-right">
+                       <input type="number" value={item.rate} onChange={e => updateItemField(item.id, 'rate', parseFloat(e.target.value) || 0)} className="w-28 bg-slate-100 border border-slate-200 rounded-xl py-3 px-4 text-right text-sm font-black outline-none focus:bg-white" />
+                    </td>
+                    <td className="px-6 py-6 bg-indigo-50/20 text-center">
+                       <input type="number" step="0.01" value={item.discountRate || ''} onChange={e => updateItemField(item.id, 'discountRate', parseFloat(e.target.value) || 0)} className="w-16 bg-white border border-indigo-200 rounded-xl py-3 text-center text-xs font-black text-indigo-500 outline-none" placeholder="0%" />
+                    </td>
+                    <td className="px-6 py-6 bg-indigo-50/20 text-center">
+                       <input type="number" value={item.igstRate} onChange={e => updateItemField(item.id, 'igstRate', parseFloat(e.target.value) || 0)} className="w-16 bg-white border border-indigo-200 rounded-xl py-3 text-center text-xs font-black text-indigo-500 outline-none" />
+                    </td>
+                    <td className="px-6 py-6 text-right">
+                        <div className="text-lg font-black text-slate-900 tabular-nums italic">
+                          {(item.amount + (item.taxAmount || 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        </div>
+                        <div className="text-[8px] font-black text-slate-400 uppercase tracking-tighter">Tax: ${item.taxAmount?.toFixed(2)}</div>
+                    </td>
+                    <td className="px-6 py-6 text-center">
+                        <button type="button" onClick={() => setVchItems(prev => prev.filter(i => i.id !== item.id))} className="text-slate-200 hover:text-rose-600 transition-all"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          <button type="button" onClick={addItem} className="w-full py-6 bg-slate-50 text-[10px] font-black uppercase text-indigo-600 hover:bg-indigo-600 hover:text-white transition-all border-t border-slate-100 tracking-[0.4em] shadow-inner">+ Append Product Shard</button>
         </div>
-
-        {isFinancial && (
-          <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
-            <div className="flex items-center space-x-4 px-4">
-              <div className="w-2 h-8 bg-emerald-500 rounded-full"></div>
-              <h4 className="text-[13px] font-black uppercase tracking-[0.3em] text-slate-800 italic">II. Fiscal Adjustments (Post-Tax)</h4>
-            </div>
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-10">
-                <div className="bg-slate-50 rounded-[3rem] border border-slate-200 overflow-hidden shadow-inner">
-                    <table className="w-full text-left">
-                       <thead className="bg-slate-100 text-[10px] font-black uppercase text-slate-500 tracking-widest">
-                          <tr>
-                             <th className="px-10 py-5">Adjustment Node</th>
-                             <th className="px-10 py-5 text-center">Protocol</th>
-                             <th className="px-10 py-5 text-right">Value ({currency})</th>
-                             <th className="px-10 py-5"></th>
-                          </tr>
-                       </thead>
-                       <tbody className="divide-y divide-slate-200">
-                          {adjustments.map(adj => (
-                            <tr key={adj.id} className="animate-in fade-in duration-300 group">
-                               <td className="px-10 py-5">
-                                  <input 
-                                    value={adj.label} 
-                                    onChange={e => updateAdjustment(adj.id, 'label', e.target.value)} 
-                                    placeholder="Adjustment Ledger..." 
-                                    className="bg-transparent border-none text-[12px] font-black text-slate-800 italic uppercase outline-none w-full group-hover:bg-white transition-colors" 
-                                  />
-                               </td>
-                               <td className="px-10 py-5 text-center">
-                                  <button 
-                                    type="button" 
-                                    onClick={() => updateAdjustment(adj.id, 'type', adj.type === 'Add' ? 'Less' : 'Add')}
-                                    className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-tighter transition-all shadow-md ${adj.type === 'Add' ? 'bg-emerald-600 text-white shadow-emerald-900/20' : 'bg-rose-600 text-white shadow-rose-900/20'}`}
-                                  >
-                                    {adj.type === 'Add' ? 'Add (+)' : 'Less (-)'}
-                                  </button>
-                               </td>
-                               <td className="px-10 py-5 text-right">
-                                  <input 
-                                    type="number" 
-                                    value={adj.amount || ''} 
-                                    onChange={e => updateAdjustment(adj.id, 'amount', parseFloat(e.target.value) || 0)} 
-                                    className="bg-transparent border-none text-[12px] font-black text-slate-900 text-right outline-none w-32 tabular-nums group-hover:bg-white transition-colors" 
-                                  />
-                               </td>
-                               <td className="px-10 py-5 text-center">
-                                  <button type="button" onClick={() => removeAdjustment(adj.id)} className="text-slate-300 hover:text-rose-600 transition-all transform hover:scale-125"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
-                               </td>
-                            </tr>
-                          ))}
-                       </tbody>
-                    </table>
-                    <button type="button" onClick={() => addAdjustment()} className="w-full py-5 bg-white/50 text-[10px] font-black uppercase text-indigo-500 hover:bg-white hover:text-indigo-600 transition-all border-t border-slate-200 tracking-[0.4em] shadow-inner">+ CUSTOM FISCAL OVERRIDE</button>
-                </div>
-
-                <div className="bg-white rounded-[3rem] p-10 border border-slate-200 shadow-sm relative overflow-hidden group/presets">
-                   <h5 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 mb-8 flex items-center">
-                      <svg className="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                      Institutional Preset Blocks
-                   </h5>
-                   <div className="flex flex-wrap gap-4 relative z-10">
-                      {COMMON_ADJUSTMENTS.map(label => (
-                         <button key={label} type="button" onClick={() => addAdjustment(label)} className="px-6 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-[10px] font-black uppercase text-slate-500 hover:border-indigo-500 hover:text-indigo-600 hover:shadow-2xl transition-all active:scale-95 shadow-sm transform hover:-translate-y-0.5">{label}</button>
-                      ))}
-                   </div>
-                </div>
-            </div>
-          </div>
-        )}
 
         <div className="flex flex-col xl:flex-row gap-12 pt-8 border-t border-slate-100">
            <div className="flex-1 space-y-4">
               <label className="text-[11px] font-black uppercase text-slate-400 ml-4 tracking-[0.4em]">Audit Narrative & Context</label>
-              <textarea value={narration} onChange={e => setNarration(e.target.value)} placeholder="Record organizational context for this movement..." className="w-full h-48 px-10 py-8 rounded-[3.5rem] border border-slate-200 bg-slate-50/50 text-sm font-medium resize-none shadow-inner outline-none focus:ring-8 focus:ring-indigo-500/5 italic leading-relaxed" />
+              <textarea value={narration} onChange={e => setNarration(e.target.value)} placeholder="Record organizational context for this resource movement..." className="w-full h-48 px-10 py-8 rounded-[3.5rem] border border-slate-200 bg-slate-50/50 text-sm font-medium resize-none shadow-inner outline-none focus:ring-8 focus:ring-indigo-500/5 italic leading-relaxed" />
            </div>
            
            <div className="w-full xl:w-[460px] space-y-8">
-              <div className="bg-slate-900 rounded-[3.5rem] p-12 text-white space-y-6 shadow-[0_40px_80px_-20px_rgba(0,0,0,0.4)] relative overflow-hidden border-b-8 border-indigo-600">
-                 <div className="relative z-10 space-y-6">
-                    <div className="flex justify-between items-center text-[12px] font-black uppercase text-slate-500 tracking-widest">
-                       <span>Combined Ledger Value</span>
-                       <span className="text-white tabular-nums">{currency} {totals.grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+              <div className="bg-slate-900 rounded-[3.5rem] p-12 text-white space-y-6 shadow-2xl relative overflow-hidden border-b-8 border-indigo-600">
+                 <div className="relative z-10 space-y-5">
+                    <div className="flex justify-between items-center text-[10px] font-black uppercase text-slate-500 tracking-widest">
+                       <span>Gross Value</span>
+                       <span className="text-white tabular-nums">{currency} {totals.subTotal.toLocaleString()}</span>
                     </div>
-
-                    {isForeignCurrency && (
-                      <div className="pt-6 border-t border-white/5 flex justify-between items-center text-[12px] font-black uppercase text-indigo-400 tracking-widest">
-                         <span>Local Anchor equivalent</span>
-                         <span className="text-indigo-200 tabular-nums">{baseCurrencyCode} {baseGrandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                    {totals.discTotal > 0 && (
+                      <div className="flex justify-between items-center text-[10px] font-black uppercase text-rose-400 tracking-widest">
+                         <span>Volume Discount</span>
+                         <span className="tabular-nums">- {currency} {totals.discTotal.toLocaleString()}</span>
                       </div>
                     )}
-                    
-                    <div className="pt-12 border-t border-slate-800 flex justify-between items-end">
+                    <div className="flex justify-between items-center text-[10px] font-black uppercase text-indigo-400 tracking-widest border-t border-white/5 pt-4">
+                       <span>Resolved Tax Component</span>
+                       <span className="text-white tabular-nums">{currency} {totals.taxTotal.toLocaleString()}</span>
+                    </div>
+                    <div className="pt-10 flex justify-between items-end border-t border-slate-800">
                        <div className="flex flex-col">
                           <span className="text-[11px] font-black uppercase italic text-indigo-500 tracking-[0.5em] mb-2">Grand Total</span>
-                          <span className="text-[8px] font-bold text-slate-600 uppercase tracking-widest">({currency})</span>
+                          <span className="text-[8px] font-bold text-slate-600 uppercase tracking-widest">Base Eq: {baseCurrencyCode} {(totals.grandTotal * exchangeRate).toLocaleString()}</span>
                        </div>
-                       <span className="text-6xl font-black tracking-tighter italic tabular-nums text-white drop-shadow-2xl">{currency} {totals.grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                       <span className="text-6xl font-black tracking-tighter italic tabular-nums text-white">{currency} {totals.grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                     </div>
                  </div>
                  <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-indigo-600 rounded-full blur-[200px] opacity-10 -mr-64 -mt-64 pointer-events-none"></div>
@@ -544,10 +357,10 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
               
               <button 
                 type="submit" 
-                disabled={isReadOnly || vchItems.length === 0 || (!partyId && !isAdjustment)} 
-                className={`w-full py-8 rounded-[2.5rem] font-black text-xs uppercase tracking-[0.4em] shadow-2xl transition-all transform active:scale-95 border-b-8 border-slate-950 ${isReadOnly ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none border-none' : 'bg-slate-900 text-white hover:bg-black group'}`}
+                disabled={isReadOnly || vchItems.length === 0 || !partyId} 
+                className={`w-full py-8 rounded-[2.5rem] font-black text-xs uppercase tracking-[0.4em] shadow-2xl transition-all transform active:scale-95 border-b-8 border-slate-950 ${isReadOnly ? 'bg-slate-200 text-slate-400 cursor-not-allowed border-none' : 'bg-slate-900 text-white hover:bg-black group'}`}
               >
-                 <span className="group-hover:scale-110 transition-transform block">Authorize Resource Transmission</span>
+                 Authorize Resource Transmission
               </button>
            </div>
         </div>
