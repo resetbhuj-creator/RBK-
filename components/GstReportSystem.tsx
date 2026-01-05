@@ -101,7 +101,6 @@ const GstReportSystem: React.FC<GstReportSystemProps> = ({ vouchers, activeCompa
   }, [reportData]);
 
   const slabChartData = useMemo(() => {
-    // Fix: Cast Object.entries to [string, any][] to avoid 'unknown' type error on 'vals' property access
     return (Object.entries(reportData.rateBreakdown) as [string, any][]).map(([rate, vals]) => ({
       name: `${rate}%`,
       value: vals.taxable
@@ -160,7 +159,6 @@ const GstReportSystem: React.FC<GstReportSystemProps> = ({ vouchers, activeCompa
 
   return (
     <div className="space-y-10 animate-in fade-in duration-500 max-w-7xl mx-auto pb-20">
-      {/* Dynamic Header */}
       <div className="bg-slate-950 rounded-[3.5rem] p-12 text-white relative overflow-hidden shadow-2xl border-b-8 border-indigo-600">
          <div className="relative z-10 flex flex-col xl:flex-row xl:items-center justify-between gap-12">
             <div>
@@ -202,18 +200,16 @@ const GstReportSystem: React.FC<GstReportSystemProps> = ({ vouchers, activeCompa
                </div>
             </div>
          </div>
-         <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-indigo-600 rounded-full blur-[150px] opacity-10 -mr-64 -mt-64 pointer-events-none"></div>
+         <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-indigo-600 rounded-full blur-[150px] opacity-10 -mr-64 -mt-64 pointer-events-none group-hover:opacity-20 transition-opacity"></div>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
-         {/* Main Summary Cards */}
          <div className="xl:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-6">
             <SummaryCard label="ITC Available" value={reportData.itcAvailable} sub="Verified Inward Supply" color="text-emerald-600" icon="📥" />
             <SummaryCard label="Output Liability" value={reportData.cgst + reportData.sgst + reportData.igst} sub="Verified Outward Supply" color="text-indigo-600" icon="📤" />
             <SummaryCard label="Net Settlement" value={reportData.netPayable} sub="CASH LEDGER IMPACT" color={reportData.netPayable >= 0 ? "text-rose-600" : "text-emerald-600"} icon="🏛️" />
          </div>
 
-         {/* Compliance Health Widget */}
          <div className="bg-white rounded-[2.5rem] p-8 border border-slate-200 shadow-sm space-y-6">
             <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em]">Filing Status</h4>
             <div className="space-y-4">
@@ -233,7 +229,6 @@ const GstReportSystem: React.FC<GstReportSystemProps> = ({ vouchers, activeCompa
          </div>
       </div>
 
-      {/* Analytics Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
          <div className="bg-white rounded-[3rem] p-10 border border-slate-200 shadow-sm h-[400px] flex flex-col">
             <h4 className="text-[11px] font-black uppercase text-slate-400 tracking-[0.3em] mb-10 flex items-center">
@@ -288,7 +283,6 @@ const GstReportSystem: React.FC<GstReportSystemProps> = ({ vouchers, activeCompa
          ))}
       </div>
 
-      {/* Report Content */}
       <main className="animate-in fade-in duration-500">
         {activeReport === 'GSTR-3B' && (
               <div className="bg-white rounded-[4rem] border border-slate-200 shadow-sm overflow-hidden">
@@ -444,7 +438,6 @@ const GstReportSystem: React.FC<GstReportSystemProps> = ({ vouchers, activeCompa
         )}
       </main>
 
-      {/* Integrated Compliance Advisory */}
       <div className="p-12 bg-slate-900 border-4 border-slate-800 rounded-[3.5rem] flex flex-col md:flex-row items-center gap-12 shadow-2xl relative overflow-hidden group">
          <div className="w-24 h-24 bg-indigo-600 rounded-3xl flex items-center justify-center text-4xl shadow-2xl shadow-indigo-900/40 shrink-0 transform -rotate-6 transition-transform group-hover:rotate-0 border-4 border-indigo-400/20 z-10">🛡️</div>
          <div className="space-y-4 relative z-10">

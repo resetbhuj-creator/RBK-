@@ -1,5 +1,6 @@
+
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Item, Ledger, Voucher, VoucherItem, Adjustment, VoucherType, Batch } from '../types';
+import { Item, Ledger, Voucher, VoucherItem, Adjustment, VoucherType, Batch, Attachment } from '../types';
 import { UNIT_MEASURES } from '../constants';
 
 interface InventoryVoucherFormProps {
@@ -23,6 +24,34 @@ const CURRENCIES = [
   { code: 'JPY', symbol: '¥', name: 'Japanese Yen' }
 ];
 
+const NARRATION_TEMPLATES: Record<string, string[]> = {
+  'Sales': [
+    "Being goods sold on credit against authorized purchase order.",
+    "Being outward supply of inventory nodes to registered counterparty.",
+    "Being bulk sales transmission finalized."
+  ],
+  'Purchase': [
+    "Being inventory shards acquired from registered supplier node.",
+    "Being inward supply of raw materials for production queue.",
+    "Being authorized procurement committed to stock ledger."
+  ],
+  'Delivery Note': [
+    "Being goods dispatched to client node pending invoice generation.",
+    "Being partial shipment of order cluster.",
+    "Being inventory released from storage vault."
+  ],
+  'Goods Receipt Note (GRN)': [
+    "Being inspection and receipt of goods into storage hub.",
+    "Being verification of inward supply shards from vendor.",
+    "Being materials accepted for quality control protocols."
+  ],
+  'Stock Adjustment': [
+    "Being correction passed for physical inventory variance.",
+    "Being adjustment for damaged or expired inventory shards.",
+    "Being internal re-calibration of asset nodes."
+  ]
+};
+
 const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly, items, batches, ledgers, onSubmit, onCancel, getNextId, activeCompany }) => {
   const [vchType, setVchType] = useState<InvType>('Sales');
   const [supplyType, setSupplyType] = useState<'Local' | 'Central'>('Local');
@@ -30,8 +59,10 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
   const [partyId, setPartyId] = useState('');
   const [reference, setReference] = useState('');
   const [narration, setNarration] = useState('');
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [vchItems, setVchItems] = useState<VoucherItem[]>([]);
   const [adjustments, setAdjustments] = useState<Adjustment[]>([]);
+  const [showTemplates, setShowTemplates] = useState(false);
   
   const [currency, setCurrency] = useState(activeCompany?.currencyConfig?.code || 'USD');
   const [exchangeRate, setExchangeRate] = useState(1);
@@ -40,12 +71,26 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
   const [query, setQuery] = useState('');
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
   const searchRef = useRef<HTMLTableDataCellElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const baseCurrencyCode = activeCompany?.currencyConfig?.code || 'USD';
-
   const nextIdPreview = useMemo(() => getNextId(vchType), [vchType, getNextId]);
-
   const isFinancial = ['Sales', 'Purchase', 'Purchase Order', 'Sales Return', 'Purchase Return'].includes(vchType);
+
+  useEffect(() => {
+    setVchItems(prev => prev.map(item => {
+      if (!isFinancial) return item;
+      const rate = item.igstRate || 0;
+      const taxAmt = (item.amount * rate) / 100;
+      return {
+        ...item,
+        taxAmount: taxAmt,
+        cgstRate: supplyType === 'Local' ? rate / 2 : 0,
+        sgstRate: supplyType === 'Local' ? rate / 2 : 0,
+        igstRate: rate
+      };
+    }));
+  }, [supplyType, isFinancial]);
 
   const filteredParties = useMemo(() => {
     const isSalesMode = vchType === 'Sales' || vchType === 'Sales Return' || vchType === 'Delivery Note' || vchType === 'Purchase Order';
@@ -69,6 +114,25 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    // Fix: Explicitly type 'file' as 'File' to resolve 'unknown' type errors for name, type, size, and Blob usage
+    Array.from(files).forEach((file: File) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setAttachments(prev => [...prev, {
+          id: `att-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+          name: file.name,
+          type: file.type,
+          size: file.size,
+          data: reader.result as string
+        }]);
+      };
+      reader.readAsDataURL(file);
+    });
+  };
 
   const addItem = () => {
     const newItem: VoucherItem = {
@@ -98,6 +162,7 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
       if (i === idx) {
         const fullRate = item.gstRate || 0;
         const gross = vi.qty * item.salePrice;
+        const taxAmt = (gross * fullRate) / 100;
         return {
           ...vi,
           itemId: item.id,
@@ -107,7 +172,9 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
           unit: item.unit,
           amount: gross,
           igstRate: fullRate,
-          taxAmount: gross * (fullRate / 100),
+          taxAmount: taxAmt,
+          cgstRate: supplyType === 'Local' ? fullRate / 2 : 0,
+          sgstRate: supplyType === 'Local' ? fullRate / 2 : 0,
           batchNo: ''
         };
       }
@@ -130,14 +197,10 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
         
         updated.amount = gross - (updated.discountAmount || 0);
         if (isFinancial) {
-          updated.taxAmount = (updated.amount * (updated.igstRate || 0)) / 100;
-          if (supplyType === 'Local') {
-            updated.cgstRate = (updated.igstRate || 0) / 2;
-            updated.sgstRate = (updated.igstRate || 0) / 2;
-          } else {
-            updated.cgstRate = 0;
-            updated.sgstRate = 0;
-          }
+          const rate = updated.igstRate || 0;
+          updated.taxAmount = (updated.amount * rate) / 100;
+          updated.cgst = supplyType === 'Local' ? rate / 2 : 0;
+          updated.sgst = supplyType === 'Local' ? rate / 2 : 0;
         }
         
         return updated;
@@ -151,10 +214,8 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
     const discTotal = vchItems.reduce((acc, i) => acc + (i.discountAmount || 0), 0);
     const taxableTotal = vchItems.reduce((acc, i) => acc + i.amount, 0);
     const taxTotal = vchItems.reduce((acc, i) => acc + (i.taxAmount || 0), 0);
-
     const adjTotal = adjustments.reduce((acc, a) => a.type === 'Add' ? acc + a.amount : acc - a.amount, 0);
     const grandTotal = taxableTotal + taxTotal + adjTotal;
-
     return { subTotal, discTotal, taxableTotal, taxTotal, grandTotal };
   }, [vchItems, adjustments]);
 
@@ -176,10 +237,12 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
       narration,
       items: vchItems,
       adjustments: adjustments,
+      attachments,
       subTotal: totals.subTotal,
       discountTotal: totals.discTotal,
       taxTotal: totals.taxTotal,
-      supplyType
+      supplyType,
+      gstClassification: vchType.includes('Sales') ? 'Output' : 'Input'
     });
   };
 
@@ -208,21 +271,6 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
             </div>
             <p className="text-xs font-black uppercase tracking-[0.4em] opacity-70 mt-3 italic">Inventory Lifecycle Hub • Multi-Currency Active</p>
           </div>
-        </div>
-        <div className="flex items-center space-x-6 relative z-10">
-           <div className="bg-white/10 p-4 rounded-3xl backdrop-blur-xl border border-white/10 flex items-center space-x-6 text-white text-right">
-              <div className="space-y-1">
-                 <label className="text-[8px] font-black uppercase text-white/60">Voucher Base</label>
-                 <select value={currency} onChange={e => setCurrency(e.target.value)} className="bg-transparent border-none text-sm font-black outline-none text-right">
-                   {CURRENCIES.map(c => <option key={c.code} value={c.code} className="bg-slate-900">{c.code}</option>)}
-                 </select>
-              </div>
-              <div className="h-8 w-px bg-white/10"></div>
-              <div className="space-y-1">
-                 <label className="text-[8px] font-black uppercase text-white/60">Global Rate</label>
-                 <input type="number" step="0.0001" value={exchangeRate} onChange={e => setExchangeRate(parseFloat(e.target.value) || 1)} className="bg-black/20 border border-white/10 rounded-lg px-2 py-0.5 text-xs font-black text-white outline-none w-24 text-right" />
-              </div>
-           </div>
         </div>
         <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-white rounded-full blur-[180px] opacity-10 -mr-64 -mt-64"></div>
       </div>
@@ -270,7 +318,6 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
                 const master = items.find(i => i.id === item.itemId);
                 const itemBatches = batches.filter(b => b.itemId === item.itemId);
                 const isExpanded = expandedItemId === item.id;
-                
                 return (
                   <React.Fragment key={item.id}>
                     <tr className={`animate-in fade-in transition-all group ${isExpanded ? 'bg-indigo-50/20' : 'hover:bg-slate-50/50'}`}>
@@ -347,58 +394,9 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
                          </button>
                       </td>
                       <td className="px-6 py-6 text-center">
-                          <button type="button" onClick={() => setVchItems(prev => prev.filter(i => i.id !== item.id))} className="text-slate-200 hover:text-rose-600 transition-all active:scale-90"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                          <button type="button" onClick={() => setVchItems(prev => prev.filter(i => i.id !== item.id))} className="text-slate-200 hover:text-rose-600 transition-all active:scale-95"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
                       </td>
                     </tr>
-
-                    {isExpanded && (
-                      <tr className="bg-indigo-50/20 animate-in slide-in-from-top-2 duration-300">
-                        <td colSpan={9} className="px-24 py-10 border-b border-indigo-100 shadow-inner">
-                           <div className="grid grid-cols-1 lg:grid-cols-2 gap-20">
-                              <div className="space-y-6">
-                                 <h5 className="text-[10px] font-black uppercase text-indigo-600 tracking-widest border-b border-indigo-100 pb-3 flex items-center"><div className="w-1 h-3 bg-indigo-500 rounded-full mr-2"></div> Statutory Tax Decomposition</h5>
-                                 <div className="grid grid-cols-3 gap-6 bg-white p-8 rounded-[2.5rem] border border-indigo-100 shadow-sm">
-                                    <div className="space-y-1">
-                                       <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">CGST ({item.cgstRate || 0}%)</span>
-                                       <div className="text-sm font-black text-slate-800">${((item.taxAmount || 0)/2).toLocaleString()}</div>
-                                    </div>
-                                    <div className="space-y-1">
-                                       <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">SGST ({item.sgstRate || 0}%)</span>
-                                       <div className="text-sm font-black text-slate-800">${((item.taxAmount || 0)/2).toLocaleString()}</div>
-                                    </div>
-                                    <div className="space-y-1">
-                                       <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">IGST ({item.igstRate || 0}%)</span>
-                                       <div className="text-sm font-black text-indigo-600">${(item.taxAmount || 0).toLocaleString()}</div>
-                                    </div>
-                                 </div>
-                              </div>
-                              <div className="space-y-6">
-                                 <h5 className="text-[10px] font-black uppercase text-emerald-600 tracking-widest border-b border-emerald-100 pb-3 flex items-center"><div className="w-1 h-3 bg-emerald-500 rounded-full mr-2"></div> Line Currency Override</h5>
-                                 <div className="bg-white p-8 rounded-[2.5rem] border border-emerald-100 shadow-sm flex items-center justify-between">
-                                    <div className="space-y-4 flex-1">
-                                       <div className="space-y-1">
-                                          <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Currency</label>
-                                          <select value={item.currency || currency} onChange={e => updateItemField(item.id, 'currency', e.target.value)} className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2 text-xs font-black outline-none">
-                                             {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.code}</option>)}
-                                          </select>
-                                       </div>
-                                    </div>
-                                    <div className="space-y-4 flex-1 px-8">
-                                       <div className="space-y-1">
-                                          <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Override Rate</label>
-                                          <input type="number" step="0.0001" value={item.exchangeRate || 1} onChange={e => updateItemField(item.id, 'exchangeRate', parseFloat(e.target.value) || 1)} className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2 text-xs font-black outline-none" />
-                                       </div>
-                                    </div>
-                                    <div className="text-right">
-                                       <div className="text-[8px] font-black text-slate-300 uppercase mb-1">Shard Equivalent</div>
-                                       <div className="text-xl font-black text-emerald-900 tabular-nums italic">${(item.amount * (item.exchangeRate || 1)).toLocaleString()}</div>
-                                    </div>
-                                 </div>
-                              </div>
-                           </div>
-                        </td>
-                      </tr>
-                    )}
                   </React.Fragment>
                 );
               })}
@@ -409,13 +407,60 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
           </button>
         </div>
 
-        <div className="flex flex-col xl:flex-row gap-16 pt-10 border-t border-slate-100">
-           <div className="flex-1 space-y-6">
-              <label className="text-[11px] font-black uppercase text-slate-400 ml-4 tracking-[0.5em]">Audit Narrative & Business Rationale</label>
-              <textarea value={narration} onChange={e => setNarration(e.target.value)} placeholder="Provide forensic context for this inventory state shift. State movement rationale and reference secondary documentation hash..." className="w-full h-56 px-10 py-10 rounded-[3.5rem] border border-slate-200 bg-slate-50/50 text-sm font-medium resize-none shadow-inner outline-none focus:ring-8 focus:ring-indigo-500/5 focus:bg-white italic leading-relaxed transition-all" />
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-16 pt-10 border-t border-slate-100">
+           <div className="space-y-12">
+              {/* Narration Section */}
+              <div className="space-y-6">
+                <div className="flex items-center justify-between px-4">
+                   <label className="text-[11px] font-black uppercase text-slate-400 tracking-[0.5em]">Audit Narrative & Rationale</label>
+                   <button type="button" onClick={() => setShowTemplates(!showTemplates)} className="text-[9px] font-black text-indigo-600 uppercase tracking-widest hover:underline">Narrative Blueprints</button>
+                </div>
+                {showTemplates && (
+                  <div className="grid grid-cols-1 gap-2 p-4 bg-white rounded-[2rem] border border-slate-200 shadow-inner mb-4">
+                     {NARRATION_TEMPLATES[vchType]?.map((temp, i) => (
+                       <button key={i} type="button" onClick={() => { setNarration(temp); setShowTemplates(false); }} className="text-left p-3 hover:bg-indigo-50 rounded-xl text-[10px] font-bold text-slate-600 transition-colors">"{temp}"</button>
+                     ))}
+                  </div>
+                )}
+                <textarea 
+                  value={narration} 
+                  onChange={e => setNarration(e.target.value)} 
+                  placeholder="State the rationale for this inventory shift..." 
+                  className="w-full h-48 px-10 py-10 rounded-[3rem] border border-slate-200 bg-slate-50/50 text-sm font-medium resize-none shadow-inner outline-none focus:ring-8 focus:ring-indigo-500/5 focus:bg-white italic leading-relaxed transition-all" 
+                />
+              </div>
+
+              {/* Attachment Section */}
+              <div className="space-y-6">
+                 <label className="text-[11px] font-black uppercase text-slate-400 ml-4 tracking-[0.5em]">Inventory Evidence (Attachments)</label>
+                 <div className="bg-white border-2 border-dashed border-slate-200 rounded-[3rem] p-8 flex flex-col items-center justify-center space-y-4 hover:border-indigo-400 hover:bg-indigo-50/20 transition-all cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+                    <input type="file" multiple className="hidden" ref={fileInputRef} onChange={handleFileUpload} />
+                    <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center text-2xl">📎</div>
+                    <div className="text-center">
+                       <p className="text-[11px] font-black text-slate-700 uppercase">Attach Manifest or Invoice</p>
+                       <p className="text-[9px] text-slate-400 font-bold uppercase mt-1">PDF or Shard Imaging (Max 5MB)</p>
+                    </div>
+                 </div>
+                 {attachments.length > 0 && (
+                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+                      {attachments.map(att => (
+                        <div key={att.id} className="flex items-center justify-between p-4 bg-white rounded-2xl border border-slate-100 shadow-sm">
+                           <div className="flex items-center space-x-3 overflow-hidden">
+                              <span className="text-lg">📄</span>
+                              <div className="min-w-0">
+                                 <p className="text-[10px] font-black text-slate-800 truncate uppercase">{att.name}</p>
+                                 <p className="text-[8px] text-slate-400 font-bold">{(att.size / 1024).toFixed(1)} KB</p>
+                              </div>
+                           </div>
+                           <button type="button" onClick={() => setAttachments(prev => prev.filter(a => a.id !== att.id))} className="text-slate-300 hover:text-rose-500"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg></button>
+                        </div>
+                      ))}
+                   </div>
+                 )}
+              </div>
            </div>
            
-           <div className="w-full xl:w-[480px] space-y-10">
+           <div className="w-full space-y-10">
               <div className="bg-slate-950 rounded-[4rem] p-12 text-white space-y-8 shadow-2xl relative overflow-hidden border-b-[12px] border-indigo-600 group">
                  <div className="relative z-10 space-y-6">
                     <div className="flex justify-between items-center text-[10px] font-black uppercase text-slate-500 tracking-widest">
@@ -452,10 +497,9 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
                   className={`w-full py-10 rounded-[3.5rem] font-black text-sm uppercase tracking-[0.5em] shadow-[0_30px_60px_-15px_rgba(0,0,0,0.3)] transition-all transform active:scale-95 border-b-[12px] border-slate-950 relative overflow-hidden ${isReadOnly ? 'bg-slate-200 text-slate-400 cursor-not-allowed border-none' : 'bg-slate-900 text-white hover:bg-black'}`}
                 >
                    Commit Inventory Shard
-                   <div className="absolute inset-0 bg-gradient-to-tr from-white/5 to-transparent pointer-events-none"></div>
                 </button>
                 <button type="button" onClick={onCancel} className="w-full py-4 text-[11px] font-black uppercase text-slate-400 tracking-[0.4em] hover:text-rose-600 transition-all flex items-center justify-center space-x-3">
-                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
+                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7" /></svg>
                    <span>Abort Data Entry</span>
                 </button>
               </div>

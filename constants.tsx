@@ -334,6 +334,13 @@ export const DISPLAY_SUB_MENUS: SubMenuItem[] = [
     description: 'Consolidated report of all outward supplies and tax liability.',
     color: 'bg-indigo-600',
     icon: <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 11l3-3m0 0l3 3m-3-3v8m0-13a9 9 0 110 18 9 9 0 010-18z" /></svg>
+  },
+  {
+    id: DisplaySubMenu.GSTR_2,
+    label: 'GSTR-2 (Purchases)',
+    description: 'Audit report of all inward supplies and input tax credit (ITC).',
+    color: 'bg-emerald-600',
+    icon: <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13l-3 3m0 0l-3-3m3 3V8m0 13a9 9 0 110-18 9 9 0 010 18z" /></svg>
   }
 ];
 

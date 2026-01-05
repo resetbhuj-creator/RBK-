@@ -72,7 +72,7 @@ const ImportExportModule: React.FC<ImportExportModuleProps> = ({
     'Inventory Items'
   ];
   
-  const FORMATS = ['XLSX', 'CSV', 'XML'];
+  const FORMATS = ['XLSX', 'CSV', 'XML', 'JSON'];
 
   const ENTITY_SCHEMAS: Record<string, { source: string; target: string; type: string; required?: boolean }[]> = {
     'Companies': [
@@ -95,7 +95,6 @@ const ImportExportModule: React.FC<ImportExportModuleProps> = ({
       { source: 'party', target: 'PartyName', type: 'String', required: true },
       { source: 'amount', target: 'TotalAmount', type: 'Float', required: true },
       { source: 'narration', target: 'Narration', type: 'String' },
-      // Line item fields for flat files (CSV/XLSX)
       { source: 'ledgerName', target: 'LineLedger', type: 'String' },
       { source: 'entryType', target: 'LineType', type: 'String' },
       { source: 'entryAmount', target: 'LineAmount', type: 'Float' }
@@ -107,7 +106,6 @@ const ImportExportModule: React.FC<ImportExportModuleProps> = ({
       { source: 'party', target: 'PartyName', type: 'String', required: true },
       { source: 'amount', target: 'GrandTotal', type: 'Float', required: true },
       { source: 'narration', target: 'Narration', type: 'String' },
-      // Line item fields for flat files
       { source: 'itemName', target: 'ItemName', type: 'String' },
       { source: 'itemQty', target: 'Quantity', type: 'Float' },
       { source: 'itemRate', target: 'Rate', type: 'Float' },
@@ -187,7 +185,6 @@ const ImportExportModule: React.FC<ImportExportModuleProps> = ({
     } else {
       reader.onload = (event) => {
         const content = event.target?.result as string;
-        setFileContent(content);
         
         try {
           if (targetFormat === 'CSV') {
@@ -195,6 +192,7 @@ const ImportExportModule: React.FC<ImportExportModuleProps> = ({
             const headers = firstLine.split(csvDelimiter).map(h => h.trim().replace(/^"|"$/g, ''));
             setDetectedHeaders(headers);
             autoMapHeaders(headers);
+            setFileContent(content);
           } else if (targetFormat === 'XML') {
             const parser = new DOMParser();
             const xmlDoc = parser.parseFromString(content, "text/xml");
@@ -205,8 +203,20 @@ const ImportExportModule: React.FC<ImportExportModuleProps> = ({
               const headers = Array.from(firstNode.children).map(c => c.tagName);
               setDetectedHeaders(headers);
               autoMapHeaders(headers);
+              setFileContent(content);
             } else {
               throw new Error("Empty XML Data Root");
+            }
+          } else if (targetFormat === 'JSON') {
+            const parsedJson = JSON.parse(content);
+            const dataArr = Array.isArray(parsedJson) ? parsedJson : [parsedJson];
+            if (dataArr.length > 0) {
+              const headers = Object.keys(dataArr[0]);
+              setDetectedHeaders(headers);
+              autoMapHeaders(headers);
+              setFileContent(dataArr);
+            } else {
+              throw new Error("Empty JSON Array");
             }
           }
           setCurrentStage('MAP');
@@ -270,7 +280,6 @@ const ImportExportModule: React.FC<ImportExportModuleProps> = ({
       const obj: any = {};
       Array.from(node.children).forEach(child => {
         if (child.children.length > 0) {
-           // Handle arrays (entries, items)
            obj[child.tagName] = Array.from(child.children).map(subChild => {
               const subObj: any = {};
               Array.from(subChild.children).forEach(gc => {
@@ -320,7 +329,6 @@ const ImportExportModule: React.FC<ImportExportModuleProps> = ({
       }).filter(x => x !== null);
     }
 
-    // VOUCHER LOGIC: Handle grouping of line items for flat files
     const voucherMap = new Map<string, Voucher>();
     data.forEach(row => {
       const vId = row[mapping['VoucherNo']];
@@ -329,7 +337,6 @@ const ImportExportModule: React.FC<ImportExportModuleProps> = ({
       if (!voucherMap.has(vId)) {
         const vObj: any = { status: 'Posted' };
         schema.forEach(s => {
-          // Main fields
           if (!['ledgerName', 'entryType', 'entryAmount', 'itemName', 'itemQty', 'itemRate', 'itemAmount'].includes(s.source)) {
              let val = row[mapping[s.target]];
              if (s.type === 'Float') val = parseFloat(val) || 0;
@@ -382,6 +389,10 @@ const ImportExportModule: React.FC<ImportExportModuleProps> = ({
       XLSX.writeFile(wb, `${fileName}.xlsx`);
       addLog(`Excel Template Dispatched: ${fileName}.xlsx`);
       return;
+    } else if (targetFormat === 'JSON') {
+      content = JSON.stringify([schema.reduce((acc, s) => ({ ...acc, [s.target]: 'SAMPLE_VALUE' }), {})], null, 2);
+      mimeType = 'application/json';
+      fileName += '.json';
     } else {
       const rootName = selectedEntity.replace(/\s/g, '') + 'Root';
       const itemName = selectedEntity.replace(/\s/g, '').slice(0, -1) || 'Record';
@@ -420,10 +431,11 @@ const ImportExportModule: React.FC<ImportExportModuleProps> = ({
         
         if (activeTab === 'IMPORT' && fileContent) {
           let parsed: any[] = [];
-          if (targetFormat === 'XLSX') {
+          if (targetFormat === 'XLSX' || targetFormat === 'JSON') {
             parsed = parseMappedData(fileContent);
           } else if (targetFormat === 'XML') {
-            parsed = parseXML(fileContent);
+            const rawXml = parseXML(fileContent);
+            parsed = parseMappedData(rawXml);
           } else if (targetFormat === 'CSV') {
             const rawCsv = parseCSV(fileContent);
             parsed = parseMappedData(rawCsv);
@@ -480,6 +492,8 @@ const ImportExportModule: React.FC<ImportExportModuleProps> = ({
       let content = '';
       if (targetFormat === 'XML') {
         content = generateXML(dataSource);
+      } else if (targetFormat === 'JSON') {
+        content = JSON.stringify(dataSource, null, 2);
       } else if (targetFormat === 'XLSX') {
         const finalData = selectedEntity.includes('Voucher') ? flattenVouchers(dataSource) : dataSource;
         const ws = XLSX.utils.json_to_sheet(finalData);
@@ -499,7 +513,7 @@ const ImportExportModule: React.FC<ImportExportModuleProps> = ({
         }
       }
       
-      const blob = new Blob([content], { type: targetFormat === 'XML' ? 'text/xml' : 'text/csv' });
+      const blob = new Blob([content], { type: targetFormat === 'XML' ? 'text/xml' : (targetFormat === 'JSON' ? 'application/json' : 'text/csv') });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -588,7 +602,7 @@ const ImportExportModule: React.FC<ImportExportModuleProps> = ({
               </div>
 
               <div onClick={() => activeTab === 'IMPORT' ? fileInputRef.current?.click() : startOperation()} className="border-4 border-dashed rounded-[3rem] p-24 text-center group transition-all cursor-pointer border-slate-100 hover:border-indigo-200 hover:bg-indigo-50/20">
-                <input type="file" ref={fileInputRef} className="hidden" accept={targetFormat === 'CSV' ? '.csv' : (targetFormat === 'XML' ? '.xml' : '.xlsx,.xls')} onChange={handleFileChange} />
+                <input type="file" ref={fileInputRef} className="hidden" accept={targetFormat === 'CSV' ? '.csv' : (targetFormat === 'XML' ? '.xml' : (targetFormat === 'JSON' ? '.json' : '.xlsx,.xls'))} onChange={handleFileChange} />
                 <div className="w-24 h-24 bg-white rounded-[2rem] flex items-center justify-center mx-auto mb-8 text-slate-200 group-hover:scale-110 group-hover:text-indigo-600 transition-all shadow-sm border border-slate-50">
                    <span className="text-4xl">{activeTab === 'IMPORT' ? '📥' : '📤'}</span>
                 </div>
@@ -608,7 +622,7 @@ const ImportExportModule: React.FC<ImportExportModuleProps> = ({
             <div className="bg-white rounded-[3rem] border border-slate-200 p-12 shadow-sm animate-in zoom-in-95 duration-500">
                <div className="flex items-center justify-between mb-10">
                   <h3 className="text-xl font-black text-slate-800 uppercase italic">Pattern Mapping Protocol</h3>
-                  <span className="px-4 py-1.5 bg-indigo-50 text-indigo-600 rounded-xl text-[10px] font-black uppercase border border-indigo-100">Found: {detectedHeaders.length} Nodes</span>
+                  <span className="px-4 py-1.5 bg-indigo-50 text-indigo-600 rounded-xl text-[9px] font-black uppercase border border-indigo-100">Found: {detectedHeaders.length} Nodes</span>
                </div>
                <div className="space-y-4 max-h-[440px] overflow-y-auto pr-4 custom-scrollbar">
                   {activeSchema.map((field, i) => (
@@ -658,7 +672,7 @@ const ImportExportModule: React.FC<ImportExportModuleProps> = ({
         </div>
 
         <div className="space-y-6">
-          <div className="bg-white rounded-[3rem] border border-slate-200 p-10 shadow-sm">
+          <div className="bg-white rounded-[2.5rem] border border-slate-200 p-10 shadow-sm">
             <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 mb-10 flex items-center">
                <div className="w-2 h-2 rounded-full bg-indigo-500 mr-3 animate-pulse"></div>
                Transfer Registry
@@ -692,7 +706,7 @@ const ImportExportModule: React.FC<ImportExportModuleProps> = ({
              <div className="relative z-10">
                 <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-indigo-300 mb-6">Security Compliance</h4>
                 <p className="text-xs leading-relaxed font-medium text-indigo-100/70 mb-10">
-                  Nexus enforces <span className="text-white font-black underline decoration-emerald-500 underline-offset-4">Statutory Schema Matching</span>. XML and XLSX objects must align with the organizational blueprint before ledger commitment.
+                  Nexus enforces <span className="text-white font-black underline decoration-emerald-500 underline-offset-4">Statutory Schema Matching</span>. XML, XLSX, and JSON objects must align with the organizational blueprint before ledger commitment.
                 </p>
                 <div className="flex items-center space-x-4">
                    <div className="px-4 py-2 bg-white/10 rounded-xl border border-white/10 text-[9px] font-black uppercase">AES-256 Enabled</div>

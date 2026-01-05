@@ -104,6 +104,32 @@ const AdministrationModule: React.FC<AdministrationModuleProps> = ({
       setAccountGroups(prev => [...prev, newGroup]);
     };
 
+    const handleItemSubmit = (data: any) => {
+      const { initialBatch, ...itemData } = data;
+      const itemId = editingId || `i-${Date.now()}`;
+      
+      if (editingId) {
+        setItems(prev => prev.map(i => i.id === editingId ? { ...itemData, id: editingId } : i));
+        addAuditLog({ action: 'UPDATE', entityType: 'MASTER', entityName: itemData.name, details: `Item ${itemData.name} updated in catalogue.` });
+      } else {
+        setItems(prev => [...prev, { ...itemData, id: itemId }]);
+        addAuditLog({ action: 'CREATE', entityType: 'MASTER', entityName: itemData.name, details: `New item ${itemData.name} initialized in catalogue.` });
+        
+        // Handle convenience initial batch creation
+        if (initialBatch) {
+          const newBatch: Batch = {
+            ...initialBatch,
+            id: `b-${Date.now()}`,
+            itemId: itemId
+          };
+          setBatches(prev => [...prev, newBatch]);
+          addAuditLog({ action: 'CREATE', entityType: 'MASTER', entityName: newBatch.batchNo, details: `Opening batch ${newBatch.batchNo} instantiated for ${itemData.name}.` });
+        }
+      }
+      setIsModalOpen(false);
+      setEditingId(null);
+    };
+
     const getRowActions = (row: any): ActionItem[] => {
       const actions: ActionItem[] = [
         { 
@@ -114,7 +140,6 @@ const AdministrationModule: React.FC<AdministrationModuleProps> = ({
         }
       ];
 
-      // Deep link to batches if it's an item
       if (activeTab === 'ITEMS' && row.isBatchTracked) {
         actions.push({
           label: 'View Batches',
@@ -280,7 +305,7 @@ const AdministrationModule: React.FC<AdministrationModuleProps> = ({
                             )}
                          </td>
                          <td className="px-6 py-3.5">
-                            <span className="px-2 py-0.5 bg-indigo-50 text-indigo-500 rounded text-[9px] font-black uppercase tracking-tighter border border-indigo-100">
+                            <span className="px-2.5 py-0.5 bg-indigo-50 text-indigo-500 rounded text-[9px] font-black uppercase tracking-tighter border border-indigo-100">
                                 {activeTab === 'BATCHES' ? 'Lot/Batch' : (row.group || row.category || row.nature || row.type || 'Consolidated')}
                             </span>
                          </td>
@@ -346,7 +371,7 @@ const AdministrationModule: React.FC<AdministrationModuleProps> = ({
                     taxes={taxes}
                     onQuickUnitAdd={(u) => setUnitMeasures(prev => Array.from(new Set([...prev, u])))}
                     onCancel={() => setIsModalOpen(false)} 
-                    onSubmit={(data) => { if (editingId) setItems(prev => prev.map(i => i.id === editingId ? { ...data, id: editingId } : i)); else setItems(prev => [...prev, { ...data, id: `i-${Date.now()}` }]); setIsModalOpen(false); }} 
+                    onSubmit={handleItemSubmit} 
                   />
                )}
                {activeTab === 'BATCHES' && (

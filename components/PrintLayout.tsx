@@ -215,7 +215,7 @@ const PrintLayout: React.FC<PrintLayoutProps> = ({
             <div className="flex-1 p-8 space-y-6">
                <div className="space-y-1">
                   <span className="text-[9px] font-black uppercase text-slate-400 tracking-[0.3em] block">Aggregate Resolved Word Node</span>
-                  <span className="text-[11px] font-black italic text-slate-800 uppercase leading-none border-b border-slate-200 pb-2 block">{amountInWords(voucher.amount)}</span>
+                  <span className="text-11px font-black italic text-slate-800 uppercase leading-none border-b border-slate-200 pb-2 block">{amountInWords(voucher.amount)}</span>
                </div>
                {voucher.narration && (
                   <div className="space-y-1">

@@ -8,6 +8,7 @@ import CashFlow from './CashFlow';
 import InventorySummary from './InventorySummary';
 import GstReportSystem from './GstReportSystem';
 import Gstr1Report from './Gstr1Report';
+import Gstr2Report from './Gstr2Report';
 import BudgetVariance from './BudgetVariance';
 import LedgerReport from './LedgerReport';
 import OutstandingReport from './OutstandingReport';
@@ -66,6 +67,8 @@ const DisplayModule: React.FC<DisplayModuleProps> = ({
         return <GstReportSystem vouchers={vouchers} activeCompany={activeCompany} taxes={taxes} taxGroups={taxGroups} onViewVoucher={onViewVoucher} />;
       case DisplaySubMenu.GSTR_1:
         return <Gstr1Report vouchers={vouchers} activeCompany={activeCompany} ledgers={ledgers} onViewVoucher={onViewVoucher} />;
+      case DisplaySubMenu.GSTR_2:
+        return <Gstr2Report vouchers={vouchers} activeCompany={activeCompany} ledgers={ledgers} onViewVoucher={onViewVoucher} />;
       default:
         return <DisplayDashboard />;
     }

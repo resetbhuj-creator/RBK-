@@ -27,27 +27,27 @@ const SubMenuItem: React.FC<{ label: string, id: string, activeId: string | null
       onClick={onClick} 
       className={`w-full text-left px-4 py-3 rounded-xl text-[10px] uppercase tracking-[0.15em] transition-all relative group/sub flex items-center border-l-4 ${
         isActive 
-          ? 'text-indigo-400 bg-indigo-500/10 border-indigo-500 shadow-[inset_15px_0_30px_rgba(99,102,241,0.05)] font-black italic translate-x-2' 
-          : 'text-slate-500 font-bold border-transparent hover:text-slate-200 hover:bg-white/5 hover:translate-x-1'
+          ? 'text-white bg-indigo-600/40 border-indigo-400 shadow-[0_0_25px_rgba(99,102,241,0.2)] font-black italic translate-x-2' 
+          : 'text-slate-400 font-bold border-transparent hover:text-slate-200 hover:bg-white/5 hover:translate-x-1'
       }`}
     >
       <div className={`w-2 h-2 rounded-full mr-3 transition-all duration-500 ${
         isActive 
-          ? 'bg-indigo-400 scale-125 shadow-[0_0_12px_#818cf8] ring-4 ring-indigo-500/20 animate-pulse' 
-          : 'bg-slate-800 scale-75 group-hover/sub:bg-slate-500'
+          ? 'bg-indigo-400 scale-125 shadow-[0_0_12px_#818cf8] ring-4 ring-indigo-500/20' 
+          : 'bg-slate-700 scale-75 group-hover/sub:bg-slate-500'
       }`} />
       
-      <span className="truncate block flex-1">{label}</span>
+      <span className={`truncate block flex-1 ${isActive ? 'text-white' : ''}`}>{label}</span>
       
       {isActive && (
-        <div className="absolute right-3 w-1.5 h-1.5 bg-indigo-500 rounded-full shadow-[0_0_10px_#6366f1]" />
+        <div className="absolute right-3 w-1.5 h-1.5 bg-indigo-400 rounded-full shadow-[0_0_10px_#6366f1]" />
       )}
     </button>
   );
 };
 
 const SubMenuContainer: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <div className="ml-6 mt-1 mb-6 space-y-1.5 border-l border-slate-800/40 pl-2 animate-in fade-in slide-in-from-left-4 duration-500">
+  <div className="ml-6 mt-2 mb-6 space-y-2 border-l border-slate-800/60 pl-2 animate-in fade-in slide-in-from-left-4 duration-500">
     {children}
   </div>
 );
@@ -78,7 +78,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       <div className="flex items-center justify-between px-6 h-20 border-b border-white/5 bg-slate-950/80 backdrop-blur-2xl shrink-0">
         <div className="flex items-center space-x-4 overflow-hidden">
           <div className="w-12 h-12 shrink-0 bg-indigo-600 rounded-2xl flex items-center justify-center font-black text-2xl overflow-hidden shadow-2xl border-2 border-indigo-400/40 transform -rotate-3 transition-transform hover:rotate-0 cursor-pointer group/logo">
-            {logo && logo.startsWith('data:image') ? (
+            {logo && logo.length > 1 ? (
               <img src={logo} alt={companyName} className="w-full h-full object-cover group-hover/logo:scale-110 transition-transform" />
             ) : (
               <span className="text-white text-base">{logo || companyName.charAt(0)}</span>
@@ -109,7 +109,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 }}
                 className={`w-full flex items-center space-x-4 px-5 py-4 rounded-2xl transition-all duration-500 relative group overflow-hidden border ${
                   isParentActive 
-                    ? 'bg-indigo-600 border-indigo-500 text-white shadow-[0_15px_35px_rgba(79,70,229,0.4)] z-10 scale-[1.03]' 
+                    ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 border-indigo-400 text-white shadow-[0_15px_35px_rgba(79,70,229,0.3)] z-10 scale-[1.03]' 
                     : 'text-slate-500 border-transparent hover:bg-white/5 hover:text-slate-100'
                 }`}
               >
@@ -118,16 +118,16 @@ const Sidebar: React.FC<SidebarProps> = ({
                   <div className="absolute left-0 top-3 bottom-3 w-1.5 bg-white rounded-r-full shadow-[0_0_15px_#fff] animate-in slide-in-from-left-4 duration-700" />
                 )}
                 
-                <span className={`${isParentActive ? 'text-white scale-110 drop-shadow-[0_0_15px_rgba(255,255,255,0.8)]' : 'text-slate-600 group-hover:text-indigo-400'} transition-all duration-500 w-6 h-6 flex items-center justify-center shrink-0`}>
+                <span className={`${isParentActive ? 'text-white scale-110 drop-shadow-[0_0_15px_rgba(255,255,255,0.6)]' : 'text-slate-600 group-hover:text-indigo-400'} transition-all duration-500 w-6 h-6 flex items-center justify-center shrink-0`}>
                   {React.cloneElement(item.icon as React.ReactElement<any>, { className: 'w-6 h-6' })}
                 </span>
                 
-                <span className={`font-black text-[11px] uppercase tracking-[0.25em] flex-1 text-left truncate italic transition-all ${isParentActive ? 'text-white translate-x-2' : 'group-hover:translate-x-1'}`}>
+                <span className={`font-black text-[11px] uppercase tracking-[0.25em] flex-1 text-left truncate italic transition-all ${isParentActive ? 'text-white font-black translate-x-1' : 'group-hover:translate-x-1'}`}>
                   {item.label}
                 </span>
 
                 {hasSub && (
-                  <div className={`transition-all duration-700 ${isParentActive ? 'rotate-180 scale-125 text-white' : 'text-slate-800 group-hover:text-slate-400'}`}>
+                  <div className={`transition-all duration-700 ${isParentActive ? 'rotate-180 scale-110 text-white' : 'text-slate-800 group-hover:text-slate-400'}`}>
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" />
                     </svg>
