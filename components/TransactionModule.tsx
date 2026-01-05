@@ -69,6 +69,10 @@ const TransactionModule: React.FC<TransactionModuleProps> = ({
     setVouchers(prev => prev.map(v => v.id === updated.id ? updated : v));
   };
 
+  const approveVoucher = (id: string) => {
+    setVouchers(prev => prev.map(v => v.id === id ? { ...v, status: 'Posted', approvedBy: 'Super Admin', approvalDate: new Date().toISOString() } : v));
+  };
+
   const deleteVoucher = (id: string) => {
     if (confirm("CRITICAL: Permanent deletion of transactional record requested. This will impact ledger balances and audit trials. Authorize purge?")) {
       setVouchers(prev => prev.filter(v => v.id !== id));
@@ -170,24 +174,34 @@ const TransactionModule: React.FC<TransactionModuleProps> = ({
           ))}
         </div>
 
-        {/* Side Actions / Pending List */}
+        {/* Side Actions / Statutory Approval Queue */}
         <div className="space-y-8">
-          <div className="bg-slate-900 rounded-[3rem] p-10 text-white relative overflow-hidden shadow-2xl group">
+          <div className="bg-slate-900 rounded-[3rem] p-10 text-white relative overflow-hidden shadow-2xl group border-l-8 border-rose-500">
              <div className="relative z-10">
-                <h4 className="text-[10px] font-black uppercase text-indigo-400 tracking-[0.4em] mb-8 flex items-center">
-                   <div className="w-2 h-2 rounded-full bg-rose-500 mr-3 animate-pulse shadow-[0_0_8px_#f43f5e]"></div>
-                   Awaiting Authorization
-                </h4>
+                <div className="flex justify-between items-center mb-8">
+                   <h4 className="text-[10px] font-black uppercase text-indigo-400 tracking-[0.4em] flex items-center">
+                      <div className="w-2 h-2 rounded-full bg-rose-500 mr-3 animate-pulse shadow-[0_0_8px_#f43f5e]"></div>
+                      Authorization Shard
+                   </h4>
+                   <span className="text-[9px] font-black text-slate-500 uppercase">Super Admin Access</span>
+                </div>
+                
                 <div className="space-y-4">
-                   {vouchers.filter(v => v.status === 'Pending Approval').slice(0, 3).map(v => (
-                     <div key={v.id} onClick={() => onViewVoucher(v.id)} className="p-5 bg-white/5 border border-white/10 rounded-2xl cursor-pointer hover:bg-white/10 transition-all flex items-center justify-between group/v">
-                        <div>
-                           <div className="text-[11px] font-black text-white italic group-hover/v:text-indigo-400">{v.id}</div>
-                           <div className="text-[9px] text-slate-500 font-bold uppercase mt-1">{v.party}</div>
+                   {vouchers.filter(v => v.status === 'Pending Approval').map(v => (
+                     <div key={v.id} className="p-5 bg-white/5 border border-white/10 rounded-2xl transition-all group/v">
+                        <div className="flex items-center justify-between mb-4">
+                           <div onClick={() => onViewVoucher(v.id)} className="cursor-pointer">
+                              <div className="text-[11px] font-black text-white italic group-hover/v:text-indigo-400">#{v.id}</div>
+                              <div className="text-[9px] text-slate-500 font-bold uppercase mt-1 truncate max-w-[140px]">{v.party}</div>
+                           </div>
+                           <div className="text-right">
+                              <div className="text-xs font-black tabular-nums">${v.amount.toLocaleString()}</div>
+                              <div className="text-[8px] font-bold text-rose-400 uppercase mt-1">Lvl 2 Verify</div>
+                           </div>
                         </div>
-                        <div className="text-right">
-                           <div className="text-xs font-black tabular-nums">${v.amount.toLocaleString()}</div>
-                           <div className="text-[8px] font-bold text-rose-500 uppercase mt-1">Authorize Required</div>
+                        <div className="grid grid-cols-2 gap-2">
+                           <button onClick={() => approveVoucher(v.id)} className="py-2 bg-emerald-600/20 text-emerald-400 rounded-xl text-[9px] font-black uppercase hover:bg-emerald-600 hover:text-white transition-all">Authorize</button>
+                           <button onClick={() => onViewVoucher(v.id)} className="py-2 bg-white/5 text-slate-400 rounded-xl text-[9px] font-black uppercase hover:bg-white/10 transition-all">Inspect</button>
                         </div>
                      </div>
                    ))}
@@ -195,18 +209,24 @@ const TransactionModule: React.FC<TransactionModuleProps> = ({
                      <div className="py-12 text-center opacity-30 italic text-xs font-medium">All transactional objects reconciled.</div>
                    )}
                 </div>
-                {stats.pending > 3 && (
-                   <button onClick={() => setActiveSubAction(TransactionSubMenu.DAY_BOOK)} className="mt-6 text-[9px] font-black text-slate-500 uppercase tracking-widest hover:text-white transition-colors">View all {stats.pending} pending objects &rarr;</button>
-                )}
              </div>
              <div className="absolute top-0 right-0 w-48 h-48 bg-indigo-600 rounded-full blur-[100px] opacity-10 -mr-24 -mt-24"></div>
           </div>
 
-          <div className="p-8 bg-indigo-50 rounded-[2.5rem] border border-indigo-100">
-             <h5 className="text-[10px] font-black uppercase text-indigo-900 tracking-widest mb-4">Operational Status</h5>
-             <p className="text-[11px] text-indigo-700/70 font-medium leading-relaxed italic">
-                Nexus Node is currently synced with the central treasury. High-fidelity cryptographic hashing is active for all new transactional commits.
+          <div className="p-8 bg-indigo-950 rounded-[2.5rem] border border-indigo-900 shadow-xl">
+             <div className="flex items-center space-x-4 mb-6">
+                <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-xl">🛡️</div>
+                <h5 className="text-[10px] font-black uppercase text-white tracking-widest leading-none">Integrity Lock</h5>
+             </div>
+             <p className="text-[11px] text-indigo-300 font-medium leading-relaxed italic mb-6">
+                {isReadOnly 
+                  ? "Historical Audit Mode is currently ACTIVE. No mutations allowed to existing ledger shards." 
+                  : "Live Operations Active. New postings are being cryptographically signed for verification."}
              </p>
+             <div className="flex bg-black/20 p-1 rounded-xl">
+                <div className={`flex-1 py-2 text-[8px] font-black text-center uppercase tracking-widest rounded-lg transition-all ${isReadOnly ? 'bg-rose-600 text-white shadow-lg' : 'text-slate-500'}`}>LOCKED</div>
+                <div className={`flex-1 py-2 text-[8px] font-black text-center uppercase tracking-widest rounded-lg transition-all ${!isReadOnly ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-500'}`}>ACTIVE</div>
+             </div>
           </div>
         </div>
       </div>

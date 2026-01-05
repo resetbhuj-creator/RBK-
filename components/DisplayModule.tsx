@@ -9,6 +9,8 @@ import InventorySummary from './InventorySummary';
 import GstReportSystem from './GstReportSystem';
 import Gstr1Report from './Gstr1Report';
 import BudgetVariance from './BudgetVariance';
+import LedgerReport from './LedgerReport';
+import OutstandingReport from './OutstandingReport';
 
 interface DisplayModuleProps {
   activeCompany: any;
@@ -27,6 +29,12 @@ interface DisplayModuleProps {
 const DisplayModule: React.FC<DisplayModuleProps> = ({ 
   activeCompany, activeSubAction, setActiveSubAction, ledgers, vouchers, items, batches, taxes, taxGroups, onViewVoucher, onPostVoucher 
 }) => {
+  const [drillDownLedgerId, setDrillDownLedgerId] = useState<string | undefined>(undefined);
+
+  const handleDrillDown = (id: string) => {
+    setDrillDownLedgerId(id);
+    setActiveSubAction(DisplaySubMenu.LEDGER_REPORT);
+  };
 
   const renderContent = () => {
     switch (activeSubAction) {
@@ -40,6 +48,10 @@ const DisplayModule: React.FC<DisplayModuleProps> = ({
         return <TrialBalance ledgers={ledgers} vouchers={vouchers} />;
       case DisplaySubMenu.CASH_FLOW:
         return <CashFlow ledgers={ledgers} vouchers={vouchers} />;
+      case DisplaySubMenu.LEDGER_REPORT:
+        return <LedgerReport ledgers={ledgers} vouchers={vouchers} onViewVoucher={onViewVoucher} defaultLedgerId={drillDownLedgerId} />;
+      case DisplaySubMenu.OUTSTANDING_REPORT:
+        return <OutstandingReport ledgers={ledgers} vouchers={vouchers} onDrillDown={handleDrillDown} />;
       case DisplaySubMenu.INVENTORY_SUMMARY:
         return (
           <InventorySummary 
@@ -136,7 +148,7 @@ const DisplayModule: React.FC<DisplayModuleProps> = ({
     <div className="space-y-8 min-h-[80vh]">
       {activeSubAction && (
         <button 
-          onClick={() => setActiveSubAction(null)}
+          onClick={() => { setActiveSubAction(null); setDrillDownLedgerId(undefined); }}
           className="flex items-center space-x-3 text-[11px] font-black uppercase text-slate-400 hover:text-indigo-600 transition-all group mb-8"
         >
           <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center group-hover:bg-indigo-50 transition-colors">

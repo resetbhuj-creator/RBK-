@@ -18,21 +18,33 @@ const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 3.0;
 
 const PrintCenter: React.FC<PrintCenterProps> = ({ vouchers, activeCompany }) => {
+  // Load preferences from persistence layer
+  const [printLayout, setPrintLayout] = useState<LayoutType>(() => (localStorage.getItem('nx_print_layout') as LayoutType) || 'GST_TAX_INVOICE');
+  const [paperSize, setPaperSize] = useState<PaperSize>(() => (localStorage.getItem('nx_paper_size') as PaperSize) || 'A4');
+  const [orientation, setOrientation] = useState<Orientation>(() => (localStorage.getItem('nx_orientation') as Orientation) || 'Portrait');
+  const [watermark, setWatermark] = useState<Watermark>(() => (localStorage.getItem('nx_watermark') as Watermark) || 'ORIGINAL');
+  const [fontSizeScale, setFontSizeScale] = useState(() => parseFloat(localStorage.getItem('nx_font_scale') || '1.0'));
+  const [marginScale, setMarginScale] = useState(() => parseFloat(localStorage.getItem('nx_margin_scale') || '1.0'));
+
   const [selectedVchIds, setSelectedVchIds] = useState<string[]>([]);
-  const [printLayout, setPrintLayout] = useState<LayoutType>('GST_TAX_INVOICE');
-  const [paperSize, setPaperSize] = useState<PaperSize>('A4');
-  const [orientation, setOrientation] = useState<Orientation>('Portrait');
-  const [watermark, setWatermark] = useState<Watermark>('ORIGINAL');
-  
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('All');
-
   const [scale, setScale] = useState(0.85);
   const [isAutoFit, setIsAutoFit] = useState(true);
   const [fitMode, setFitMode] = useState<'PAGE' | 'WIDTH'>('PAGE');
   const [isSpooling, setIsSpooling] = useState(false);
   
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Persist settings whenever they change
+  useEffect(() => {
+    localStorage.setItem('nx_print_layout', printLayout);
+    localStorage.setItem('nx_paper_size', paperSize);
+    localStorage.setItem('nx_orientation', orientation);
+    localStorage.setItem('nx_watermark', watermark);
+    localStorage.setItem('nx_font_scale', fontSizeScale.toString());
+    localStorage.setItem('nx_margin_scale', marginScale.toString());
+  }, [printLayout, paperSize, orientation, watermark, fontSizeScale, marginScale]);
 
   const filteredVouchers = useMemo(() => {
     return vouchers.filter(v => {
@@ -99,22 +111,12 @@ const PrintCenter: React.FC<PrintCenterProps> = ({ vouchers, activeCompany }) =>
     return () => observer.disconnect();
   }, [isAutoFit, fitMode, paperSize, orientation, previewVch]);
 
-  const toggleSelectFiltered = () => {
-    const filteredIds = filteredVouchers.map(v => v.id);
-    const allFilteredSelected = filteredIds.every(id => selectedVchIds.includes(id));
-    if (allFilteredSelected) {
-      setSelectedVchIds(prev => prev.filter(id => !filteredIds.includes(id)));
-    } else {
-      setSelectedVchIds(prev => Array.from(new Set([...prev, ...filteredIds])));
-    }
-  };
-
   return (
     <div className="grid grid-cols-1 xl:grid-cols-5 gap-8 animate-in fade-in duration-500 h-[calc(100vh-160px)]">
       <style dangerouslySetInnerHTML={{ __html: `
         @media print {
           @page { 
-            margin: 0mm; 
+            margin: ${10 * marginScale}mm; 
             size: ${paperSize.toLowerCase()} ${orientation.toLowerCase()}; 
           }
           body * { visibility: hidden; }
@@ -129,19 +131,22 @@ const PrintCenter: React.FC<PrintCenterProps> = ({ vouchers, activeCompany }) =>
         <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col flex-1">
           <div className="px-8 py-6 border-b border-slate-100 bg-slate-50/50 shrink-0 space-y-4">
              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-black uppercase tracking-widest text-slate-800">Print Registry</h3>
-                <button onClick={toggleSelectFiltered} className="text-[10px] font-black text-indigo-600 uppercase hover:underline tracking-widest transition-all hover:text-indigo-800">
-                   {filteredVouchers.length > 0 && filteredVouchers.every(v => selectedVchIds.includes(v.id)) ? 'Deselect Visible' : 'Select Visible'}
+                <h3 className="text-sm font-black uppercase tracking-widest text-slate-800">Spool Registry</h3>
+                <button 
+                  onClick={() => setSelectedVchIds(selectedVchIds.length === filteredVouchers.length ? [] : filteredVouchers.map(v => v.id))} 
+                  className="text-[10px] font-black text-indigo-600 uppercase hover:underline tracking-widest transition-all"
+                >
+                   {selectedVchIds.length === filteredVouchers.length ? 'Deselect All' : 'Select Visible'}
                 </button>
              </div>
              
              <div className="grid grid-cols-2 gap-3">
-                <div className="relative group flex-1">
+                <div className="relative group">
                    <input 
                      value={searchQuery}
                      onChange={e => setSearchQuery(e.target.value)}
-                     placeholder="Query Party/ID..."
-                     className="w-full pl-9 pr-3 py-2.5 bg-white border border-slate-200 rounded-xl text-[10px] font-black outline-none focus:ring-4 focus:ring-indigo-500/5 transition-all shadow-inner"
+                     placeholder="Filter nodes..."
+                     className="w-full pl-9 pr-3 py-2.5 bg-white border border-slate-200 rounded-xl text-[10px] font-black outline-none focus:ring-4 focus:ring-indigo-500/5 transition-all shadow-inner italic"
                    />
                    <svg className="w-4 h-4 absolute left-3 top-3 text-slate-300 group-focus-within:text-indigo-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                 </div>
@@ -150,11 +155,11 @@ const PrintCenter: React.FC<PrintCenterProps> = ({ vouchers, activeCompany }) =>
                   onChange={e => setTypeFilter(e.target.value)}
                   className="px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-[10px] font-black text-indigo-600 outline-none cursor-pointer hover:border-indigo-300 transition-all"
                 >
-                  <option value="All">All Categories</option>
-                  <option value="Sales">Sales Vouchers</option>
-                  <option value="Purchase">Purchase Vouchers</option>
-                  <option value="Payment">Payments</option>
-                  <option value="Receipt">Receipts</option>
+                  <option value="All">All Types</option>
+                  <option value="Sales">Sales</option>
+                  <option value="Purchase">Purchase</option>
+                  <option value="Payment">Payment</option>
+                  <option value="Receipt">Receipt</option>
                 </select>
              </div>
           </div>
@@ -173,8 +178,9 @@ const PrintCenter: React.FC<PrintCenterProps> = ({ vouchers, activeCompany }) =>
                      <div className="min-w-0">
                         <div className="text-xs font-black text-slate-800 uppercase italic leading-none group-hover:text-indigo-600 transition-colors truncate">{v.party}</div>
                         <div className="text-[9px] font-bold text-slate-400 uppercase mt-1.5 flex items-center">
-                           <span className={`px-1.5 rounded mr-2 font-black ${v.type === 'Sales' ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-200 text-slate-500'}`}>{v.type.substring(0, 1)}</span>
-                           {v.id} • {v.date}
+                           <span className="font-mono text-indigo-400 mr-2">{v.id}</span>
+                           <span className="text-slate-300 opacity-50 mr-2">|</span>
+                           <span>{v.date}</span>
                         </div>
                      </div>
                   </div>
@@ -186,63 +192,50 @@ const PrintCenter: React.FC<PrintCenterProps> = ({ vouchers, activeCompany }) =>
              ))}
              {filteredVouchers.length === 0 && (
                <div className="py-20 text-center opacity-30 italic">
-                  <p className="text-[10px] font-black uppercase tracking-widest">No matching records found</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest">Registry exhausted</p>
                </div>
              )}
           </div>
           
           <div className="p-6 border-t border-slate-100 bg-slate-900 flex justify-between items-center shrink-0">
              <div className="space-y-1">
-                <span className="text-[9px] font-black uppercase text-indigo-400 tracking-[0.2em] block">Staged Collection</span>
-                <div className="text-white text-lg font-black italic tracking-tighter">{batchStats.count} Documents</div>
+                <span className="text-[9px] font-black uppercase text-indigo-400 tracking-[0.2em] block">Payload Staged</span>
+                <div className="text-white text-lg font-black italic tracking-tighter tabular-nums">{batchStats.count} Objects</div>
              </div>
              <div className="text-right">
-                <span className="text-[9px] font-black uppercase text-slate-500 tracking-[0.2em] block">Collective Value</span>
+                <span className="text-[9px] font-black uppercase text-slate-500 tracking-[0.2em] block">Total Transacted</span>
                 <div className="text-white text-lg font-black italic tracking-tighter tabular-nums">${batchStats.value.toLocaleString()}</div>
              </div>
           </div>
         </div>
 
-        {/* Global Configuration */}
+        {/* Persistent Configuration Panel */}
         <div className="bg-white rounded-[2.5rem] p-8 border border-slate-200 shadow-sm shrink-0 space-y-6">
-           <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-[0.3em]">Hardware Specs</h3>
+           <div className="flex items-center justify-between border-b border-slate-50 pb-4">
+              <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-[0.3em]">Device Defaults</h3>
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981]"></div>
+           </div>
            
            <div className="space-y-6">
-              <div className="space-y-2">
-                 <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Document Blueprint</label>
-                 <div className="grid grid-cols-3 gap-2">
-                    {[
-                      { id: 'STANDARD', label: 'Classic', icon: '📄' },
-                      { id: 'COMPACT', label: 'Lean', icon: '📏' },
-                      { id: 'GST_TAX_INVOICE', label: 'Tax Node', icon: '🏛️' }
-                    ].map(l => (
-                      <button key={l.id} onClick={() => setPrintLayout(l.id as any)} className={`p-3 rounded-xl border-2 flex flex-col items-center justify-center transition-all ${printLayout === l.id ? 'bg-indigo-50 border-indigo-600 text-indigo-900 shadow-sm' : 'bg-slate-50 border-transparent text-slate-400 hover:border-slate-200'}`}>
-                         <span className="text-lg mb-1">{l.icon}</span>
-                         <span className="text-[8px] font-black uppercase tracking-tighter">{l.label}</span>
-                      </button>
-                    ))}
-                 </div>
-              </div>
-
               <div className="grid grid-cols-2 gap-4">
                  <div className="space-y-2">
-                    <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Media Size</label>
+                    <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Page Architecture</label>
                     <select 
                       value={paperSize} 
                       onChange={e => setPaperSize(e.target.value as any)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-[10px] font-black text-indigo-600 outline-none hover:bg-white transition-all"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-[10px] font-black text-indigo-600 outline-none hover:bg-white transition-all shadow-sm"
                     >
-                       <option value="A4">A4 (Standard)</option>
+                       <option value="A4">A4 (ISO Standard)</option>
                        <option value="Letter">US Letter</option>
-                       <option value="A5">A5 (Mini)</option>
+                       <option value="A5">A5 (Compact)</option>
                     </select>
                  </div>
                  <div className="space-y-2">
-                    <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Axis Mode</label>
+                    <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Render Orientation</label>
                     <select 
                       value={orientation} 
                       onChange={e => setOrientation(e.target.value as any)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-[10px] font-black text-indigo-600 outline-none hover:bg-white transition-all"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-[10px] font-black text-indigo-600 outline-none hover:bg-white transition-all shadow-sm"
                     >
                        <option value="Portrait">Portrait</option>
                        <option value="Landscape">Landscape</option>
@@ -251,7 +244,50 @@ const PrintCenter: React.FC<PrintCenterProps> = ({ vouchers, activeCompany }) =>
               </div>
 
               <div className="space-y-2">
-                 <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Security Marking</label>
+                 <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Document Identity (Blueprint)</label>
+                 <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { id: 'STANDARD', label: 'Classic', icon: '📄' },
+                      { id: 'COMPACT', label: 'Minimal', icon: '📏' },
+                      { id: 'GST_TAX_INVOICE', label: 'Statutory', icon: '🏛️' }
+                    ].map(l => (
+                      <button key={l.id} onClick={() => setPrintLayout(l.id as any)} className={`p-3 rounded-xl border-2 flex flex-col items-center justify-center transition-all ${printLayout === l.id ? 'bg-indigo-50 border-indigo-600 text-indigo-900 shadow-md' : 'bg-slate-50 border-transparent text-slate-400 hover:border-slate-200'}`}>
+                         <span className="text-lg mb-1">{l.icon}</span>
+                         <span className="text-[8px] font-black uppercase tracking-tighter">{l.label}</span>
+                      </button>
+                    ))}
+                 </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-6 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                 <div className="space-y-2">
+                    <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest flex justify-between">
+                       <span>Font Scale</span>
+                       <span className="text-indigo-600">{Math.round(fontSizeScale * 100)}%</span>
+                    </label>
+                    <input 
+                      type="range" min="0.5" max="1.5" step="0.05" 
+                      value={fontSizeScale} 
+                      onChange={e => setFontSizeScale(parseFloat(e.target.value))}
+                      className="w-full h-1 bg-slate-200 rounded-full appearance-none accent-indigo-600 cursor-pointer" 
+                    />
+                 </div>
+                 <div className="space-y-2">
+                    <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest flex justify-between">
+                       <span>Margins</span>
+                       <span className="text-indigo-600">{Math.round(marginScale * 100)}%</span>
+                    </label>
+                    <input 
+                      type="range" min="0.2" max="2.0" step="0.1" 
+                      value={marginScale} 
+                      onChange={e => setMarginScale(parseFloat(e.target.value))}
+                      className="w-full h-1 bg-slate-200 rounded-full appearance-none accent-indigo-600 cursor-pointer" 
+                    />
+                 </div>
+              </div>
+
+              <div className="space-y-2">
+                 <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Institutional Marking</label>
                  <div className="grid grid-cols-5 gap-1 bg-slate-50 p-1 rounded-xl border border-slate-200">
                     {['NONE', 'DRAFT', 'ORIGINAL', 'DUPLICATE', 'TRIPLICATE'].map(w => (
                       <button 
@@ -274,12 +310,12 @@ const PrintCenter: React.FC<PrintCenterProps> = ({ vouchers, activeCompany }) =>
               {isSpooling ? (
                 <div className="flex items-center space-x-3">
                   <div className="w-4 h-4 border-3 border-white/20 border-t-white rounded-full animate-spin"></div>
-                  <span>Transmitting...</span>
+                  <span>Syncing Shards...</span>
                 </div>
               ) : (
                 <>
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
-                  <span>Engage Hardware</span>
+                  <span>Transmit to Cluster</span>
                 </>
               )}
            </button>
@@ -288,23 +324,13 @@ const PrintCenter: React.FC<PrintCenterProps> = ({ vouchers, activeCompany }) =>
 
       {/* Preview Viewport */}
       <div className="xl:col-span-3 flex flex-col min-h-0 bg-slate-200/40 rounded-[3rem] border border-slate-200 overflow-hidden shadow-inner relative">
-         {/* Spooling Overlay */}
-         {isSpooling && (
-            <div className="absolute inset-0 z-50 bg-slate-950/80 backdrop-blur-xl flex flex-col items-center justify-center animate-in fade-in duration-500">
-               <div className="w-32 h-32 relative mb-10">
-                  <div className="absolute inset-0 border-8 border-indigo-500/20 rounded-full"></div>
-                  <div className="absolute inset-0 border-8 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-                  <div className="absolute inset-0 flex items-center justify-center text-3xl">🖨️</div>
-               </div>
-               <h3 className="text-2xl font-black text-white italic uppercase tracking-widest">Encoding Shards</h3>
-               <p className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.5em] mt-4 animate-pulse">Relay: Active Tunnel 01</p>
-            </div>
-         )}
-
          <div className="bg-white px-10 py-5 flex items-center justify-between border-b border-slate-200 shrink-0">
-            <div className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200 shadow-inner">
-               <button onClick={() => { setFitMode('PAGE'); setIsAutoFit(true); }} className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${isAutoFit && fitMode === 'PAGE' ? 'bg-white text-indigo-600 shadow-lg' : 'text-slate-400'}`}>Fit Page</button>
-               <button onClick={() => { setFitMode('WIDTH'); setIsAutoFit(true); }} className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${isAutoFit && fitMode === 'WIDTH' ? 'bg-white text-indigo-600 shadow-lg' : 'text-slate-400'}`}>Fit Width</button>
+            <div className="flex items-center space-x-6">
+               <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200 shadow-inner">
+                  <button onClick={() => { setFitMode('PAGE'); setIsAutoFit(true); }} className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${isAutoFit && fitMode === 'PAGE' ? 'bg-white text-indigo-600 shadow-lg' : 'text-slate-400'}`}>Fit Page</button>
+                  <button onClick={() => { setFitMode('WIDTH'); setIsAutoFit(true); }} className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${isAutoFit && fitMode === 'WIDTH' ? 'bg-white text-indigo-600 shadow-lg' : 'text-slate-400'}`}>Fit Width</button>
+               </div>
+               <span className="text-[8px] font-black uppercase text-slate-300 tracking-[0.2em] italic">Live Mirroring Shard 01</span>
             </div>
 
             <div className="flex items-center space-x-4 bg-slate-50 p-2 rounded-2xl border border-slate-200 shadow-sm">
@@ -314,7 +340,7 @@ const PrintCenter: React.FC<PrintCenterProps> = ({ vouchers, activeCompany }) =>
             </div>
          </div>
 
-         <div ref={containerRef} className="flex-1 overflow-auto custom-scrollbar p-16 relative scroll-smooth bg-slate-300/20">
+         <div ref={containerRef} className="flex-1 overflow-auto custom-scrollbar p-16 relative scroll-smooth bg-slate-300/10">
             <div className="flex justify-center min-h-full">
                {previewVch ? (
                  <div 
@@ -336,16 +362,16 @@ const PrintCenter: React.FC<PrintCenterProps> = ({ vouchers, activeCompany }) =>
                   />
                  </div>
                ) : (
-                 <div className="flex flex-col items-center justify-center h-64 text-slate-400 space-y-8 opacity-40 animate-pulse mt-40">
+                 <div className="flex flex-col items-center justify-center h-64 text-slate-400 space-y-8 opacity-40 mt-40">
                     <div className="w-24 h-24 bg-white rounded-[2.5rem] flex items-center justify-center shadow-inner border border-slate-200">
                       <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
                     </div>
-                    <p className="text-sm font-black uppercase tracking-[0.5em] italic">Buffer empty. Select docs for preview.</p>
+                    <p className="text-sm font-black uppercase tracking-[0.5em] italic">Spool Buffer Offline</p>
                  </div>
                )}
             </div>
             
-            {/* Batch Output Stream */}
+            {/* Hidden output for the print stream */}
             <div id="batch-spool-output" className="hidden">
                {(selectedVchIds.length > 0 ? selectedVchIds : (filteredVouchers.length > 0 ? [filteredVouchers[0].id] : [])).map((id, idx) => {
                   const v = vouchers.find(x => x.id === id);

@@ -44,7 +44,9 @@ export enum DisplaySubMenu {
   CASH_FLOW = 'Cash Flow',
   INVENTORY_SUMMARY = 'Inventory Summary',
   GST_REPORTS = 'GST Reports',
-  GSTR_1 = 'GSTR-1 (Sales)'
+  GSTR_1 = 'GSTR-1 (Sales)',
+  LEDGER_REPORT = 'Ledger Statement',
+  OUTSTANDING_REPORT = 'Bills Outstanding'
 }
 
 export type GstReportType = 'GSTR-1' | 'GSTR-2' | 'GSTR-3B' | 'HSN-SUMMARY';
@@ -147,6 +149,7 @@ export interface VoucherItem {
   batchNo?: string;
   currency?: string;
   exchangeRate?: number;
+  costCenter?: string;
 }
 
 export interface Adjustment {
@@ -169,6 +172,8 @@ export interface LedgerEntry {
   igst?: number;
   currency?: string;
   exchangeRate?: number;
+  costCenter?: string;
+  billRef?: string;
 }
 
 export type VoucherType = 'Sales' | 'Purchase' | 'Sales Return' | 'Purchase Return' | 'Payment' | 'Receipt' | 'Journal' | 'Contra' | 'Delivery Note' | 'Goods Receipt Note (GRN)' | 'Stock Adjustment' | 'Purchase Order' | 'Credit Note' | 'Debit Note';
