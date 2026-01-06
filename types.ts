@@ -1,3 +1,4 @@
+
 import React from 'react';
 
 export enum MainMenuType {
@@ -39,7 +40,8 @@ export enum TransactionSubMenu {
   DEBIT_NOTE = 'Debit Note',
   PURCHASE_ORDER = 'Purchase Orders',
   BANK_RECONCILIATION = 'Bank Reconciliation',
-  DAY_BOOK = 'Day Book'
+  DAY_BOOK = 'Day Book',
+  TRANSACTION_LOG = 'Transaction Log'
 }
 
 export enum DisplaySubMenu {
@@ -58,8 +60,7 @@ export enum DisplaySubMenu {
   OUTSTANDING_REPORT = 'Bills Outstanding'
 }
 
-export type GstReportType = 'GSTR-1' | 'GSTR-2' | 'GSTR-3B' | 'HSN-SUMMARY';
-
+// Fixed: Added missing CommunicationSubMenu enum
 export enum CommunicationSubMenu {
   PRINT_CENTER = 'Print Center',
   EMAIL_GATEWAY = 'Email Gateway',
@@ -67,11 +68,11 @@ export enum CommunicationSubMenu {
   DISPATCH_LOGS = 'Dispatch Logs'
 }
 
+// Fixed: Added missing HouseKeepingSubMenu enum
 export enum HouseKeepingSubMenu {
   DATABASE_UTILITY = 'Database Utility',
   INTEGRITY_CHECK = 'Data Integrity',
   SYSTEM_AUDIT = 'Security Audit',
-  DATA_PURGE = 'Data Purge Utility',
   RENUMBERING = 'Voucher Renumbering',
   PREFERENCES = 'System Preferences'
 }
@@ -104,11 +105,13 @@ export interface Company {
   approvalThreshold?: number;
 }
 
+export type PermissionLevel = 'none' | 'read' | 'write' | 'all';
+
 export interface UserPermissions {
-  company: 'none' | 'read' | 'write' | 'all';
-  administration: 'none' | 'read' | 'write' | 'all';
-  transaction: 'none' | 'read' | 'write' | 'all';
-  display: 'none' | 'read' | 'write' | 'all';
+  company: PermissionLevel;
+  administration: PermissionLevel;
+  transaction: PermissionLevel;
+  display: PermissionLevel;
 }
 
 export interface Role {
@@ -133,8 +136,8 @@ export interface User {
 export interface AuditLog {
   id: string;
   actor: string;
-  action: 'CREATE' | 'UPDATE' | 'DELETE' | 'STATUS_CHANGE' | 'AUTHORIZE';
-  entityType: 'USER' | 'ROLE' | 'SYSTEM' | 'COMPANY' | 'VOUCHER' | 'MASTER';
+  action: 'CREATE' | 'UPDATE' | 'DELETE' | 'STATUS_CHANGE' | 'LOGIN';
+  entityType: 'USER' | 'ROLE' | 'COMPANY' | 'LEDGER' | 'GROUP' | 'VOUCHER' | 'MASTER';
   entityName: string;
   details: string;
   timestamp: string;
@@ -156,13 +159,7 @@ export interface VoucherItem {
   igstRate?: number;
   taxAmount?: number;
   batchNo?: string;
-}
-
-export interface Adjustment {
-  id: string;
-  label: string;
-  type: 'Add' | 'Less';
-  amount: number;
+  currency?: string;
 }
 
 export interface LedgerEntry {
@@ -173,9 +170,6 @@ export interface LedgerEntry {
   amount: number;
   taxRate?: number;
   taxAmount?: number;
-  cgst?: number;
-  sgst?: number;
-  igst?: number;
 }
 
 export type VoucherType = 'Sales' | 'Purchase' | 'Sales Return' | 'Purchase Return' | 'Payment' | 'Receipt' | 'Journal' | 'Contra' | 'Delivery Note' | 'Goods Receipt Note (GRN)' | 'Stock Adjustment' | 'Purchase Order' | 'Credit Note' | 'Debit Note';
@@ -189,25 +183,18 @@ export interface Voucher {
   status: 'Draft' | 'Posted' | 'Cancelled' | 'Pending Approval';
   narration?: string;
   ledgerId?: string;
-  secondaryLedgerId?: string;
   entries?: LedgerEntry[];
-  reference?: string;
-  sourceDocRef?: string;
-  returnReason?: string;
-  items?: VoucherItem[];
-  adjustments?: Adjustment[];
-  subTotal?: number;
-  discountTotal?: number;
-  taxTotal?: number;
-  supplyType?: 'Local' | 'Central';
-  gstClassification?: 'Input' | 'Output';
-  isReconciled?: boolean;
-  bankDate?: string;
-  attachments?: Attachment[];
-  approvedBy?: string;
-  approvalDate?: string;
   currency?: string;
   exchangeRate?: number;
+  isReconciled?: boolean;
+  bankDate?: string;
+  subTotal?: number;
+  taxTotal?: number;
+  items?: VoucherItem[];
+  supplyType?: 'Local' | 'Central';
+  gstClassification?: 'Input' | 'Output';
+  approvedBy?: string;
+  approvalDate?: string;
 }
 
 export interface Ledger {
@@ -217,29 +204,15 @@ export interface Ledger {
   openingBalance: number;
   type: 'Debit' | 'Credit';
   budget?: number;
+  taxId?: string;
+  email?: string;
 }
 
-export interface Item {
+export interface AccountGroup {
   id: string;
   name: string;
-  category: string;
-  unit: string;
-  salePrice: number;
-  costPrice?: number;
-  hsnCode: string;
-  gstRate: number;
-  taxGroupId?: string;
-  currentStock?: number;
-  isBatchTracked?: boolean;
-}
-
-export interface Batch {
-  id: string;
-  itemId: string;
-  batchNo: string;
-  mfgDate: string;
-  expiryDate: string;
-  currentStock: number;
+  nature: 'Assets' | 'Liabilities' | 'Income' | 'Expenses';
+  isSystem?: boolean;
 }
 
 export interface MenuItem {
@@ -256,10 +229,14 @@ export interface SubMenuItem {
   color: string;
 }
 
-export interface AccountGroup {
+export interface Tax {
   id: string;
   name: string;
-  nature: 'Assets' | 'Liabilities' | 'Income' | 'Expenses';
+  rate: number;
+  type: string;
+  classification: 'Input' | 'Output';
+  supplyType: 'Local' | 'Central';
+  groupId?: string;
   isSystem?: boolean;
 }
 
@@ -270,24 +247,37 @@ export interface TaxGroup {
   isSystem?: boolean;
 }
 
-export interface Tax {
+export interface Item {
   id: string;
   name: string;
-  rate: number;
-  type: string; 
-  classification: 'Input' | 'Output';
-  supplyType: 'Local' | 'Central';
-  groupId?: string;
+  category: string;
+  unit: string;
+  salePrice: number;
+  costPrice: number;
+  hsnCode: string;
+  gstRate: number;
+  taxGroupId?: string;
+  isBatchTracked?: boolean;
 }
 
-export type TaskPriority = 'Low' | 'Medium' | 'High';
+export interface Batch {
+  id: string;
+  itemId: string;
+  batchNo: string;
+  mfgDate: string;
+  expiryDate: string;
+  currentStock: number;
+}
+
+export type TaskPriority = 'High' | 'Medium' | 'Low';
 
 export interface Task {
   id: string;
   title: string;
-  description?: string;
   dueDate: string;
   priority: TaskPriority;
   status: 'Pending' | 'Completed';
   createdAt: string;
 }
+
+export type GstReportType = 'GSTR-1' | 'GSTR-2' | 'GSTR-3B' | 'HSN-SUMMARY';

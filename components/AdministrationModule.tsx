@@ -13,7 +13,7 @@ import TaxForm from './TaxForm';
 import TaxGroupForm from './TaxGroupForm';
 import ActionMenu, { ActionItem } from './ActionMenu';
 import EmailGateway from './EmailGateway';
-import CsvImportWizard from './CsvImportWizard';
+import CsvImportWizard, { ImportField } from './CsvImportWizard';
 
 interface AdministrationModuleProps {
   users: User[];
@@ -56,6 +56,16 @@ const AdministrationModule: React.FC<AdministrationModuleProps> = ({
   unitMeasures, setUnitMeasures, companies = [], setCompanies, isFYLocked
 }) => {
 
+  const ITEM_IMPORT_FIELDS: ImportField[] = [
+    { key: 'name', label: 'Item Designation', required: true },
+    { key: 'category', label: 'Category', defaultValue: 'General' },
+    { key: 'unit', label: 'Unit of Measure', defaultValue: 'Nos' },
+    { key: 'salePrice', label: 'Standard Sale Price', type: 'number' },
+    { key: 'costPrice', label: 'Base Cost Price', type: 'number' },
+    { key: 'hsnCode', label: 'HSN/SAC Code', defaultValue: '0000' },
+    { key: 'gstRate', label: 'Tax Rate (%)', type: 'number', defaultValue: 18 }
+  ];
+
   const MastersManagementView = () => {
     const [activeTab, setActiveTab] = useState<'LEDGERS' | 'GROUPS' | 'ITEMS' | 'BATCHES' | 'TAX_CONFIGS' | 'TAX_GROUPS'>('LEDGERS');
     const [searchTerm, setSearchTerm] = useState('');
@@ -97,15 +107,17 @@ const AdministrationModule: React.FC<AdministrationModuleProps> = ({
       setEditingId(null);
     };
 
-    const handleImportSubmit = (importedItems: Item[]) => {
-       setItems(prev => [...prev, ...importedItems]);
+    const handleBulkImport = (importedData: any[]) => {
+       if (activeTab === 'ITEMS') {
+          setItems(prev => [...prev, ...importedData]);
+          addAuditLog({
+            action: 'CREATE',
+            entityType: 'MASTER',
+            entityName: 'ITEM_BULK_IMPORT',
+            details: `Bulk Ingestion Success: ${importedData.length} item shards committed.`
+          });
+       }
        setIsImportOpen(false);
-       addAuditLog({
-         action: 'CREATE',
-         entityType: 'MASTER',
-         entityName: 'ITEM_BULK_IMPORT',
-         details: `Bulk Ingestion Complete: ${importedItems.length} objects injected via CSV Relay.`
-       });
     };
 
     const handleBatchSubmit = (data: Omit<Batch, 'id'>) => {
@@ -156,7 +168,7 @@ const AdministrationModule: React.FC<AdministrationModuleProps> = ({
                 onClick={() => setIsImportOpen(true)}
                 className="px-6 py-3 bg-slate-100 text-slate-500 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-200 transition-all border border-slate-200"
               >
-                CSV Import
+                CSV Ingest
               </button>
             )}
             {activeTab === 'BATCHES' && selectedItemIdForBatches && (
@@ -294,7 +306,13 @@ const AdministrationModule: React.FC<AdministrationModuleProps> = ({
         {isImportOpen && (
            <div className="fixed inset-0 z-[150] flex items-center justify-center p-6 bg-slate-950/80 backdrop-blur-xl animate-in fade-in duration-300">
               <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto custom-scrollbar shadow-2xl">
-                 <CsvImportWizard onCancel={() => setIsImportOpen(false)} onImport={handleImportSubmit} existingItems={items} />
+                 <CsvImportWizard 
+                   entityName={activeTab === 'ITEMS' ? "Item Catalogue" : "Registry Shards"}
+                   fields={ITEM_IMPORT_FIELDS}
+                   existingKeys={items.map(i => i.name)}
+                   onCancel={() => setIsImportOpen(false)} 
+                   onImport={handleBulkImport} 
+                 />
               </div>
            </div>
         )}
@@ -320,7 +338,7 @@ const AdministrationModule: React.FC<AdministrationModuleProps> = ({
         {activeSubAction === AdminSubMenu.MASTERS ? <MastersManagementView /> : 
          activeSubAction === AdminSubMenu.USERS ? <UsersModule users={users} setUsers={setUsers} roles={roles} setRoles={setRoles} auditLogs={auditLogs} addAuditLog={addAuditLog} /> :
          (activeSubAction === AdminSubMenu.BACKUP || activeSubAction === AdminSubMenu.AUTOMATIC_BACKUP) ? <BackupModule initialView={activeSubAction === AdminSubMenu.AUTOMATIC_BACKUP ? 'AUTOMATIC_BACKUPS' : 'SNAPSHOTS'} /> :
-         activeSubAction === AdminSubMenu.IMPORT_EXPORT ? <ImportExportModule vouchers={vouchers} items={items} setItems={setItems} /> :
+         activeSubAction === AdminSubMenu.IMPORT_EXPORT ? <ImportExportModule vouchers={vouchers} items={items} setItems={setItems} ledgers={ledgers} setLedgers={setLedgers} addAuditLog={addAuditLog} /> :
          activeSubAction === AdminSubMenu.YEAR_CHANGE ? <YearChangeModule activeCompany={activeCompany} currentFY={currentFY} setCurrentFY={setCurrentFY} onClose={() => setActiveSubAction(null)} /> :
          activeSubAction === AdminSubMenu.EMAIL_GATEWAY ? <EmailGateway vouchers={vouchers} ledgers={ledgers} accountGroups={accountGroups} activeCompany={activeCompany} /> :
          <div className="bg-white rounded-[4rem] p-20 border border-slate-200 h-full flex flex-col items-center justify-center text-center">

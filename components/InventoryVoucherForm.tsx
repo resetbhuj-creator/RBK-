@@ -1,5 +1,7 @@
+
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Item, Ledger, Voucher, VoucherItem, Adjustment, VoucherType, Batch, Attachment } from '../types';
+// Fixed: Removed missing and unused Adjustment import from types
+import { Item, Ledger, Voucher, VoucherItem, VoucherType, Batch, Attachment } from '../types';
 
 interface InventoryVoucherFormProps {
   isReadOnly?: boolean;

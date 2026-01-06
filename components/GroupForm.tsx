@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { AccountGroup } from '../types';
 
@@ -43,71 +42,60 @@ const GroupForm: React.FC<GroupFormProps> = ({ initialData, onCancel, onSubmit }
     }
   };
 
-  const inputClass = (name: string) => `
-    w-full px-4 py-2.5 rounded-xl border outline-none transition-all text-sm
-    ${errors[name] ? 'border-rose-500 focus:ring-2 focus:ring-rose-100 bg-rose-50/30' : 'border-slate-200 focus:ring-2 focus:ring-indigo-500 bg-white shadow-sm'}
-  `;
-
   return (
-    <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
-      <div className="px-8 py-6 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
-        <div>
-          <h3 className="text-xl font-bold text-slate-800">{initialData ? 'Edit Account Group' : 'New Account Group'}</h3>
-          <p className="text-xs text-slate-500">Classify ledgers under statutory financial categories.</p>
+    <div className="bg-white rounded-[3rem] border border-slate-200 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
+      <div className="px-10 py-10 bg-slate-950 text-white flex justify-between items-center shrink-0 border-b border-slate-900">
+        <div className="flex items-center space-x-6">
+          <div className="w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center text-3xl shadow-xl transform rotate-3">📁</div>
+          <div>
+            <h3 className="text-2xl font-black italic uppercase tracking-tighter leading-none">{initialData ? 'Edit Account Cluster' : 'Define New Account Cluster'}</h3>
+            <p className="text-[10px] font-bold uppercase tracking-[0.4em] text-indigo-400 mt-2">Structural Mapping • Master Partition</p>
+          </div>
         </div>
-        <button onClick={onCancel} className="p-2 hover:bg-slate-200 rounded-full text-slate-400 transition-colors">
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+        <button onClick={onCancel} className="p-3 bg-white/5 hover:bg-rose-500 rounded-full transition-all border border-white/10 group">
+          <svg className="w-6 h-6 text-slate-500 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth={3} /></svg>
         </button>
       </div>
 
-      <form onSubmit={handleSubmit} className="p-8 space-y-6">
-        <div className="space-y-1">
-          <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Group Name</label>
+      <form onSubmit={handleSubmit} className="p-12 space-y-12 bg-slate-50/20">
+        <div className="space-y-2">
+          <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-2">Cluster Title (Group Name)</label>
           <input 
             value={formData.name} 
             onChange={e => setFormData({...formData, name: e.target.value})} 
             placeholder="e.g. Fixed Assets (Tangible)" 
-            className={inputClass('name')}
-            disabled={initialData?.isSystem}
+            className={`w-full px-6 py-4 rounded-2xl border outline-none font-black text-sm shadow-inner transition-all ${errors.name ? 'border-rose-500 bg-rose-50' : 'border-slate-200 focus:ring-8 focus:ring-indigo-500/5 bg-white'}`}
           />
-          {errors.name && <p className="text-[10px] text-rose-500 font-bold mt-1">{errors.name}</p>}
-          {initialData?.isSystem && <p className="text-[9px] text-amber-500 font-bold mt-1 italic">System names are locked for structural integrity.</p>}
+          {errors.name && <p className="text-[10px] text-rose-500 font-black mt-2 ml-1">{errors.name}</p>}
         </div>
 
-        <div className="space-y-1">
-          <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Account Nature</label>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-1 bg-slate-100 rounded-2xl">
+        <div className="space-y-4">
+          <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-2">Primary Financial Nature</label>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 p-1.5 bg-slate-200 rounded-[2rem] border border-slate-200 shadow-inner">
             {NATURES.map((nature) => (
               <button
                 key={nature}
                 type="button"
                 onClick={() => setFormData({...formData, nature})}
-                className={`py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${
+                className={`py-4 text-[10px] font-black uppercase tracking-[0.2em] rounded-2xl transition-all ${
                   formData.nature === nature 
-                    ? 'bg-white text-indigo-600 shadow-sm' 
-                    : 'text-slate-500 hover:text-slate-700'
+                    ? 'bg-white text-indigo-600 shadow-xl scale-105' 
+                    : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
                 {nature}
               </button>
             ))}
           </div>
-          {errors.nature && <p className="text-[10px] text-rose-500 font-bold mt-1">{errors.nature}</p>}
+          <p className="text-[9px] text-slate-400 font-medium italic px-4 leading-relaxed">
+             Note: Changing the nature fundamentally alters how linked ledgers are projected in statutory financial statements (Balance Sheet / Profit & Loss).
+          </p>
         </div>
 
-        <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-          <div className="flex items-start space-x-3 text-slate-600">
-            <svg className="w-5 h-5 text-indigo-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-            <p className="text-[11px] font-medium leading-relaxed">
-              Account groups define how linked ledgers are rolled up into the Balance Sheet and Profit & Loss statement. Changing the 'Nature' will fundamentally alter financial reporting.
-            </p>
-          </div>
-        </div>
-
-        <div className="pt-6 border-t border-slate-100 flex justify-end space-x-3">
-          <button type="button" onClick={onCancel} className="px-6 py-2.5 rounded-xl text-slate-500 font-bold hover:bg-slate-50 transition-colors">Cancel</button>
-          <button type="submit" className="px-10 py-2.5 bg-indigo-600 text-white rounded-xl font-black shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all transform active:scale-95">
-            {initialData ? 'Commit Changes' : 'Create Group'}
+        <div className="pt-10 border-t border-slate-200 flex flex-col sm:flex-row justify-end gap-5">
+          <button type="button" onClick={onCancel} className="px-10 py-5 rounded-[1.8rem] font-black text-xs uppercase tracking-widest text-slate-400 hover:bg-white hover:text-slate-600 transition-all">Abort Action</button>
+          <button type="submit" className="px-16 py-5 bg-slate-950 text-white rounded-[1.8rem] font-black text-xs uppercase tracking-[0.4em] shadow-2xl hover:bg-indigo-600 transition-all transform active:scale-95 border-b-8 border-black/40">
+            {initialData ? 'Commit Blueprint Update' : 'Authorize New Cluster'}
           </button>
         </div>
       </form>

@@ -61,6 +61,12 @@ const Gstr2Report: React.FC<Gstr2ReportProps> = ({ vouchers, ledgers, activeComp
       if (!v.supplyType) {
         errors.push({ vId: v.id, party: v.party, message: 'Place of Supply (Jurisdiction) not defined.', severity: 'CRITICAL' });
       }
+
+      v.items?.forEach(item => {
+         if (!item.hsn || item.hsn.trim() === '' || item.hsn === 'N/A') {
+            errors.push({ vId: v.id, party: v.party, message: `Missing HSN code for inward item: ${item.name}`, severity: 'WARNING' });
+         }
+      });
     });
 
     setFilingErrors(errors);
@@ -120,7 +126,7 @@ const Gstr2Report: React.FC<Gstr2ReportProps> = ({ vouchers, ledgers, activeComp
                              <td className="px-12 py-8 text-xs font-bold text-slate-400 uppercase">{v.date}</td>
                              <td className="px-12 py-8 text-right font-black text-slate-900 tabular-nums">${v.grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                              <td className="px-12 py-8 text-center">
-                                <span className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase border shadow-sm ${v.supplyType === 'Local' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-indigo-50 text-indigo-600 border-indigo-100'}`}>
+                                <span className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase border shadow-sm ${v.supplyType === 'Local' ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-indigo-50 text-indigo-600 border-indigo-100'}`}>
                                    {pos}
                                 </span>
                              </td>
@@ -132,6 +138,9 @@ const Gstr2Report: React.FC<Gstr2ReportProps> = ({ vouchers, ledgers, activeComp
                           </tr>
                        );
                     })}
+                    {reportData.list.length === 0 && (
+                       <tr><td colSpan={8} className="py-40 text-center text-slate-300 italic font-black uppercase tracking-widest">Zero inward shards in selected period.</td></tr>
+                    )}
                </tbody>
             </table>
          </div>

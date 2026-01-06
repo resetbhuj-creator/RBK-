@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { User, UserPermissions, Role } from '../types';
+import React, { useState, useEffect } from 'react';
+import { User, UserPermissions, Role, PermissionLevel } from '../types';
 
 interface UserFormProps {
   initialData?: User;
@@ -8,13 +8,13 @@ interface UserFormProps {
   onSubmit: (data: Omit<User, 'id' | 'lastLogin'>) => void;
 }
 
-const PERM_LEVELS = ['none', 'read', 'write', 'all'] as const;
+const PERM_LEVELS: PermissionLevel[] = ['none', 'read', 'write', 'all'];
 
-const PERM_LEVEL_INFO = {
-  none: { label: 'RESTRICTED', desc: 'No access to module', color: 'text-slate-400', bg: 'bg-slate-100', icon: '🔒' },
-  read: { label: 'AUDITOR', desc: 'Passive visibility only', color: 'text-sky-600', bg: 'bg-sky-50', icon: '👁️' },
-  write: { label: 'OPERATOR', desc: 'Input & Update capability', color: 'text-indigo-600', bg: 'bg-indigo-50', icon: '✏️' },
-  all: { label: 'SOVEREIGN', desc: 'Full CRUD & Statutory authority', color: 'text-emerald-600', bg: 'bg-emerald-50', icon: '⭐' }
+const PERM_INFO = {
+  none: { label: 'RESTRICTED', desc: 'No access permitted to this shard.', color: 'text-slate-400', bg: 'bg-slate-100', icon: '🔒' },
+  read: { label: 'AUDITOR', desc: 'Passive visibility of all entries.', color: 'text-blue-600', bg: 'bg-blue-50', icon: '👁️' },
+  write: { label: 'OPERATOR', desc: 'Input and update capability.', color: 'text-indigo-600', bg: 'bg-indigo-50', icon: '✏️' },
+  all: { label: 'ADMINISTRATOR', desc: 'Full structural authority.', color: 'text-emerald-600', bg: 'bg-emerald-50', icon: '⭐' }
 };
 
 const UserForm: React.FC<UserFormProps> = ({ initialData, availableRoles, onCancel, onSubmit }) => {
@@ -24,7 +24,7 @@ const UserForm: React.FC<UserFormProps> = ({ initialData, availableRoles, onCanc
     phone: '',
     role: availableRoles[0]?.name || 'Staff',
     status: 'Active',
-    permissions: availableRoles[0]?.permissions || {
+    permissions: {
       company: 'read',
       administration: 'none',
       transaction: 'read',
@@ -32,8 +32,8 @@ const UserForm: React.FC<UserFormProps> = ({ initialData, availableRoles, onCanc
     }
   });
 
+  const [globalPermission, setGlobalPermission] = useState<PermissionLevel>('read');
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [touched, setTouched] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (initialData) {
@@ -48,33 +48,24 @@ const UserForm: React.FC<UserFormProps> = ({ initialData, availableRoles, onCanc
     }
   }, [initialData]);
 
-  const validate = () => {
-    const newErrors: Record<string, string> = {};
-    if (!formData.name.trim()) newErrors.name = 'Full identity designation required';
-    if (!formData.email.trim()) newErrors.email = 'Corporate communication node required';
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) newErrors.email = 'Invalid node address format';
-    
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
   const handleRoleChange = (roleName: string) => {
-    const selectedRole = availableRoles.find(r => r.name === roleName);
+    const role = availableRoles.find(r => r.name === roleName);
     setFormData(prev => ({
       ...prev,
       role: roleName,
-      permissions: selectedRole ? { ...selectedRole.permissions } : prev.permissions
+      permissions: role ? { ...role.permissions } : prev.permissions
     }));
   };
 
-  const handlePermChange = (module: keyof UserPermissions, level: UserPermissions[keyof UserPermissions]) => {
+  const handlePermChange = (module: keyof UserPermissions, level: PermissionLevel) => {
     setFormData(prev => ({
       ...prev,
       permissions: { ...prev.permissions, [module]: level }
     }));
   };
 
-  const handleGlobalApply = (level: UserPermissions[keyof UserPermissions]) => {
+  const applyGlobalPermission = (level: PermissionLevel) => {
+    setGlobalPermission(level);
     setFormData(prev => ({
       ...prev,
       permissions: {
@@ -86,166 +77,146 @@ const UserForm: React.FC<UserFormProps> = ({ initialData, availableRoles, onCanc
     }));
   };
 
+  const validate = () => {
+    const newErrors: Record<string, string> = {};
+    if (!formData.name.trim()) newErrors.name = 'Full name required';
+    if (!formData.email.trim()) newErrors.email = 'Email node required';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) newErrors.email = 'Invalid node address';
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setTouched({ name: true, email: true });
     if (validate()) onSubmit(formData);
   };
 
-  const PermissionRow = ({ label, module }: { label: string, module: keyof UserPermissions }) => {
-    const currentVal = formData.permissions[module];
-    const activeInfo = (PERM_LEVEL_INFO as any)[currentVal];
-
+  const PermissionRow = ({ module, label }: { module: keyof UserPermissions, label: string }) => {
+    const current = formData.permissions[module];
+    const info = PERM_INFO[current];
     return (
-      <div className="p-6 rounded-[2.5rem] border-2 border-slate-100 bg-white shadow-sm group hover:border-indigo-100 transition-all">
-        <div className="flex items-center justify-between mb-5">
-          <div className="flex items-center space-x-4">
-            <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-indigo-600 group-hover:text-white transition-all">
-              {activeInfo.icon}
-            </div>
-            <div>
-              <h4 className="text-[11px] font-black uppercase text-slate-800 tracking-tight italic">{label}</h4>
-              <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Modular Access</p>
-            </div>
+      <div className="flex flex-col space-y-4 p-6 bg-slate-50 rounded-3xl border border-slate-100 group hover:border-indigo-200 transition-all">
+        <div className="flex justify-between items-center">
+          <div className="flex items-center space-x-3">
+             <div className="w-8 h-8 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-xs shadow-xs">{info.icon}</div>
+             <span className="text-[10px] font-black uppercase text-slate-500 tracking-widest italic">{label} Shard</span>
           </div>
-          <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded border ${activeInfo.bg} ${activeInfo.color} border-current opacity-60`}>
-              {activeInfo.label}
-          </span>
+          <div className="relative group/tooltip">
+             <span className={`text-[8px] font-black px-2 py-0.5 rounded border ${info.bg} ${info.color} border-current opacity-70 cursor-help uppercase tracking-widest`}>
+               {info.label}
+             </span>
+             <div className="absolute bottom-full right-0 mb-2 hidden group-hover/tooltip:block z-10">
+                <div className="bg-slate-900 text-white text-[9px] font-black uppercase py-2 px-3 rounded-xl whitespace-nowrap shadow-2xl border border-white/10">
+                   {info.desc}
+                </div>
+             </div>
+          </div>
         </div>
-        
-        <div className="grid grid-cols-4 gap-1.5 bg-slate-100 p-1.5 rounded-2xl border border-slate-200 shadow-inner">
-          {PERM_LEVELS.map(level => (
-            <button
-              key={level}
-              type="button"
-              onClick={() => handlePermChange(module, level)}
-              className={`flex-1 py-3 text-[9px] font-black uppercase tracking-tighter rounded-xl transition-all ${
-                currentVal === level 
-                  ? 'bg-white text-indigo-600 shadow-lg border border-slate-100 scale-105 z-10' 
-                  : 'text-slate-400 hover:text-slate-700'
-              }`}
-            >
-              {level}
-            </button>
-          ))}
+        <div className="flex bg-slate-200/50 p-1 rounded-2xl border border-slate-200 shadow-inner">
+           {PERM_LEVELS.map(level => (
+             <button
+               key={level}
+               type="button"
+               onClick={() => handlePermChange(module, level)}
+               className={`flex-1 py-2 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all ${current === level ? 'bg-white text-indigo-600 shadow-md scale-105' : 'text-slate-400 hover:text-slate-600'}`}
+             >
+               {level}
+             </button>
+           ))}
         </div>
       </div>
     );
   };
 
   return (
-    <div className="bg-white rounded-[3.5rem] shadow-2xl overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-300 max-w-6xl mx-auto">
-      <div className="px-10 py-10 bg-slate-950 text-white flex justify-between items-center relative overflow-hidden">
-        <div className="relative z-10 flex items-center space-x-6">
-          <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-xl transform -rotate-3 transition-transform hover:rotate-0 border-4 border-indigo-400/20">
-            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
-          </div>
+    <div className="bg-white rounded-[3.5rem] shadow-2xl overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-300 max-w-5xl mx-auto">
+      <div className="px-12 py-10 bg-slate-950 text-white flex justify-between items-center relative overflow-hidden">
+        <div className="relative z-10 flex items-center space-x-8">
+          <div className="w-16 h-16 bg-indigo-600 rounded-[1.8rem] flex items-center justify-center text-3xl shadow-2xl transform rotate-3 border-4 border-indigo-400/20">👤</div>
           <div>
-            <h3 className="text-3xl font-black tracking-tighter uppercase italic leading-none">Identity Workspace</h3>
-            <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-[0.4em] mt-3">Personnel Profile & Authorization Logic</p>
+            <h3 className="text-3xl font-black italic uppercase tracking-tighter leading-none">{initialData ? 'Update Account Node' : 'Authorize Identity'}</h3>
+            <p className="text-[10px] font-bold uppercase tracking-[0.4em] text-indigo-400 mt-2">IAM Controller • System Partition</p>
           </div>
         </div>
-        <button onClick={onCancel} className="relative z-10 p-3 bg-white/5 hover:bg-rose-500 rounded-full text-slate-400 hover:text-white transition-all border border-white/10">
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
+        <button onClick={onCancel} className="relative z-10 p-3 bg-white/5 hover:bg-rose-600 rounded-full transition-all border border-white/10 group">
+          <svg className="w-6 h-6 text-slate-500 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth={3} /></svg>
         </button>
         <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-indigo-600 rounded-full blur-[150px] opacity-10 -mr-32 -mt-32"></div>
       </div>
 
-      <form onSubmit={handleSubmit} className="p-10 space-y-12 bg-slate-50/30 overflow-y-auto max-h-[75vh] custom-scrollbar">
-        
-        {/* Basic Identity Details */}
-        <section className="space-y-6">
-          <div className="flex items-center space-x-4">
-             <div className="w-1 h-6 bg-indigo-600 rounded-full"></div>
-             <h4 className="text-xs font-black uppercase text-slate-800 tracking-widest">I. Staff Parameters</h4>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-white p-10 rounded-[3rem] border border-slate-200 shadow-sm">
-            <div className="space-y-1">
-              <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-2">Legal Identity Name</label>
-              <input 
-                value={formData.name} 
-                onChange={e => setFormData({...formData, name: e.target.value})} 
-                placeholder="e.g. Vance Alexander" 
-                className={`w-full px-6 py-4 rounded-2xl border outline-none transition-all text-sm font-bold ${touched.name && errors.name ? 'border-rose-500 bg-rose-50/50' : 'border-slate-200 focus:ring-4 focus:ring-indigo-500/10'}`}
-              />
-              {touched.name && errors.name && <p className="text-[10px] text-rose-500 font-bold mt-1 ml-2">{errors.name}</p>}
-            </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-2">Corporate Node Address (Email)</label>
-              <input 
-                value={formData.email} 
-                onChange={e => setFormData({...formData, email: e.target.value})} 
-                placeholder="vance@nexus-core.net" 
-                className={`w-full px-6 py-4 rounded-2xl border outline-none transition-all text-sm font-bold ${touched.email && errors.email ? 'border-rose-500 bg-rose-50/50' : 'border-slate-200 focus:ring-4 focus:ring-indigo-500/10'}`}
-              />
-              {touched.email && errors.email && <p className="text-[10px] text-rose-500 font-bold mt-1 ml-2">{errors.email}</p>}
-            </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-2">Structural Role Assignment</label>
-              <select 
-                value={formData.role} 
-                onChange={e => handleRoleChange(e.target.value)}
-                className="w-full px-6 py-4 rounded-2xl border border-slate-200 bg-white text-sm font-black text-indigo-600 outline-none shadow-sm cursor-pointer hover:border-indigo-400 transition-colors"
-              >
-                {availableRoles.map(role => (
-                  <option key={role.id} value={role.name}>{role.name}</option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-1">
-               <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-2">Availability State</label>
-               <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200 shadow-inner">
-                  {(['Active', 'Suspended'] as const).map(s => (
-                    <button 
-                      key={s}
-                      type="button"
-                      onClick={() => setFormData({...formData, status: s})}
-                      className={`flex-1 py-3.5 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${formData.status === s ? 'bg-white text-slate-900 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
-                    >
-                      {s}
-                    </button>
-                  ))}
-               </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Permission Orchestrator */}
-        <section className="space-y-8">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="w-1 h-6 bg-indigo-600 rounded-full"></div>
-              <h4 className="text-xs font-black uppercase text-slate-800 tracking-widest">II. Authorization Matrix</h4>
-            </div>
-            
-            <div className="flex items-center space-x-4 bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm">
-               <span className="text-[9px] font-black uppercase text-slate-400 px-4">Global Blueprint:</span>
-               {PERM_LEVELS.map(level => (
-                 <button
-                   key={level}
-                   type="button"
-                   onClick={() => handleGlobalApply(level)}
-                   className="px-5 py-2 text-[9px] font-black uppercase rounded-xl transition-all text-indigo-600 bg-indigo-50 border border-indigo-100 hover:bg-indigo-600 hover:text-white"
-                 >
-                   Apply {level}
-                 </button>
+      <form onSubmit={handleSubmit} className="p-12 space-y-12 overflow-y-auto max-h-[75vh] custom-scrollbar bg-slate-50/20">
+        <section className="grid grid-cols-1 md:grid-cols-2 gap-10">
+           <div className="space-y-2">
+             <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-2">Identity Designation (Name)</label>
+             <input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className={`w-full px-6 py-4 rounded-2xl border outline-none font-black text-sm shadow-inner transition-all ${errors.name ? 'border-rose-500 bg-rose-50' : 'border-slate-200 focus:ring-8 focus:ring-indigo-500/5 bg-white'}`} placeholder="e.g. Vance Alexander" />
+           </div>
+           <div className="space-y-2">
+             <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-2">Secure Node Address (Email)</label>
+             <input value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className={`w-full px-6 py-4 rounded-2xl border outline-none font-black text-sm shadow-inner transition-all ${errors.email ? 'border-rose-500 bg-rose-50' : 'border-slate-200 focus:ring-8 focus:ring-indigo-500/5 bg-white'}`} placeholder="vance@nexus-erp.net" />
+           </div>
+           <div className="space-y-2">
+             <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-2">Structural Mapping (Role)</label>
+             <select value={formData.role} onChange={e => handleRoleChange(e.target.value)} className="w-full px-6 py-4 rounded-2xl border border-slate-200 bg-white font-black text-sm outline-none focus:ring-8 focus:ring-indigo-500/5 shadow-inner appearance-none cursor-pointer text-indigo-600 uppercase italic">
+                {availableRoles.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
+             </select>
+           </div>
+           <div className="space-y-2">
+             <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-2">Availability State</label>
+             <div className="flex bg-white p-1 rounded-2xl border border-slate-200 shadow-inner">
+               {(['Active', 'Suspended'] as const).map(s => (
+                 <button key={s} type="button" onClick={() => setFormData({...formData, status: s})} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-[0.2em] rounded-xl transition-all ${formData.status === s ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}>{s}</button>
                ))}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <PermissionRow label="Corporate Domain" module="company" />
-            <PermissionRow label="Infrastructure Master" module="administration" />
-            <PermissionRow label="Transactional Operations" module="transaction" />
-            <PermissionRow label="Display Intelligence" module="display" />
-          </div>
+             </div>
+           </div>
         </section>
 
-        <div className="pt-10 border-t border-slate-200 flex flex-col sm:flex-row justify-end space-y-4 sm:space-y-0 sm:space-x-6">
-          <button type="button" onClick={onCancel} className="px-10 py-5 rounded-2xl text-slate-400 font-black text-xs uppercase tracking-widest hover:bg-white transition-all transform active:scale-95">Discard</button>
-          <button type="submit" className="px-16 py-5 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-[0.3em] shadow-2xl hover:bg-indigo-600 transition-all transform active:scale-95 border-b-8 border-slate-950">
-            {initialData ? 'Update Account Node' : 'Authorize Identity Node'}
-          </button>
+        <section className="space-y-10 pt-10 border-t border-slate-200">
+           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div>
+                 <h4 className="text-xl font-black uppercase italic text-slate-800 tracking-tighter">Modular Authorization Matrix</h4>
+                 <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Define granular access nodes for system partitions</p>
+              </div>
+              <div className="flex items-center space-x-4 bg-indigo-50 p-1.5 rounded-2xl border border-indigo-100 shadow-sm">
+                 <span className="text-[9px] font-black uppercase text-indigo-400 px-4 tracking-[0.2em]">Global Shard Preset:</span>
+                 {PERM_LEVELS.map(level => (
+                    <button key={level} type="button" onClick={() => applyGlobalPermission(level)} className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${globalPermission === level ? 'bg-indigo-600 text-white shadow-md' : 'text-indigo-400 hover:bg-white'}`}>{level}</button>
+                 ))}
+              </div>
+           </div>
+
+           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <PermissionRow module="company" label="Corporate Hub" />
+              <PermissionRow module="administration" label="Institutional Master" />
+              <PermissionRow module="transaction" label="Operational Loop" />
+              <PermissionRow module="display" label="Intelligence Node" />
+           </div>
+
+           {/* Permission Legend */}
+           <div className="p-8 bg-slate-900 rounded-[2.5rem] border-4 border-slate-800 relative overflow-hidden shadow-2xl">
+              <div className="relative z-10 flex items-start space-x-10">
+                 <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-2xl shadow-xl shrink-0">🛡️</div>
+                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 flex-1">
+                    {Object.entries(PERM_INFO).map(([key, val]) => (
+                      <div key={key} className="space-y-2">
+                        <div className={`text-[10px] font-black uppercase tracking-[0.2em] ${val.color} flex items-center`}>
+                           <span className="mr-2 text-xs">{val.icon}</span>
+                           {val.label}
+                        </div>
+                        <p className="text-[10px] font-medium text-slate-500 leading-relaxed italic">"{val.desc}"</p>
+                      </div>
+                    ))}
+                 </div>
+              </div>
+              <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500 rounded-full blur-[120px] opacity-10 -mr-32 -mt-32"></div>
+           </div>
+        </section>
+
+        <div className="pt-10 border-t border-slate-200 flex flex-col sm:flex-row justify-end gap-5">
+           <button type="button" onClick={onCancel} className="px-12 py-5 rounded-[1.8rem] font-black text-xs uppercase tracking-widest text-slate-400 hover:bg-white hover:text-slate-600 transition-all">Discard Changes</button>
+           <button type="submit" className="px-16 py-5 bg-slate-950 text-white rounded-[1.8rem] font-black text-xs uppercase tracking-[0.4em] shadow-2xl hover:bg-indigo-600 transition-all transform active:scale-95 border-b-8 border-black/40">
+              {initialData ? 'Commit Identity Delta' : 'Provision Identity Shard'}
+           </button>
         </div>
       </form>
     </div>
