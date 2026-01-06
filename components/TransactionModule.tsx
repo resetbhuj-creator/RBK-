@@ -24,6 +24,7 @@ interface TransactionModuleProps {
 const TransactionModule: React.FC<TransactionModuleProps> = ({ 
   activeCompany, currentFY, isReadOnly, activeSubAction, setActiveSubAction, ledgers, items, batches, vouchers, setVouchers, onViewVoucher 
 }) => {
+  const [editingVoucher, setEditingVoucher] = useState<Voucher | undefined>(undefined);
 
   const generateVoucherId = useCallback((type: string) => {
     const prefixMap: Record<string, string> = {
@@ -37,6 +38,7 @@ const TransactionModule: React.FC<TransactionModuleProps> = ({
     const yearPart = yearParts.join('-');
     const yearIdentifier = `/${yearPart}/`;
     
+    // Filter by type and year
     const relevantVouchers = vouchers.filter(v => v.type === type && v.id.includes(yearIdentifier));
     
     let maxNum = 0;
@@ -51,28 +53,38 @@ const TransactionModule: React.FC<TransactionModuleProps> = ({
     return `${prefix}/${yearPart}/${nextNum}`;
   }, [vouchers, currentFY]);
 
-  const handlePostVoucher = (data: Omit<Voucher, 'id'>) => {
-    let assignedId = generateVoucherId(data.type);
-    
-    let attempts = 0;
-    while (vouchers.some(v => v.id === assignedId) && attempts < 10) {
-      const parts = assignedId.split('/');
-      const nextNum = (parseInt(parts[parts.length - 1]) + 1).toString().padStart(5, '0');
-      assignedId = `${parts[0]}/${parts[1]}/${nextNum}`;
-      attempts++;
+  const handlePostVoucher = (data: Omit<Voucher, 'id' | 'status'>, status: Voucher['status'] = 'Posted') => {
+    if (editingVoucher) {
+      // Logic for editing existing voucher
+      const updatedVch: Voucher = { 
+        ...editingVoucher, 
+        ...data, 
+        status, 
+        approvedBy: undefined, 
+        approvalDate: undefined 
+      };
+      setVouchers(prev => prev.map(v => v.id === editingVoucher.id ? updatedVch : v));
+      setEditingVoucher(undefined);
+    } else {
+      // Logic for new voucher
+      let assignedId = generateVoucherId(data.type);
+      const newVch: Voucher = { ...data, id: assignedId, status };
+      setVouchers(prev => [newVch, ...prev]);
     }
-
-    const newVch: Voucher = { ...data, id: assignedId, status: 'Posted' };
-    setVouchers(prev => [newVch, ...prev]);
     setActiveSubAction(TransactionSubMenu.DAY_BOOK);
+  };
+
+  const handleEditFromList = (v: Voucher) => {
+    setEditingVoucher(v);
+    if (['Sales', 'Purchase', 'Sales Return', 'Purchase Return', 'Purchase Order', 'Delivery Note', 'Goods Receipt Note (GRN)', 'Stock Adjustment', 'Credit Note', 'Debit Note'].includes(v.type)) {
+      setActiveSubAction(TransactionSubMenu.INVENTORY_VOUCHERS);
+    } else {
+      setActiveSubAction(TransactionSubMenu.ACCOUNTING_VOUCHERS);
+    }
   };
 
   const updateVoucher = (updated: Voucher) => {
     setVouchers(prev => prev.map(v => v.id === updated.id ? updated : v));
-  };
-
-  const approveVoucher = (id: string) => {
-    setVouchers(prev => prev.map(v => v.id === id ? { ...v, status: 'Posted', approvedBy: 'Super Admin', approvalDate: new Date().toISOString() } : v));
   };
 
   const deleteVoucher = (id: string) => {
@@ -80,16 +92,6 @@ const TransactionModule: React.FC<TransactionModuleProps> = ({
       setVouchers(prev => prev.filter(v => v.id !== id));
     }
   };
-
-  const stats = useMemo(() => {
-    const today = new Date().toISOString().split('T')[0];
-    const posted = vouchers.filter(v => v.status === 'Posted').length;
-    const pending = vouchers.filter(v => v.status === 'Pending Approval').length;
-    const dayTurnover = vouchers.filter(v => v.date === today).reduce((acc, v) => acc + v.amount, 0);
-    const noteCount = vouchers.filter(v => v.type === 'Credit Note' || v.type === 'Debit Note').length;
-
-    return { posted, pending, dayTurnover, noteCount };
-  }, [vouchers]);
 
   const renderContent = () => {
     switch (activeSubAction) {
@@ -101,41 +103,16 @@ const TransactionModule: React.FC<TransactionModuleProps> = ({
             vouchers={vouchers}
             activeCompany={activeCompany}
             onSubmit={handlePostVoucher} 
-            onCancel={() => setActiveSubAction(null)}
+            onCancel={() => { setActiveSubAction(null); setEditingVoucher(undefined); }}
             getNextId={generateVoucherId}
-          />
-        );
-      case TransactionSubMenu.SALES_RETURN:
-        return (
-          <InventoryVoucherForm 
-            isReadOnly={isReadOnly} 
-            items={items} 
-            batches={batches}
-            ledgers={ledgers} 
-            vouchers={vouchers}
-            activeCompany={activeCompany}
-            forcedVType="Sales Return"
-            onSubmit={handlePostVoucher} 
-            onCancel={() => setActiveSubAction(null)}
-            getNextId={generateVoucherId}
-          />
-        );
-      case TransactionSubMenu.PURCHASE_RETURN:
-        return (
-          <InventoryVoucherForm 
-            isReadOnly={isReadOnly} 
-            items={items} 
-            batches={batches}
-            ledgers={ledgers} 
-            vouchers={vouchers}
-            activeCompany={activeCompany}
-            forcedVType="Purchase Return"
-            onSubmit={handlePostVoucher} 
-            onCancel={() => setActiveSubAction(null)}
-            getNextId={generateVoucherId}
+            editingVoucher={editingVoucher}
           />
         );
       case TransactionSubMenu.INVENTORY_VOUCHERS:
+      case TransactionSubMenu.SALES_RETURN:
+      case TransactionSubMenu.PURCHASE_RETURN:
+      case TransactionSubMenu.CREDIT_NOTE:
+      case TransactionSubMenu.DEBIT_NOTE:
         return (
           <InventoryVoucherForm 
             isReadOnly={isReadOnly} 
@@ -144,35 +121,11 @@ const TransactionModule: React.FC<TransactionModuleProps> = ({
             ledgers={ledgers} 
             vouchers={vouchers}
             activeCompany={activeCompany}
+            forcedVType={activeSubAction === TransactionSubMenu.INVENTORY_VOUCHERS ? undefined : activeSubAction as unknown as any}
             onSubmit={handlePostVoucher} 
-            onCancel={() => setActiveSubAction(null)}
+            onCancel={() => { setActiveSubAction(null); setEditingVoucher(undefined); }}
             getNextId={generateVoucherId}
-          />
-        );
-      case TransactionSubMenu.CREDIT_NOTE:
-        return (
-          <VoucherEntryForm 
-            isReadOnly={isReadOnly} 
-            ledgers={ledgers} 
-            vouchers={vouchers}
-            activeCompany={activeCompany}
-            forcedVType="Credit Note"
-            onSubmit={handlePostVoucher} 
-            onCancel={() => setActiveSubAction(null)}
-            getNextId={generateVoucherId}
-          />
-        );
-      case TransactionSubMenu.DEBIT_NOTE:
-        return (
-          <VoucherEntryForm 
-            isReadOnly={isReadOnly} 
-            ledgers={ledgers} 
-            vouchers={vouchers}
-            activeCompany={activeCompany}
-            forcedVType="Debit Note"
-            onSubmit={handlePostVoucher} 
-            onCancel={() => setActiveSubAction(null)}
-            getNextId={generateVoucherId}
+            editingVoucher={editingVoucher}
           />
         );
       case TransactionSubMenu.BANK_RECONCILIATION:
@@ -185,7 +138,14 @@ const TransactionModule: React.FC<TransactionModuleProps> = ({
           />
         );
       case TransactionSubMenu.DAY_BOOK:
-        return <DayBook vouchers={vouchers} onDelete={deleteVoucher} onViewVoucher={onViewVoucher} />;
+        return (
+          <DayBook 
+            vouchers={vouchers} 
+            onDelete={deleteVoucher} 
+            onViewVoucher={onViewVoucher} 
+            onEditVoucher={handleEditFromList}
+          />
+        );
       default:
         return <TransactionDashboard />;
     }
@@ -193,79 +153,24 @@ const TransactionModule: React.FC<TransactionModuleProps> = ({
 
   const TransactionDashboard = () => (
     <div className="space-y-10 animate-in fade-in duration-500">
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {[
-          { label: "Today's Volume", value: `$${stats.dayTurnover.toLocaleString()}`, icon: '💰', color: 'text-emerald-600', bg: 'bg-emerald-50' },
-          { label: "Pending Approvals", value: stats.pending, icon: '⚖️', color: 'text-rose-600', bg: 'bg-rose-50' },
-          { label: "Secondary Notes", value: stats.noteCount, icon: '📉', color: 'text-indigo-600', bg: 'bg-indigo-50' },
-          { label: "Total Postings", value: stats.posted, icon: '📜', color: 'text-slate-600', bg: 'bg-slate-50' }
-        ].map((kpi, i) => (
-          <div key={i} className={`p-8 rounded-[2.5rem] border border-slate-200 shadow-sm transition-all hover:shadow-xl hover:border-indigo-100 group ${kpi.bg}`}>
-            <div className="flex justify-between items-start mb-4">
-              <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{kpi.label}</span>
-              <span className="text-xl">{kpi.icon}</span>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        {TRANSACTION_SUB_MENUS.map((item) => (
+          <button
+            key={item.id}
+            onClick={() => setActiveSubAction(item.id as TransactionSubMenu)}
+            className="group relative bg-white p-10 rounded-[3rem] border border-slate-200 shadow-sm hover:shadow-2xl hover:border-indigo-200 transition-all duration-500 text-left overflow-hidden flex flex-col"
+          >
+            <div className={`w-16 h-16 ${item.color} rounded-2xl flex items-center justify-center text-white mb-10 group-hover:scale-110 group-hover:-rotate-3 transition-all shadow-xl`}>
+              {React.cloneElement(item.icon as React.ReactElement<any>, { className: 'w-8 h-8' })}
             </div>
-            <div className={`text-4xl font-black italic tracking-tighter tabular-nums ${kpi.color}`}>{kpi.value}</div>
-          </div>
+            <h3 className="text-2xl font-black text-slate-800 mb-3 group-hover:text-indigo-600 transition-colors uppercase italic leading-none tracking-tighter">{item.label}</h3>
+            <p className="text-xs text-slate-400 font-medium leading-relaxed mb-10">{item.description}</p>
+            <div className="mt-auto flex items-center text-indigo-600 font-black text-[10px] uppercase tracking-[0.3em] opacity-0 group-hover:opacity-100 transition-all translate-y-2 group-hover:translate-y-0">
+              <span>Enter Workplace</span>
+              <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+            </div>
+          </button>
         ))}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
-          {TRANSACTION_SUB_MENUS.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setActiveSubAction(item.id as TransactionSubMenu)}
-              className="group relative bg-white p-10 rounded-[3rem] border border-slate-200 shadow-sm hover:shadow-2xl hover:border-indigo-200 transition-all duration-500 text-left overflow-hidden flex flex-col"
-            >
-              <div className={`w-16 h-16 ${item.color} rounded-2xl flex items-center justify-center text-white mb-10 group-hover:scale-110 group-hover:-rotate-3 transition-all shadow-xl`}>
-                {React.cloneElement(item.icon as React.ReactElement<any>, { className: 'w-8 h-8' })}
-              </div>
-              <h3 className="text-2xl font-black text-slate-800 mb-3 group-hover:text-indigo-600 transition-colors uppercase italic leading-none tracking-tighter">{item.label}</h3>
-              <p className="text-xs text-slate-400 font-medium leading-relaxed mb-10">{item.description}</p>
-              <div className="mt-auto flex items-center text-indigo-600 font-black text-[10px] uppercase tracking-[0.3em] opacity-0 group-hover:opacity-100 transition-all translate-y-2 group-hover:translate-y-0">
-                <span>Enter Workplace</span>
-                <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
-              </div>
-            </button>
-          ))}
-        </div>
-
-        <div className="space-y-8">
-          <div className="bg-slate-900 rounded-[3rem] p-10 text-white relative overflow-hidden shadow-2xl group border-l-8 border-rose-500">
-             <div className="relative z-10">
-                <div className="flex justify-between items-center mb-8">
-                   <h4 className="text-[10px] font-black uppercase text-indigo-400 tracking-[0.4em] flex items-center">
-                      <div className="w-2 h-2 rounded-full bg-rose-500 mr-3 animate-pulse shadow-[0_0_8px_#f43f5e]"></div>
-                      Note Authorization
-                   </h4>
-                </div>
-                <div className="space-y-4">
-                   {vouchers.filter(v => (v.type === 'Credit Note' || v.type === 'Debit Note') && v.status === 'Pending Approval').map(v => (
-                     <div key={v.id} className="p-5 bg-white/5 border border-white/10 rounded-2xl transition-all group/v">
-                        <div className="flex items-center justify-between mb-4">
-                           <div onClick={() => onViewVoucher(v.id)} className="cursor-pointer">
-                              <div className="text-[11px] font-black text-white italic group-hover/v:text-indigo-400">#{v.id}</div>
-                              <div className="text-[9px] text-slate-500 font-bold uppercase mt-1">{v.party}</div>
-                           </div>
-                           <div className="text-right">
-                              <div className="text-xs font-black tabular-nums">${v.amount.toLocaleString()}</div>
-                           </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2">
-                           <button onClick={() => approveVoucher(v.id)} className="py-2 bg-emerald-600/20 text-emerald-400 rounded-xl text-[9px] font-black uppercase hover:bg-emerald-600 transition-all">Approve</button>
-                           <button onClick={() => onViewVoucher(v.id)} className="py-2 bg-white/5 text-slate-400 rounded-xl text-[9px] font-black uppercase hover:bg-white/10 transition-all">Inspect</button>
-                        </div>
-                     </div>
-                   ))}
-                   {vouchers.filter(v => (v.type === 'Credit Note' || v.type === 'Debit Note') && v.status === 'Pending Approval').length === 0 && (
-                     <div className="py-12 text-center opacity-30 italic text-xs font-medium uppercase tracking-widest">Secondary Notes Reconciled</div>
-                   )}
-                </div>
-             </div>
-             <div className="absolute top-0 right-0 w-48 h-48 bg-indigo-600 rounded-full blur-[100px] opacity-10 -mr-24 -mt-24"></div>
-          </div>
-        </div>
       </div>
     </div>
   );
@@ -274,7 +179,7 @@ const TransactionModule: React.FC<TransactionModuleProps> = ({
     <div className="space-y-4">
       {activeSubAction && (
         <button 
-          onClick={() => setActiveSubAction(null)}
+          onClick={() => { setActiveSubAction(null); setEditingVoucher(undefined); }}
           className="flex items-center space-x-3 text-[11px] font-black uppercase text-slate-400 hover:text-indigo-600 transition-all group mb-8"
         >
           <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center group-hover:bg-indigo-50 transition-colors">

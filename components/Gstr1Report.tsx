@@ -182,7 +182,8 @@ const Gstr1Report: React.FC<Gstr1ReportProps> = ({ vouchers, ledgers, activeComp
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {Object.values(reportData.hsn).map((row, i) => (
+              {/* Fix: Cast Object.values to HsnSummaryEntry[] to avoid 'unknown' type errors */}
+              {(Object.values(reportData.hsn) as HsnSummaryEntry[]).map((row, i) => (
                 <tr key={i} className="hover:bg-indigo-50/20 transition-all border-b border-slate-50 last:border-0">
                   <td className="px-10 py-6 font-mono text-xs font-black text-indigo-600">{row.hsn}</td>
                   <td className="px-10 py-6 text-xs font-black text-slate-800 uppercase italic">{row.desc}</td>

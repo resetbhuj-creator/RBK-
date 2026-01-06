@@ -126,18 +126,6 @@ const App: React.FC = () => {
   const [currentFY, setCurrentFY] = useState(() => localStorage.getItem('nexus_erp_current_fy') || '2023 - 2024');
   const [isFYLocked, setIsFYLocked] = useState(() => localStorage.getItem('nexus_erp_fy_locked') === 'true');
 
-  // Global CMD+K Listener
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault();
-        setIsCommandPaletteOpen(prev => !prev);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
   // Persistence Sync
   useEffect(() => {
     localStorage.setItem('nexus_erp_companies', JSON.stringify(companies));
@@ -155,6 +143,18 @@ const App: React.FC = () => {
     localStorage.setItem('nexus_erp_current_fy', currentFY);
     localStorage.setItem('nexus_erp_fy_locked', String(isFYLocked));
   }, [companies, accountGroups, ledgers, items, batches, vouchers, taxes, taxGroups, users, roles, auditLogs, currentCompanyId, currentFY, isFYLocked]);
+
+  // Global Command Palette Shortcut
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setIsCommandPaletteOpen(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const addAuditLog = useCallback((logData: Omit<AuditLog, 'id' | 'timestamp' | 'actor'> & { actor?: string }) => {
     const newLog: AuditLog = {
@@ -333,12 +333,12 @@ const App: React.FC = () => {
           <VoucherModal voucher={voucherToView} activeCompany={activeCompany} onClose={() => setViewingVoucherId(null)} />
         )}
         
-        <footer className="h-6 bg-indigo-900 text-white flex items-center justify-between px-4 text-[9px] font-black uppercase tracking-widest shrink-0 border-t border-white/5">
+        <footer className="h-6 bg-slate-900 text-white flex items-center justify-between px-4 text-[9px] font-black uppercase tracking-widest shrink-0 border-t border-white/5">
            <div className="flex items-center space-x-4">
-              <span className="flex items-center"><div className="w-1.5 h-1.5 bg-emerald-400 rounded-full mr-2 animate-pulse"></div> Secure Node: Operational</span>
+              <span className="flex items-center"><div className="w-1.5 h-1.5 bg-emerald-400 rounded-full mr-2 animate-pulse"></div> Secure Shard: Operational</span>
               <span className="opacity-30">|</span>
               <span>Draft Buffer: {vouchers.filter(v => v.status === 'Draft').length} Objects</span>
-              <span className="opacity-30 ml-4">Press CMD+K for Global Search</span>
+              <span className="opacity-30 ml-4">Press CMD+K for Global Pulse</span>
            </div>
         </footer>
       </div>

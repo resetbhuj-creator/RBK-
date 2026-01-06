@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Voucher, Item, Ledger, Company } from '../types';
-import * as XLSX from 'xlsx';
+import React, { useState, useRef } from 'react';
+import { Voucher, Item, Ledger } from '../types';
 
 interface ImportExportModuleProps {
   vouchers?: Voucher[];
@@ -28,7 +27,7 @@ const ImportExportModule: React.FC<ImportExportModuleProps> = ({
     let data: any[] = [];
     if (selectedEntity === 'Inventory Items') data = items;
     else if (selectedEntity === 'Accounting Vouchers') data = vouchers;
-    else if (selectedEntity === 'Ledger Masters') data = []; // Placeholder
+    else if (selectedEntity === 'Ledger Masters') data = []; // Placeholder for ledger masters
 
     setTimeout(() => {
       if (data.length === 0) {
@@ -43,7 +42,7 @@ const ImportExportModule: React.FC<ImportExportModuleProps> = ({
 
       if (targetFormat === 'CSV') {
         const headers = Object.keys(data[0]).join(',');
-        const rows = data.map(row => Object.values(row).map(v => `"${v}"`).join(','));
+        const rows = data.map(row => Object.values(row).map(v => typeof v === 'object' ? JSON.stringify(v) : `"${v}"`).join(','));
         content = [headers, ...rows].join('\n');
         mimeType = 'text/csv';
         extension = 'csv';
@@ -53,10 +52,14 @@ const ImportExportModule: React.FC<ImportExportModuleProps> = ({
         extension = 'json';
       } else if (targetFormat === 'XML') {
         content = '<?xml version="1.0" encoding="UTF-8"?>\n<NexusExport>\n' + 
-          data.map(item => `  <Item>\n${Object.entries(item).map(([k, v]) => `    <${k}>${v}</${k}>`).join('\n')}\n  </Item>`).join('\n') + 
+          data.map(item => `  <Record>\n${Object.entries(item).map(([k, v]) => `    <${k}>${typeof v === 'object' ? JSON.stringify(v) : v}</${k}>`).join('\n')}\n  </Record>`).join('\n') + 
           '\n</NexusExport>';
         mimeType = 'application/xml';
         extension = 'xml';
+      } else {
+          alert('XLSX logic typically requires external library buffer.');
+          setIsProcessing(false);
+          return;
       }
 
       if (content) {

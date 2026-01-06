@@ -101,7 +101,7 @@ export interface Company {
   fyStartDate: string;
   booksBeginDate: string;
   lastAccessed?: string;
-  approvalThreshold?: number; // Transactions above this need approval
+  approvalThreshold?: number;
 }
 
 export interface UserPermissions {
@@ -150,15 +150,12 @@ export interface VoucherItem {
   rate: number;
   discountRate?: number;
   discountAmount?: number;
-  amount: number; // Taxable value after discount
+  amount: number; 
   cgstRate?: number;
   sgstRate?: number;
   igstRate?: number;
   taxAmount?: number;
   batchNo?: string;
-  currency?: string;
-  exchangeRate?: number;
-  costCenter?: string;
 }
 
 export interface Adjustment {
@@ -179,10 +176,6 @@ export interface LedgerEntry {
   cgst?: number;
   sgst?: number;
   igst?: number;
-  currency?: string;
-  exchangeRate?: number;
-  costCenter?: string;
-  billRef?: string;
 }
 
 export type VoucherType = 'Sales' | 'Purchase' | 'Sales Return' | 'Purchase Return' | 'Payment' | 'Receipt' | 'Journal' | 'Contra' | 'Delivery Note' | 'Goods Receipt Note (GRN)' | 'Stock Adjustment' | 'Purchase Order' | 'Credit Note' | 'Debit Note';
@@ -224,9 +217,6 @@ export interface Ledger {
   openingBalance: number;
   type: 'Debit' | 'Credit';
   budget?: number;
-  taxId?: string; // Statutory identifier for GSTR categorization
-  address?: string;
-  email?: string; // Added for Email Gateway functionality
 }
 
 export interface Item {

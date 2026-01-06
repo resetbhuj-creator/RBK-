@@ -424,7 +424,6 @@ export const DISPLAY_SUB_MENUS: SubMenuItem[] = [
   }
 ];
 
-// Added COMMUNICATION_SUB_MENUS to resolve missing export error
 export const COMMUNICATION_SUB_MENUS: SubMenuItem[] = [
   {
     id: CommunicationSubMenu.PRINT_CENTER,
@@ -472,7 +471,6 @@ export const COMMUNICATION_SUB_MENUS: SubMenuItem[] = [
   }
 ];
 
-// Added HOUSE_KEEPING_SUB_MENUS to resolve missing export error
 export const HOUSE_KEEPING_SUB_MENUS: SubMenuItem[] = [
   {
     id: HouseKeepingSubMenu.DATABASE_UTILITY,
@@ -536,7 +534,6 @@ export const TAX_TYPES = ['CGST', 'SGST', 'IGST', 'Other'];
 
 export const UNIT_MEASURES = ['Pcs', 'Kg', 'Litre', 'Box', 'Nos', 'Mtrs', 'Set', 'SqFt', 'Roll'];
 
-/* Added export of CATEGORIES to resolve the missing export error in AdministrationModule.tsx */
 export const CATEGORIES = [
   'General',
   'Electronics',

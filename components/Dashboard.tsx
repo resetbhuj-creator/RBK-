@@ -66,10 +66,15 @@ const Dashboard: React.FC<DashboardProps> = ({ activeCompany, vouchers, tasks, s
     const expenses = vouchers.filter(v => v.type === 'Purchase' || v.type === 'Payment').reduce((acc, v) => acc + v.amount, 0);
     const cash = vouchers.filter(v => v.type === 'Receipt').reduce((acc, v) => acc + v.amount, 0);
     
-    const assets = 150000; // Mock current assets
-    const liabilities = 45000; // Mock current liabilities
-    const liquidityRatio = (assets / liabilities).toFixed(2);
-    const reconStatus = 85; // Mock percentage
+    // Liquidity Ratio Calculation Mock (Current Assets / Current Liabilities)
+    const mockAssets = 150000 + revenue;
+    const mockLiabilities = 45000 + expenses;
+    const liquidityRatio = (mockAssets / mockLiabilities).toFixed(2);
+
+    // Reconciliation Status Calculation
+    const reconVch = vouchers.filter(v => ['Payment', 'Receipt', 'Contra'].includes(v.type));
+    const reconciledCount = reconVch.filter(v => v.isReconciled).length;
+    const reconStatus = reconVch.length > 0 ? Math.round((reconciledCount / reconVch.length) * 100) : 0;
 
     return { revenue, expenses, liquidityRatio, reconStatus };
   }, [vouchers]);
@@ -87,10 +92,6 @@ const Dashboard: React.FC<DashboardProps> = ({ activeCompany, vouchers, tasks, s
     };
     setTasks(prev => [newTask, ...prev]);
     setNewTaskTitle('');
-  };
-
-  const toggleTask = (id: string) => {
-    setTasks(prev => prev.map(t => t.id === id ? { ...t, status: t.status === 'Completed' ? 'Pending' : 'Completed' } : t));
   };
 
   const isOverdue = (date: string) => {
@@ -115,8 +116,8 @@ const Dashboard: React.FC<DashboardProps> = ({ activeCompany, vouchers, tasks, s
     <div className="space-y-6 animate-in fade-in duration-300">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-black text-slate-800 tracking-tight italic uppercase">Operational Intel</h2>
-          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Active Node: <span className="text-indigo-600">{activeCompany?.name || '---'}</span></p>
+          <h2 className="text-2xl font-black text-slate-800 tracking-tight italic uppercase leading-none">Operational Intel</h2>
+          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-2">Active Node: <span className="text-indigo-600">{activeCompany?.name || '---'}</span></p>
         </div>
         <div className="flex items-center space-x-3">
           <div className="p-3 bg-white rounded-xl shadow-sm border border-slate-100 flex items-center space-x-3">
@@ -128,12 +129,12 @@ const Dashboard: React.FC<DashboardProps> = ({ activeCompany, vouchers, tasks, s
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Total Revenue', value: `${symbol}${financialHealth.revenue.toLocaleString()}`, trend: '+12.5%', color: 'text-emerald-500', bg: 'bg-emerald-50' },
-          { label: 'Liquidity Ratio', value: financialHealth.liquidityRatio, trend: 'Optimal', color: 'text-blue-500', bg: 'bg-blue-50' },
-          { label: 'Reconciliation', value: `${financialHealth.reconStatus}%`, trend: '+0.8%', color: 'text-indigo-500', bg: 'bg-indigo-50' },
-          { label: 'Pending Approvals', value: vouchers.filter(v => v.status === 'Draft').length.toString(), trend: 'Queue', color: 'text-amber-500', bg: 'bg-amber-50' }
+          { label: 'Total Revenue', value: `${symbol}${financialHealth.revenue.toLocaleString()}`, trend: '+12.5%', color: 'text-emerald-500', bg: 'bg-emerald-50', bar: false },
+          { label: 'Liquidity Ratio', value: financialHealth.liquidityRatio, trend: 'Optimal', color: 'text-blue-500', bg: 'bg-blue-50', bar: false },
+          { label: 'Reconciliation', value: `${financialHealth.reconStatus}%`, trend: '+0.8%', color: 'text-indigo-500', bg: 'bg-indigo-50', bar: true, progress: financialHealth.reconStatus },
+          { label: 'Draft Buffer', value: vouchers.filter(v => v.status === 'Draft').length.toString(), trend: 'Queue', color: 'text-amber-500', bg: 'bg-amber-50', bar: false }
         ].map((stat, i) => (
-          <div key={i} className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm transition-all hover:shadow-xl hover:border-indigo-100 group">
+          <div key={i} className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm transition-all hover:shadow-xl hover:border-indigo-100 group flex flex-col justify-between">
             <div className="flex justify-between items-start mb-4">
               <span className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] group-hover:text-indigo-500 transition-colors">{stat.label}</span>
               <span className={`text-[8px] font-black px-2 py-0.5 rounded-lg ${stat.bg} ${stat.color} border border-current opacity-60`}>
@@ -141,9 +142,11 @@ const Dashboard: React.FC<DashboardProps> = ({ activeCompany, vouchers, tasks, s
               </span>
             </div>
             <div className="text-3xl font-black text-slate-800 italic tracking-tighter tabular-nums">{stat.value}</div>
-            {stat.label === 'Reconciliation' && (
-              <div className="mt-4 h-1 w-full bg-slate-100 rounded-full overflow-hidden">
-                <div className="h-full bg-indigo-500" style={{ width: `${financialHealth.reconStatus}%` }}></div>
+            {stat.bar && (
+              <div className="mt-6">
+                <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden shadow-inner p-0.5">
+                  <div className={`h-full ${stat.color.replace('text', 'bg')} rounded-full transition-all duration-1000 shadow-[0_0_10px_rgba(79,70,229,0.3)]`} style={{ width: `${stat.progress}%` }}></div>
+                </div>
               </div>
             )}
           </div>
@@ -156,7 +159,7 @@ const Dashboard: React.FC<DashboardProps> = ({ activeCompany, vouchers, tasks, s
             <div className="flex justify-between items-center mb-8 relative z-10">
               <div>
                 <h3 className="text-sm font-black text-slate-800 uppercase tracking-[0.3em]">Growth Velocity</h3>
-                <p className="text-[10px] text-slate-400 mt-1 font-medium">Outward supply vs operational burn</p>
+                <p className="text-[10px] text-slate-400 mt-1 font-medium italic">Outward supply vs operational burn</p>
               </div>
             </div>
             <div className="flex-1 w-full relative z-10">
@@ -208,12 +211,19 @@ const Dashboard: React.FC<DashboardProps> = ({ activeCompany, vouchers, tasks, s
           <div className="bg-white p-10 rounded-[3rem] border border-slate-200 shadow-sm flex flex-col h-[400px]">
             <h3 className="text-xs font-black text-slate-800 uppercase tracking-[0.3em] mb-8">Mission Control</h3>
             <div className="flex-1 overflow-auto custom-scrollbar space-y-4">
-              {filteredTasks.map((task) => (
-                <div key={task.id} className="p-4 rounded-2xl bg-slate-50 border border-slate-100">
-                  <div className="text-[10px] font-black uppercase text-slate-800 truncate">{task.title}</div>
-                  <div className="text-[8px] font-bold text-indigo-600 mt-1 uppercase">{formatDueDate(task.dueDate)}</div>
+              {filteredTasks.length > 0 ? filteredTasks.map((task) => (
+                <div key={task.id} className="p-4 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-between">
+                  <div>
+                    <div className="text-[10px] font-black uppercase text-slate-800 truncate">{task.title}</div>
+                    <div className="text-[8px] font-bold text-indigo-600 mt-1 uppercase">{formatDueDate(task.dueDate)}</div>
+                  </div>
+                  <div className={`w-2 h-2 rounded-full ${task.priority === 'High' ? 'bg-rose-500' : 'bg-indigo-500'}`}></div>
                 </div>
-              ))}
+              )) : (
+                 <div className="h-full flex flex-col items-center justify-center opacity-20 italic">
+                    <p className="text-[10px] font-black uppercase tracking-widest">Queue Clear</p>
+                 </div>
+              )}
             </div>
           </div>
         </div>

@@ -1,6 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Item, Ledger, Voucher, VoucherItem, Adjustment, VoucherType, Batch, Attachment } from '../types';
-import { UNIT_MEASURES } from '../constants';
 
 interface InventoryVoucherFormProps {
   isReadOnly?: boolean;
@@ -17,196 +16,48 @@ interface InventoryVoucherFormProps {
 
 type InvType = Extract<VoucherType, 'Sales' | 'Purchase' | 'Sales Return' | 'Purchase Return' | 'Purchase Order' | 'Delivery Note' | 'Goods Receipt Note (GRN)' | 'Stock Adjustment' | 'Credit Note' | 'Debit Note'>;
 
-const ADJ_REASONS = [
-  'Sales Return',
-  'Purchase Return',
-  'Post-sale Discount',
-  'Correction of Pricing',
-  'Quantity Variance',
-  'Defective Goods',
-  'Post-purchase Rebate',
-  'Other Statutory Adjustment'
-];
-
 const CURRENCIES = [
-  { code: 'USD', symbol: '$', name: 'US Dollar' },
-  { code: 'EUR', symbol: '€', name: 'Euro' },
-  { code: 'GBP', symbol: '£', name: 'British Pound' },
-  { code: 'INR', symbol: '₹', name: 'Indian Rupee' },
-  { code: 'AED', symbol: 'د.إ', name: 'UAE Dirham' }
+  { code: 'USD', symbol: '$' },
+  { code: 'EUR', symbol: '€' },
+  { code: 'GBP', symbol: '£' },
+  { code: 'INR', symbol: '₹' },
+  { code: 'AED', symbol: 'د.إ' }
 ];
-
-const NARRATION_TEMPLATES: Record<string, string[]> = {
-  'Sales': [
-    "Being goods sold on credit against authorized purchase order.",
-    "Being outward supply of inventory nodes to registered counterparty.",
-    "Being bulk sales transmission finalized."
-  ],
-  'Purchase': [
-    "Being inventory shards acquired from registered supplier node.",
-    "Being inward supply of raw materials for production queue.",
-    "Being authorized procurement committed to stock ledger."
-  ],
-  'Delivery Note': [
-    "Being goods dispatched to client node pending invoice generation.",
-    "Being partial shipment of order cluster.",
-    "Being inventory released from storage vault."
-  ],
-  'Goods Receipt Note (GRN)': [
-    "Being inspection and receipt of goods into storage hub.",
-    "Being materials accepted for quality control protocols."
-  ],
-  'Credit Note': [
-     "Being goods returned by customer against outward invoice.",
-     "Being adjustment for pricing variance in sales.",
-     "Being authorized post-sale credit to client account."
-  ],
-  'Debit Note': [
-     "Being goods returned to supplier node against inward invoice.",
-     "Being adjustment for pricing variance in procurement.",
-     "Being authorized post-purchase debit to vendor account."
-  ],
-  'Stock Adjustment': [
-    "Being correction passed for physical inventory variance.",
-    "Being internal re-calibration of asset nodes."
-  ]
-};
 
 const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly, items, batches, ledgers, vouchers = [], onSubmit, onCancel, getNextId, activeCompany, forcedVType }) => {
   const [vchType, setVchType] = useState<InvType>(forcedVType || 'Sales');
-  const [supplyType, setSupplyType] = useState<'Local' | 'Central'>('Local');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [partyId, setPartyId] = useState('');
-  const [reference, setReference] = useState('');
-  const [sourceDocRef, setSourceDocRef] = useState('');
-  const [returnReason, setReturnReason] = useState('');
   const [narration, setNarration] = useState('');
-  const [attachments, setAttachments] = useState<Attachment[]>([]);
-  const [vchItems, setVchItems] = useState<VoucherItem[]>([]);
-  const [adjustments, setAdjustments] = useState<Adjustment[]>([]);
-  const [showTemplates, setShowTemplates] = useState(false);
-  const [previewAttachment, setPreviewAttachment] = useState<Attachment | null>(null);
-  
-  const [showSourcePicker, setShowSourcePicker] = useState(false);
-  const [sourceSearch, setSourceSearch] = useState('');
-  
-  const [currency, setCurrency] = useState(activeCompany?.currencyConfig?.code || 'USD');
+  const [currency, setCurrency] = useState('USD');
   const [exchangeRate, setExchangeRate] = useState(1);
+  
+  const [vchItems, setVchItems] = useState<VoucherItem[]>([
+    { id: '1', itemId: '', name: '', hsn: '', qty: 1, unit: 'Nos', rate: 0, amount: 0, igstRate: 18, taxAmount: 0 }
+  ]);
 
   const [searchIdx, setSearchIdx] = useState<number | null>(null);
   const [query, setQuery] = useState('');
-  const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
   const searchRef = useRef<HTMLTableDataCellElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const baseCurrencyCode = activeCompany?.currencyConfig?.code || 'USD';
-  const nextIdPreview = useMemo(() => getNextId(vchType), [vchType, getNextId]);
-  const isFinancial = ['Sales', 'Purchase', 'Purchase Order', 'Sales Return', 'Purchase Return', 'Credit Note', 'Debit Note'].includes(vchType);
-  const isNote = vchType.includes('Return') || vchType === 'Credit Note' || vchType === 'Debit Note';
-
-  useEffect(() => {
-    if (forcedVType) setVchType(forcedVType);
-  }, [forcedVType]);
-
-  useEffect(() => {
-    setVchItems(prev => prev.map(item => {
-      if (!isFinancial) return item;
-      const rate = item.igstRate || 0;
-      const taxAmt = (item.amount * rate) / 100;
-      return {
-        ...item,
-        taxAmount: taxAmt,
-        cgstRate: supplyType === 'Local' ? rate / 2 : 0,
-        sgstRate: supplyType === 'Local' ? rate / 2 : 0,
-        igstRate: rate
-      };
-    }));
-  }, [supplyType, isFinancial]);
-
-  const selectedPartyLedger = useMemo(() => ledgers.find(l => l.id === partyId), [ledgers, partyId]);
 
   const filteredParties = useMemo(() => {
-    if (vchType === 'Sales' || vchType === 'Sales Return' || vchType === 'Delivery Note' || vchType === 'Credit Note') {
-      return ledgers.filter(l => l.group === 'Sundry Debtors');
-    }
-    if (vchType === 'Purchase' || vchType === 'Purchase Return' || vchType === 'Goods Receipt Note (GRN)' || vchType === 'Debit Note' || vchType === 'Purchase Order') {
-      return ledgers.filter(l => l.group === 'Sundry Creditors');
-    }
+    if (vchType.includes('Sales')) return ledgers.filter(l => l.group === 'Sundry Debtors');
+    if (vchType.includes('Purchase')) return ledgers.filter(l => l.group === 'Sundry Creditors');
     return ledgers;
   }, [ledgers, vchType]);
 
-  const filteredVouchersForSource = useMemo(() => {
-    if (!selectedPartyLedger) return [];
-    return vouchers.filter(v => 
-      v.party === selectedPartyLedger.name && 
-      v.id.toLowerCase().includes(sourceSearch.toLowerCase())
-    ).slice(0, 10);
-  }, [vouchers, selectedPartyLedger, sourceSearch]);
-
   const searchResults = useMemo(() => {
     const term = query.toLowerCase();
-    return items.filter(i => 
-      i.name.toLowerCase().includes(term) || 
-      i.hsnCode.includes(term) ||
-      i.category.toLowerCase().includes(term)
-    ).slice(0, 8);
+    return items.filter(i => i.name.toLowerCase().includes(term) || i.hsnCode.includes(term)).slice(0, 5);
   }, [items, query]);
 
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (searchRef.current && !searchRef.current.contains(e.target as Node)) setSearchIdx(null);
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files) return;
-    Array.from(files).forEach((file: File) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setAttachments(prev => [...prev, {
-          id: `att-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
-          name: file.name,
-          type: file.type,
-          size: file.size,
-          data: reader.result as string
-        }]);
-      };
-      reader.readAsDataURL(file);
-    });
-  };
-
   const addItem = () => {
-    const newItem: VoucherItem = {
-      id: `vi-${Date.now()}`,
-      itemId: '',
-      name: '',
-      hsn: '',
-      qty: 1,
-      unit: 'Nos',
-      rate: 0,
-      discountRate: 0,
-      discountAmount: 0,
-      amount: 0,
-      igstRate: 0,
-      taxAmount: 0,
-      batchNo: '',
-      currency: currency,
-      exchangeRate: 1
-    };
-    setVchItems(prev => [...prev, newItem]);
-    setSearchIdx(vchItems.length);
-    setQuery('');
+    setVchItems([...vchItems, { id: Date.now().toString(), itemId: '', name: '', hsn: '', qty: 1, unit: 'Nos', rate: 0, amount: 0, igstRate: 18, taxAmount: 0 }]);
   };
 
   const selectItem = (idx: number, item: Item) => {
     setVchItems(prev => prev.map((vi, i) => {
       if (i === idx) {
-        const fullRate = item.gstRate || 0;
-        const gross = vi.qty * item.salePrice;
-        const taxAmt = (gross * fullRate) / 100;
         return {
           ...vi,
           itemId: item.id,
@@ -214,12 +65,8 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
           hsn: item.hsnCode,
           rate: item.salePrice,
           unit: item.unit,
-          amount: gross,
-          igstRate: fullRate,
-          taxAmount: taxAmt,
-          cgstRate: supplyType === 'Local' ? fullRate / 2 : 0,
-          sgstRate: supplyType === 'Local' ? fullRate / 2 : 0,
-          batchNo: ''
+          amount: vi.qty * item.salePrice,
+          taxAmount: (vi.qty * item.salePrice * vi.igstRate!) / 100
         };
       }
       return vi;
@@ -231,16 +78,8 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
     setVchItems(prev => prev.map(item => {
       if (item.id === id) {
         let updated = { ...item, [field]: value };
-        const gross = updated.qty * updated.rate;
-        if (field === 'discountRate') updated.discountAmount = (gross * (updated.discountRate || 0)) / 100;
-        else if (field === 'discountAmount') updated.discountRate = gross > 0 ? (updated.discountAmount! / gross) * 100 : 0;
-        updated.amount = gross - (updated.discountAmount || 0);
-        if (isFinancial) {
-          const rate = updated.igstRate || 0;
-          updated.taxAmount = (updated.amount * rate) / 100;
-          updated.cgstRate = supplyType === 'Local' ? rate / 2 : 0;
-          updated.sgstRate = supplyType === 'Local' ? rate / 2 : 0;
-        }
+        updated.amount = updated.qty * updated.rate;
+        updated.taxAmount = (updated.amount * (updated.igstRate || 0)) / 100;
         return updated;
       }
       return item;
@@ -248,260 +87,126 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
   };
 
   const totals = useMemo(() => {
-    const subTotal = vchItems.reduce((acc, i) => acc + (i.qty * i.rate), 0);
-    const discTotal = vchItems.reduce((acc, i) => acc + (i.discountAmount || 0), 0);
-    const taxableTotal = vchItems.reduce((acc, i) => acc + i.amount, 0);
+    const subTotal = vchItems.reduce((acc, i) => acc + i.amount, 0);
     const taxTotal = vchItems.reduce((acc, i) => acc + (i.taxAmount || 0), 0);
-    const adjTotal = adjustments.reduce((acc, a) => a.type === 'Add' ? acc + a.amount : acc - a.amount, 0);
-    const grandTotal = taxableTotal + taxTotal + adjTotal;
-    return { subTotal, discTotal, taxableTotal, taxTotal, grandTotal };
-  }, [vchItems, adjustments]);
+    const grandTotal = subTotal + taxTotal;
+    return { subTotal, taxTotal, grandTotal };
+  }, [vchItems]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (isReadOnly || vchItems.length === 0 || !partyId) {
-      alert("Verification Failed: Valid party and items required.");
-      return;
-    }
+    if (isReadOnly) return;
     onSubmit({
       type: vchType,
       date,
-      party: selectedPartyLedger?.name || 'Unknown',
+      party: ledgers.find(l => l.id === partyId)?.name || 'Unknown',
       amount: totals.grandTotal,
       currency,
       exchangeRate,
-      reference,
-      sourceDocRef,
-      returnReason,
       items: vchItems,
-      adjustments: adjustments,
-      attachments,
       subTotal: totals.subTotal,
-      discountTotal: totals.discTotal,
-      taxTotal: totals.taxTotal,
-      supplyType,
-      gstClassification: vchType.includes('Sales') || vchType === 'Credit Note' ? 'Output' : 'Input'
+      taxTotal: totals.taxTotal
     });
   };
 
-  const activeColor = vchType === 'Sales' || vchType === 'Sales Return' || vchType === 'Delivery Note' || vchType === 'Credit Note' ? 'emerald' : 'indigo';
-
   return (
-    <div className="bg-white rounded-[3.5rem] border border-slate-200 shadow-2xl overflow-hidden max-w-7xl mx-auto animate-in zoom-in-95 duration-300">
-      <div className={`px-10 py-12 bg-${activeColor}-600 text-white flex justify-between items-center relative overflow-hidden`}>
-        <div className="flex items-center space-x-8 relative z-10">
-          <div className="w-20 h-20 bg-white/20 rounded-[2rem] flex items-center justify-center text-4xl border border-white/10 backdrop-blur-md shadow-2xl transform -rotate-6">
-            {vchType.includes('Return') || isNote ? '🔙' : (vchType.includes('Sales') ? '📤' : '📥')}
-          </div>
+    <div className="bg-white rounded-[3.5rem] border border-slate-200 shadow-2xl overflow-hidden max-w-7xl mx-auto animate-in zoom-in-95">
+      <div className="px-10 py-12 bg-indigo-600 text-white flex justify-between items-center relative overflow-hidden">
+        <div className="relative z-10 flex items-center space-x-8">
+          <div className="w-20 h-20 bg-white/20 rounded-[2rem] flex items-center justify-center text-4xl border border-white/10 backdrop-blur-md shadow-2xl">📤</div>
           <div>
-            <div className="flex items-center space-x-5">
-              <select 
-                value={vchType} 
-                onChange={e => setVchType(e.target.value as InvType)}
-                className="bg-transparent border-none text-4xl font-black uppercase italic tracking-tighter leading-none outline-none cursor-pointer"
-              >
-                {['Sales', 'Purchase', 'Sales Return', 'Purchase Return', 'Credit Note', 'Debit Note', 'Purchase Order', 'Delivery Note', 'Goods Receipt Note (GRN)', 'Stock Adjustment'].map(v => <option key={v} value={v} className="bg-slate-900 text-base">{v} Protocol</option>)}
-              </select>
-              <div className="px-5 py-1.5 bg-black/20 rounded-xl border border-white/10 flex items-center space-x-3">
-                 <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
-                 <span className="text-[11px] font-black uppercase tracking-widest text-emerald-400">NODE: {nextIdPreview}</span>
-              </div>
-            </div>
-            <p className="text-xs font-black uppercase tracking-[0.4em] opacity-70 mt-3 italic">Inventory Lifecycle Hub • Multi-Currency Active</p>
+            <h3 className="text-4xl font-black uppercase italic tracking-tighter leading-none">{vchType} Console</h3>
+            <p className="text-xs font-black uppercase tracking-[0.4em] opacity-70 mt-3 italic">Identity Shard: {getNextId(vchType)}</p>
           </div>
         </div>
-        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-white rounded-full blur-[180px] opacity-10 -mr-64 -mt-64"></div>
+        <div className="flex items-center space-x-6 relative z-10">
+           <div className="space-y-2 text-right">
+              <label className="text-[9px] font-black uppercase text-indigo-200 tracking-widest block">Anchor Currency</label>
+              <div className="flex bg-black/20 p-1 rounded-xl border border-white/10 backdrop-blur-md">
+                 {CURRENCIES.map(c => (
+                   <button key={c.code} type="button" onClick={() => setCurrency(c.code)} className={`px-3 py-1.5 text-[10px] font-black rounded-lg transition-all ${currency === c.code ? 'bg-white text-indigo-600 shadow-md' : 'text-indigo-100 hover:text-white'}`}>{c.code}</button>
+                 ))}
+              </div>
+           </div>
+        </div>
       </div>
 
       <form onSubmit={handleSubmit} className="p-12 space-y-12">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-10 bg-slate-50 p-10 rounded-[3.5rem] border border-slate-100 shadow-inner">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-10 bg-slate-50 p-10 rounded-[3rem] border border-slate-100 shadow-inner">
           <div className="space-y-2">
-            <label className="text-[10px] font-black uppercase text-slate-400 ml-2 tracking-widest">Post Date</label>
+            <label className="text-[10px] font-black uppercase text-slate-400 ml-2 tracking-widest">Execution Moment</label>
             <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full px-7 py-4 rounded-2xl border border-slate-200 text-sm font-black bg-white outline-none focus:ring-8 focus:ring-indigo-500/5 shadow-sm" />
           </div>
-          <div className="md:col-span-2 space-y-2">
+          <div className="space-y-2">
             <label className="text-[10px] font-black uppercase text-slate-400 ml-2 tracking-widest">Authorized Party Node</label>
-            <select value={partyId} onChange={e => { setPartyId(e.target.value); setSourceDocRef(''); }} className="w-full px-7 py-4 rounded-2xl border border-slate-200 text-sm font-black text-indigo-600 bg-white outline-none focus:ring-8 focus:ring-indigo-500/5 shadow-sm appearance-none cursor-pointer">
+            <select value={partyId} onChange={e => setPartyId(e.target.value)} className="w-full px-7 py-4 rounded-2xl border border-slate-200 text-sm font-black text-indigo-600 bg-white outline-none focus:ring-8 focus:ring-indigo-500/5 shadow-sm appearance-none cursor-pointer">
               <option value="">-- Choose Master Ledger --</option>
-              {filteredParties.map(p => <option key={p.id} value={p.id}>{p.name} [{p.group}]</option>)}
+              {filteredParties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
-          </div>
-          <div className="space-y-2 text-right">
-             <label className="text-[10px] font-black uppercase text-slate-400 mr-2 tracking-widest">Operating Jurisdiction</label>
-             <div className="flex bg-slate-200/50 p-1 rounded-2xl border border-slate-200">
-                {(['Local', 'Central'] as const).map(s => (
-                  <button key={s} type="button" onClick={() => setSupplyType(s)} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-tighter rounded-xl transition-all ${supplyType === s ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}>{s}</button>
-                ))}
-             </div>
           </div>
         </div>
 
-        {isNote && (
-          <div className="bg-white rounded-[2.5rem] p-10 border border-slate-200 shadow-inner space-y-8 animate-in slide-in-from-top-4">
-             <div className="flex items-center space-x-4">
-                <div className="w-1.5 h-6 bg-indigo-600 rounded-full"></div>
-                <h4 className="text-xs font-black uppercase text-slate-800 tracking-widest">Linking & Adjustment Protocol</h4>
-             </div>
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                <div className="space-y-2 relative">
-                   <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest ml-1">Link Source Transaction</label>
-                   <div className="relative">
-                      <input 
-                       value={sourceDocRef} 
-                       onChange={e => { setSourceDocRef(e.target.value); setSourceSearch(e.target.value); setShowSourcePicker(true); }} 
-                       onFocus={() => setShowSourcePicker(true)}
-                       placeholder="Query previous transactions..."
-                       className="w-full px-6 py-4 rounded-2xl border border-slate-200 bg-slate-50 text-sm font-black text-slate-700 shadow-inner outline-none focus:ring-4 focus:ring-indigo-500/10 italic"
-                      />
-                      {showSourcePicker && selectedPartyLedger && filteredVouchersForSource.length > 0 && (
-                        <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-200 rounded-2xl shadow-2xl z-[100] overflow-hidden animate-in fade-in zoom-in-95">
-                           <div className="p-3 bg-slate-50 border-b border-slate-100 text-[8px] font-black text-slate-400 uppercase tracking-widest px-4">Ledger History: {selectedPartyLedger.name}</div>
-                           {filteredVouchersForSource.map(v => (
-                             <div 
-                               key={v.id} 
-                               onClick={() => { setSourceDocRef(v.id); setShowSourcePicker(false); if(v.items) setVchItems(v.items.map(vi => ({...vi, id: `vi-${Date.now()}-${Math.random()}`}))); }}
-                               className="px-4 py-3 hover:bg-indigo-50 cursor-pointer flex justify-between items-center transition-all group/item"
-                             >
-                               <div className="flex flex-col">
-                                 <span className="text-[10px] font-black text-indigo-600 italic">#{v.id}</span>
-                                 <span className="text-[8px] font-bold text-slate-400 uppercase">{v.date} ({v.type})</span>
-                               </div>
-                               <span className="text-[10px] font-black text-slate-900 italic">${v.amount.toLocaleString()}</span>
-                             </div>
-                           ))}
-                        </div>
-                      )}
-                      {showSourcePicker && <div className="fixed inset-0 z-[-1]" onClick={() => setShowSourcePicker(false)}></div>}
-                   </div>
-                </div>
-                <div className="space-y-2">
-                   <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest ml-1">Statutory Reason Code</label>
-                   <select 
-                    value={returnReason} 
-                    onChange={e => setReturnReason(e.target.value)}
-                    className="w-full px-6 py-4 rounded-2xl border border-slate-200 bg-slate-50 text-sm font-black text-indigo-600 outline-none cursor-pointer"
-                   >
-                      <option value="">-- Select Regulatory Reason --</option>
-                      {ADJ_REASONS.map(r => <option key={r} value={r}>{r}</option>)}
-                   </select>
-                </div>
-             </div>
-          </div>
-        )}
-
-        <div className="bg-white rounded-[3.5rem] border border-slate-200 overflow-hidden shadow-2xl min-h-[300px]">
+        <div className="bg-white rounded-[3.5rem] border border-slate-200 overflow-hidden shadow-2xl">
           <table className="w-full text-left border-collapse">
             <thead className="bg-slate-950 text-[9px] font-black uppercase text-slate-400 tracking-widest">
               <tr>
-                <th className="px-8 py-7 w-64">Product Resource</th>
-                <th className="px-6 py-7 text-center w-32">Batch No</th>
+                <th className="px-8 py-7">Resource Designation</th>
                 <th className="px-6 py-7 text-center w-24">Qty</th>
                 <th className="px-6 py-7 text-right w-32">Rate</th>
-                <th className="px-6 py-7 text-center w-24 bg-indigo-950/30">Disc%</th>
-                <th className="px-6 py-7 text-center w-24 bg-indigo-950/30">Tax%</th>
+                <th className="px-6 py-7 text-center w-24 bg-indigo-950/20">Tax%</th>
                 <th className="px-6 py-7 text-right w-44">Net Value ({currency})</th>
-                <th className="px-6 py-7 w-16 text-center"></th>
-                <th className="px-6 py-7 w-12"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50 bg-white">
-              {vchItems.map((item, idx) => {
-                const master = items.find(i => i.id === item.itemId);
-                const itemBatches = batches.filter(b => b.itemId === item.itemId);
-                const isExpanded = expandedItemId === item.id;
-                return (
-                  <React.Fragment key={item.id}>
-                    <tr className={`animate-in fade-in transition-all group ${isExpanded ? 'bg-indigo-50/20' : 'hover:bg-slate-50/50'}`}>
-                      <td className="px-8 py-6 relative" ref={searchIdx === idx ? searchRef : null}>
-                          {searchIdx === idx ? (
-                            <div className="absolute top-2 left-6 z-50 w-[460px] bg-white rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95">
-                                <div className="p-5 border-b border-slate-100 bg-slate-50 flex items-center space-x-4">
-                                  <input autoFocus value={query} onChange={e => setQuery(e.target.value)} placeholder="Query Catalogue Registry..." className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-xs font-black outline-none" />
-                                </div>
-                                <div className="max-h-80 overflow-y-auto custom-scrollbar">
-                                  {searchResults.map(res => (
-                                    <div key={res.id} onClick={() => selectItem(idx, res)} className="p-6 hover:bg-indigo-50 cursor-pointer flex items-center justify-between border-b border-slate-50 group/res">
-                                        <div className="flex items-center space-x-4">
-                                          <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center text-lg shadow-sm group-hover/res:bg-indigo-600 group-hover/res:text-white transition-all">{res.name.charAt(0)}</div>
-                                          <div>
-                                              <div className="text-xs font-black text-slate-800 uppercase italic group-hover/res:text-indigo-700">{res.name}</div>
-                                              <div className="text-[8px] font-black text-indigo-400 uppercase italic mt-1">{res.category}</div>
-                                          </div>
-                                        </div>
-                                        <span className="text-sm font-black text-slate-900">${res.salePrice.toLocaleString()}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                            </div>
-                          ) : (
-                            <div onClick={() => setSearchIdx(idx)} className="cursor-pointer">
-                              <div className={`text-base font-black italic tracking-tighter uppercase ${item.name ? 'text-slate-800' : 'text-slate-300'}`}>
-                                {item.name || '--- Locate Resource Node ---'}
+              {vchItems.map((item, idx) => (
+                <tr key={item.id} className="hover:bg-slate-50/50 transition-all group">
+                  <td className="px-8 py-6 relative" ref={searchIdx === idx ? searchRef : null}>
+                    {searchIdx === idx ? (
+                      <div className="absolute top-2 left-6 z-50 w-[400px] bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95">
+                          <input autoFocus value={query} onChange={e => setQuery(e.target.value)} placeholder="Query Catalogue..." className="w-full p-4 border-b text-sm font-bold outline-none" />
+                          <div className="max-h-60 overflow-y-auto custom-scrollbar">
+                            {searchResults.map(res => (
+                              <div key={res.id} onClick={() => selectItem(idx, res)} className="p-4 hover:bg-indigo-50 cursor-pointer flex justify-between items-center border-b border-slate-50">
+                                  <span className="text-xs font-black text-slate-800 uppercase italic">{res.name}</span>
+                                  <span className="text-[10px] font-bold text-slate-400">${res.salePrice}</span>
                               </div>
-                            </div>
-                          )}
-                      </td>
-                      <td className="px-6 py-6 text-center">
-                        {master?.isBatchTracked ? (
-                          <select value={item.batchNo} onChange={e => updateItemField(item.id, 'batchNo', e.target.value)} className="w-full bg-slate-100 border border-slate-200 rounded-xl py-3 px-2 text-xs font-black outline-none focus:bg-white transition-all shadow-sm">
-                            <option value="">-- BATCH --</option>
-                            {itemBatches.map(b => <option key={b.id} value={b.batchNo}>{b.batchNo} ({b.currentStock})</option>)}
-                          </select>
-                        ) : (
-                          <span className="text-[9px] font-bold text-slate-300 uppercase block text-center italic">Standard</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-6 text-center">
-                        <input type="number" value={item.qty} onChange={e => updateItemField(item.id, 'qty', parseFloat(e.target.value) || 0)} className="w-20 bg-slate-100 border border-slate-200 rounded-xl py-3 px-2 text-center text-sm font-black outline-none focus:bg-white shadow-sm" />
-                      </td>
-                      <td className="px-6 py-6 text-right">
-                        <input type="number" value={item.rate} onChange={e => updateItemField(item.id, 'rate', parseFloat(e.target.value) || 0)} className="w-28 bg-slate-100 border border-slate-200 rounded-xl py-3 px-4 text-right text-sm font-black outline-none focus:bg-white shadow-sm tabular-nums" />
-                      </td>
-                      <td className="px-6 py-6 bg-indigo-50/20 text-center">
-                        <input type="number" step="0.01" value={item.discountRate || ''} onChange={e => updateItemField(item.id, 'discountRate', parseFloat(e.target.value) || 0)} className="w-16 bg-white border border-indigo-200 rounded-xl py-3 text-center text-xs font-black text-indigo-500 outline-none shadow-sm" placeholder="0%" />
-                      </td>
-                      <td className="px-6 py-6 bg-indigo-50/20 text-center">
-                        <input type="number" value={item.igstRate} onChange={e => updateItemField(item.id, 'igstRate', parseFloat(e.target.value) || 0)} className="w-16 bg-white border border-indigo-200 rounded-xl py-3 text-center text-xs font-black text-indigo-500 outline-none shadow-sm" />
-                      </td>
-                      <td className="px-6 py-6 text-right">
-                          <div className="text-lg font-black text-slate-900 tabular-nums italic">
-                            {(item.amount + (item.taxAmount || 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            ))}
                           </div>
-                      </td>
-                      <td className="px-6 py-6 text-center">
-                         <button 
-                           type="button" 
-                           onClick={() => setExpandedItemId(expandedItemId === item.id ? null : item.id)}
-                           className={`p-3 rounded-xl transition-all shadow-md ${isExpanded ? 'bg-indigo-600 text-white rotate-180' : 'bg-slate-100 text-slate-400 hover:text-indigo-600'}`}
-                         >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" /></svg>
-                         </button>
-                      </td>
-                      <td className="px-6 py-6 text-center">
-                          <button type="button" onClick={() => setVchItems(prev => prev.filter(i => i.id !== item.id))} className="text-slate-200 hover:text-rose-500 transition-all active:scale-95"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
-                      </td>
-                    </tr>
-                  </React.Fragment>
-                );
-              })}
+                      </div>
+                    ) : (
+                      <div onClick={() => setSearchIdx(idx)} className="cursor-pointer">
+                        <div className={`text-base font-black italic tracking-tighter uppercase ${item.name ? 'text-slate-800' : 'text-slate-300'}`}>
+                          {item.name || '--- Locate Resource ---'}
+                        </div>
+                        {item.hsn && <div className="text-[9px] font-bold text-slate-400 uppercase mt-1">HSN: {item.hsn}</div>}
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-6 py-6 text-center">
+                    <input type="number" value={item.qty} onChange={e => updateItemField(item.id, 'qty', parseFloat(e.target.value) || 0)} className="w-20 bg-slate-50 border border-slate-200 rounded-xl py-3 px-2 text-center text-sm font-black outline-none" />
+                  </td>
+                  <td className="px-6 py-6 text-right">
+                    <input type="number" value={item.rate} onChange={e => updateItemField(item.id, 'rate', parseFloat(e.target.value) || 0)} className="w-28 bg-slate-50 border border-slate-200 rounded-xl py-3 px-4 text-right text-sm font-black outline-none tabular-nums" />
+                  </td>
+                  <td className="px-6 py-6 bg-indigo-50/20 text-center">
+                    <input type="number" value={item.igstRate} onChange={e => updateItemField(item.id, 'igstRate', parseFloat(e.target.value) || 0)} className="w-16 bg-white border border-indigo-200 rounded-xl py-3 text-center text-xs font-black text-indigo-500 outline-none" />
+                  </td>
+                  <td className="px-6 py-6 text-right">
+                      <div className="text-lg font-black text-slate-900 tabular-nums italic">
+                        ${(item.amount + (item.taxAmount || 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </div>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
-          <button type="button" onClick={addItem} className="w-full py-8 bg-slate-50 text-[11px] font-black uppercase text-indigo-600 hover:bg-indigo-600 hover:text-white transition-all border-t border-slate-100 tracking-[0.5em] shadow-inner group">
-            <span className="group-hover:translate-x-3 transition-transform inline-block">+ Append Resource Shard</span>
-          </button>
+          <button type="button" onClick={addItem} className="w-full py-8 bg-slate-50 text-[11px] font-black uppercase text-indigo-600 hover:bg-indigo-600 hover:text-white transition-all border-t border-slate-100 tracking-[0.5em] shadow-inner">+ Append Resource Shard</button>
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-16 pt-10 border-t border-slate-100">
-           <div className="space-y-12">
-              <div className="space-y-6">
-                <label className="text-[11px] font-black uppercase text-slate-400 tracking-[0.4em] px-4">Audit Narrative & Rationale</label>
-                <textarea 
-                  value={narration} 
-                  onChange={e => setNarration(e.target.value)} 
-                  placeholder="State the rationale for this inventory shift..." 
-                  className="w-full h-48 px-10 py-10 rounded-[3rem] border border-slate-200 bg-slate-50/50 text-sm font-medium resize-none shadow-inner outline-none focus:ring-8 focus:ring-indigo-500/5 focus:bg-white italic leading-relaxed transition-all" 
-                />
-              </div>
+           <div className="space-y-6">
+              <label className="text-[11px] font-black uppercase text-slate-400 tracking-[0.4em] px-4">Audit Narrative</label>
+              <textarea value={narration} onChange={e => setNarration(e.target.value)} placeholder="Rationale..." className="w-full h-48 px-10 py-10 rounded-[3rem] border border-slate-200 bg-slate-50/50 text-sm font-medium italic resize-none shadow-inner outline-none focus:bg-white transition-all" />
            </div>
            
            <div className="w-full space-y-10">
@@ -509,24 +214,23 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
                  <div className="relative z-10 space-y-6">
                     <div className="flex justify-between items-center text-[10px] font-black uppercase text-slate-500 tracking-widest">
                        <span>Aggregate Gross</span>
-                       <span className="text-white tabular-nums">{currency} {totals.subTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                       <span className="text-white tabular-nums">${totals.subTotal.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-[10px] font-black uppercase text-indigo-400 tracking-widest">
+                       <span>Statutory Yield (GST)</span>
+                       <span className="text-white tabular-nums">+ ${totals.taxTotal.toLocaleString()}</span>
                     </div>
                     <div className="pt-12 flex justify-between items-end border-t border-slate-800">
-                       <div className="flex flex-col">
-                          <span className="text-[11px] font-black uppercase italic text-indigo-500 tracking-[0.6em] mb-3">GRAND TOTAL</span>
-                          <span className="text-[8px] font-bold text-slate-600 uppercase tracking-widest">Anchor: {baseCurrencyCode} {(totals.grandTotal * exchangeRate).toLocaleString()}</span>
-                       </div>
-                       <div className="text-right">
-                          <div className="text-6xl font-black tracking-tighter italic tabular-nums text-white group-hover:scale-105 transition-transform origin-right duration-500">{currency} {totals.grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
-                       </div>
+                       <span className="text-[11px] font-black uppercase italic text-indigo-500 tracking-[0.6em] mb-3">GRAND TOTAL</span>
+                       <div className="text-6xl font-black italic tracking-tighter tabular-nums text-white group-hover:scale-105 transition-transform origin-right duration-500">{currency} {totals.grandTotal.toLocaleString()}</div>
                     </div>
                  </div>
-                 <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-indigo-600 rounded-full blur-[200px] opacity-10 -mr-64 -mt-64 pointer-events-none group-hover:opacity-20 transition-opacity"></div>
+                 <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-600 rounded-full blur-[100px] opacity-10 -mr-32 -mt-32"></div>
               </div>
               
-              <div className="flex flex-col gap-6">
-                <button type="submit" disabled={isReadOnly || vchItems.length === 0 || !partyId} className={`w-full py-10 rounded-[3.5rem] font-black text-sm uppercase tracking-[0.5em] shadow-2xl transition-all transform active:scale-95 border-b-[12px] border-slate-950 ${isReadOnly ? 'bg-slate-200 text-slate-400 cursor-not-allowed border-none' : 'bg-slate-900 text-white hover:bg-black'}`}>Commit Inventory Note</button>
-                <button type="button" onClick={onCancel} className="w-full py-4 text-[11px] font-black uppercase text-slate-400 tracking-[0.4em] hover:text-rose-600 transition-all">Abort Data Entry</button>
+              <div className="flex gap-4">
+                <button type="button" onClick={onCancel} className="flex-1 py-6 rounded-[2rem] border border-slate-200 font-black text-xs uppercase tracking-widest text-slate-400 hover:bg-slate-50">Discard</button>
+                <button type="submit" className="flex-[2] py-10 bg-slate-900 text-white rounded-[3.5rem] font-black text-sm uppercase tracking-[0.5em] shadow-2xl hover:bg-black transition-all transform active:scale-95 border-b-[12px] border-slate-950">Authorize Sequence</button>
               </div>
            </div>
         </div>
