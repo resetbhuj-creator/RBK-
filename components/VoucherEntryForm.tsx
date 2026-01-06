@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Voucher, Ledger, LedgerEntry, VoucherType, PermissionLevel } from '../types';
+import { Voucher, Ledger, LedgerEntry, VoucherType } from '../types';
 
 interface VoucherEntryFormProps {
   isReadOnly?: boolean;
@@ -58,7 +58,7 @@ const VoucherEntryForm: React.FC<VoucherEntryFormProps> = ({
 
   const addEntryRow = () => {
       const lastType = ledgerEntries[ledgerEntries.length-1]?.type || 'Dr';
-      setLedgerEntries([...ledgerEntries, { id: Date.now().toString(), ledgerId: '', ledgerName: '', type: lastType === 'Dr' ? 'Cr' : 'Dr', amount: 0, taxRate: 0 }]);
+      setLedgerEntries([...ledgerEntries, { id: Date.now().toString(), ledgerId: '', ledgerName: '', type: lastType === 'Dr' ? 'Cr' : 'Dr', amount: 0, taxRate: 0, taxAmount: 0 }]);
   };
 
   const removeEntryRow = (id: string) => {
@@ -85,7 +85,9 @@ const VoucherEntryForm: React.FC<VoucherEntryFormProps> = ({
       narration,
       currency,
       exchangeRate,
-      entries: ledgerEntries
+      entries: ledgerEntries,
+      subTotal: ledgerEntries.reduce((acc, e) => acc + e.amount, 0),
+      taxTotal: ledgerEntries.reduce((acc, e) => acc + (e.taxAmount || 0), 0)
     });
   };
 
@@ -179,7 +181,6 @@ const VoucherEntryForm: React.FC<VoucherEntryFormProps> = ({
          <button type="button" onClick={addEntryRow} className="w-full py-6 mt-6 bg-white/50 border-4 border-dashed border-slate-200 rounded-[2.5rem] text-[10px] font-black uppercase text-slate-400 hover:bg-white hover:text-indigo-600 hover:border-indigo-200 transition-all tracking-[0.5em] shadow-sm">+ Append Partition Segment</button>
       </div>
 
-      {/* Proofing Panel */}
       <div className="bg-slate-900 rounded-[3.5rem] p-12 text-white relative overflow-hidden border-b-[10px] border-indigo-600 group">
          <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-12">
             <div className="flex flex-col items-center md:items-start space-y-4">

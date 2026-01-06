@@ -64,9 +64,9 @@ const Dashboard: React.FC<DashboardProps> = ({ activeCompany, vouchers, tasks, s
   const financialHealth = useMemo(() => {
     const revenue = vouchers.filter(v => v.type === 'Sales').reduce((acc, v) => acc + v.amount, 0);
     const expenses = vouchers.filter(v => v.type === 'Purchase' || v.type === 'Payment').reduce((acc, v) => acc + v.amount, 0);
-    const cash = vouchers.filter(v => v.type === 'Receipt').reduce((acc, v) => acc + v.amount, 0);
     
     // Liquidity Ratio Calculation Mock (Current Assets / Current Liabilities)
+    // In a real app, this would use ledger balances from the Balance Sheet logic
     const mockAssets = 150000 + revenue;
     const mockLiabilities = 45000 + expenses;
     const liquidityRatio = (mockAssets / mockLiabilities).toFixed(2);
@@ -78,27 +78,6 @@ const Dashboard: React.FC<DashboardProps> = ({ activeCompany, vouchers, tasks, s
 
     return { revenue, expenses, liquidityRatio, reconStatus };
   }, [vouchers]);
-
-  const addTask = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newTaskTitle.trim()) return;
-    const newTask: Task = {
-      id: `tsk-${Date.now()}`,
-      title: newTaskTitle,
-      dueDate: newTaskDueDate,
-      priority: 'Medium',
-      status: 'Pending',
-      createdAt: new Date().toISOString()
-    };
-    setTasks(prev => [newTask, ...prev]);
-    setNewTaskTitle('');
-  };
-
-  const isOverdue = (date: string) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return new Date(date) < today;
-  };
 
   const formatDueDate = (date: string) => {
     const d = new Date(date);
@@ -130,7 +109,7 @@ const Dashboard: React.FC<DashboardProps> = ({ activeCompany, vouchers, tasks, s
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { label: 'Total Revenue', value: `${symbol}${financialHealth.revenue.toLocaleString()}`, trend: '+12.5%', color: 'text-emerald-500', bg: 'bg-emerald-50', bar: false },
-          { label: 'Liquidity Ratio', value: financialHealth.liquidityRatio, trend: 'Optimal', color: 'text-blue-500', bg: 'bg-blue-50', bar: false },
+          { label: 'Liquidity Ratio', value: financialHealth.liquidityRatio, trend: 'Optimal', color: 'text-blue-500', bg: 'bg-blue-50', bar: true, progress: Math.min(parseFloat(financialHealth.liquidityRatio) * 33, 100) },
           { label: 'Reconciliation', value: `${financialHealth.reconStatus}%`, trend: '+0.8%', color: 'text-indigo-500', bg: 'bg-indigo-50', bar: true, progress: financialHealth.reconStatus },
           { label: 'Draft Buffer', value: vouchers.filter(v => v.status === 'Draft').length.toString(), trend: 'Queue', color: 'text-amber-500', bg: 'bg-amber-50', bar: false }
         ].map((stat, i) => (

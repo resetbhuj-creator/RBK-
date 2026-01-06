@@ -1,4 +1,3 @@
-
 import React from 'react';
 
 export enum MainMenuType {
@@ -60,7 +59,6 @@ export enum DisplaySubMenu {
   OUTSTANDING_REPORT = 'Bills Outstanding'
 }
 
-// Fixed: Added missing CommunicationSubMenu enum
 export enum CommunicationSubMenu {
   PRINT_CENTER = 'Print Center',
   EMAIL_GATEWAY = 'Email Gateway',
@@ -68,7 +66,6 @@ export enum CommunicationSubMenu {
   DISPATCH_LOGS = 'Dispatch Logs'
 }
 
-// Fixed: Added missing HouseKeepingSubMenu enum
 export enum HouseKeepingSubMenu {
   DATABASE_UTILITY = 'Database Utility',
   INTEGRITY_CHECK = 'Data Integrity',
