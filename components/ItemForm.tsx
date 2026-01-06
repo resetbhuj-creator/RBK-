@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Item, TaxGroup, Tax, Batch } from '../types';
-/* Added import for CATEGORIES from constants */
 import { CATEGORIES } from '../constants';
 
 interface ItemFormProps {
@@ -73,16 +72,11 @@ const ItemForm: React.FC<ItemFormProps> = ({
     }
   }, [initialData]);
 
-  /**
-   * Statutory Logic: Selecting a group iterates through the global tax registry
-   * to aggregate the effective percentage rate.
-   */
   const handleTaxGroupChange = (groupId: string) => {
     let newRate = formData.gstRate;
     if (groupId) {
       const components = taxes.filter(t => t.groupId === groupId);
       if (components.length > 0) {
-        // Aggregated statutory rate (e.g., 9% CGST + 9% SGST = 18%)
         newRate = components.reduce((acc, t) => acc + t.rate, 0);
       }
     }
@@ -107,6 +101,9 @@ const ItemForm: React.FC<ItemFormProps> = ({
     
     if (currentData.isBatchTracked && !initialData) {
       if (!batchData.batchNo.trim()) newErrors.batchNo = 'Initial Batch No is required';
+      if (batchData.expiryDate && new Date(batchData.expiryDate) < new Date(batchData.mfgDate)) {
+        newErrors.expiryDate = 'Expiry cannot precede Manufacturing date';
+      }
     }
 
     setErrors(newErrors);
@@ -285,29 +282,48 @@ const ItemForm: React.FC<ItemFormProps> = ({
           </div>
         </div>
 
-        {/* Batch Tracking Option */}
-        <div className="p-8 bg-white rounded-[2.5rem] border border-slate-200 shadow-sm space-y-6">
+        {/* Batch Tracking Section */}
+        <div className="p-10 bg-white rounded-[3rem] border border-slate-200 shadow-sm space-y-8">
           <div className="flex items-center justify-between">
              <div className="flex items-center space-x-4">
-                <div className="w-1.5 h-6 bg-indigo-600 rounded-full"></div>
-                <h4 className="text-xs font-black uppercase text-slate-800 tracking-widest italic">Lifecycle Tracking</h4>
+                <div className="w-1 h-8 bg-indigo-600 rounded-full"></div>
+                <h4 className="text-sm font-black uppercase text-slate-800 tracking-widest italic">Lifecycle Tracking Cluster</h4>
              </div>
-             <button type="button" onClick={() => setFormData({...formData, isBatchTracked: !formData.isBatchTracked})} className={`flex items-center space-x-3 px-4 py-2 rounded-xl border-2 transition-all ${formData.isBatchTracked ? 'bg-indigo-50 border-indigo-600 text-indigo-900' : 'bg-slate-50 border-slate-200 text-slate-400'}`}>
-               <span className="text-[10px] font-black uppercase tracking-widest">{formData.isBatchTracked ? 'Batch Enabled' : 'Standard Tracking'}</span>
+             <button type="button" onClick={() => setFormData({...formData, isBatchTracked: !formData.isBatchTracked})} className={`flex items-center space-x-3 px-6 py-2.5 rounded-2xl border-2 transition-all shadow-sm ${formData.isBatchTracked ? 'bg-indigo-50 border-indigo-600 text-indigo-900' : 'bg-slate-50 border-slate-200 text-slate-400'}`}>
+               <span className="text-[10px] font-black uppercase tracking-widest">{formData.isBatchTracked ? 'Batch-Level Precision Enabled' : 'Standard Tracking Node'}</span>
              </button>
           </div>
           
           {formData.isBatchTracked && !initialData && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-6 border-t border-slate-50 animate-in slide-in-from-top-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 pt-8 border-t border-slate-100 animate-in slide-in-from-top-4 duration-500">
                 <div className="space-y-2">
-                   <label className="text-[9px] font-black uppercase text-slate-400 ml-1">Initial Opening Batch</label>
-                   <input value={batchData.batchNo} onChange={e => setBatchData({...batchData, batchNo: e.target.value.toUpperCase()})} className={inputClass('batchNo')} placeholder="e.g. LOT-4091-B" />
+                   <label className="text-[9px] font-black uppercase text-slate-400 ml-1">Opening Batch #</label>
+                   <input value={batchData.batchNo} onChange={e => setBatchData({...batchData, batchNo: e.target.value.toUpperCase()})} className={inputClass('batchNo')} placeholder="e.g. B-001" />
+                   {touched.batchNo && errors.batchNo && <p className="text-[8px] text-rose-500 font-bold">{errors.batchNo}</p>}
                 </div>
                 <div className="space-y-2">
-                   <label className="text-[9px] font-black uppercase text-slate-400 ml-1">Initial Quantity</label>
-                   <input type="number" value={batchData.currentStock} onChange={e => setBatchData({...batchData, currentStock: parseFloat(e.target.value) || 0})} className={inputClass('currentStock')} />
+                   <label className="text-[9px] font-black uppercase text-slate-400 ml-1">MFG Date</label>
+                   <input type="date" value={batchData.mfgDate} onChange={e => setBatchData({...batchData, mfgDate: e.target.value})} className={inputClass('mfgDate')} />
+                </div>
+                <div className="space-y-2">
+                   <label className="text-[9px] font-black uppercase text-slate-400 ml-1">EXP Boundary</label>
+                   <input type="date" value={batchData.expiryDate} onChange={e => setBatchData({...batchData, expiryDate: e.target.value})} className={inputClass('expiryDate')} />
+                   {errors.expiryDate && <p className="text-[8px] text-rose-500 font-bold">{errors.expiryDate}</p>}
+                </div>
+                <div className="space-y-2">
+                   <label className="text-[9px] font-black uppercase text-slate-400 ml-1">Opening Physical Mass</label>
+                   <div className="relative">
+                    <input type="number" value={batchData.currentStock} onChange={e => setBatchData({...batchData, currentStock: parseFloat(e.target.value) || 0})} className={inputClass('currentStock')} />
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[8px] font-black text-slate-300 uppercase">{formData.unit || 'Units'}</span>
+                   </div>
                 </div>
             </div>
+          )}
+          {formData.isBatchTracked && initialData && (
+             <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-center space-x-3 text-slate-400">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                <span className="text-[10px] font-bold uppercase tracking-widest italic">Existing item lot management is handled via the registry expansion view.</span>
+             </div>
           )}
         </div>
 
@@ -340,7 +356,7 @@ const ItemForm: React.FC<ItemFormProps> = ({
               </div>
 
               <div className="text-right shrink-0">
-                 <div className="text-[11px] font-black uppercase italic text-indigo-500 tracking-[0.5em] mb-3">GRAND TOTAL (MRP)</div>
+                 <div className="text-[11px] font-black uppercase italic text-indigo-500 tracking-[0.6em] mb-3">GRAND TOTAL (MRP)</div>
                  <div className="text-7xl font-black italic tracking-tighter tabular-nums text-white">
                     ${priceMetrics.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                  </div>
