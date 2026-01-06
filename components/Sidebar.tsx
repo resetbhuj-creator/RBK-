@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { MainMenuType, AdminSubMenu, TransactionSubMenu, DisplaySubMenu, CommunicationSubMenu, HouseKeepingSubMenu } from '../types';
 import { MENU_ITEMS, ADMINISTRATION_SUB_MENUS, TRANSACTION_SUB_MENUS, DISPLAY_SUB_MENUS, COMMUNICATION_SUB_MENUS, HOUSE_KEEPING_SUB_MENUS } from '../constants';
@@ -26,30 +25,32 @@ const SubMenuItem: React.FC<{ label: string, id: string, activeId: string | null
   return (
     <button 
       onClick={onClick} 
-      className={`w-full text-left px-4 py-2.5 rounded-xl text-[10px] uppercase tracking-[0.15em] transition-all relative group/sub flex items-center border-l-4 ${
+      className={`w-full text-left px-4 py-3 rounded-xl text-[9px] uppercase tracking-[0.2em] transition-all relative group/sub flex items-center border-l-2 ${
         isActive 
-          ? 'text-white bg-gradient-to-r from-indigo-600 to-indigo-800 border-indigo-400 shadow-[0_4px_12px_rgba(79,70,229,0.3)] font-black italic translate-x-1.5' 
+          ? 'text-white bg-indigo-500/20 border-indigo-400 shadow-[0_4px_20px_rgba(79,70,229,0.15)] font-black italic translate-x-2' 
           : 'text-slate-500 font-bold border-transparent hover:text-slate-200 hover:bg-white/5 hover:translate-x-1'
       }`}
     >
       <div className={`w-1.5 h-1.5 rounded-full mr-3 transition-all duration-500 ${
         isActive 
-          ? 'bg-white scale-125 shadow-[0_0_8px_#fff] ring-2 ring-indigo-400' 
+          ? 'bg-indigo-400 scale-125 shadow-[0_0_10px_#818cf8] ring-2 ring-white/10' 
           : 'bg-slate-700 scale-75 group-hover/sub:bg-slate-500'
       }`} />
       
       <span className={`truncate block flex-1 ${isActive ? 'drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]' : ''}`}>{label}</span>
       
       {isActive && (
-        <div className="absolute right-2 w-1 h-2 bg-indigo-300 rounded-full animate-pulse shadow-[0_0_8px_#a5b4fc]" />
+        <div className="absolute right-3 w-1.5 h-1.5 bg-indigo-300 rounded-full animate-pulse shadow-[0_0_8px_#a5b4fc]" />
       )}
     </button>
   );
 };
 
-const SubMenuContainer: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <div className="ml-7 mt-2 mb-4 space-y-1 border-l border-slate-800 pl-3 animate-in fade-in slide-in-from-left-2 duration-300">
-    {children}
+const SubMenuContainer: React.FC<{ children: React.ReactNode, isOpen: boolean }> = ({ children, isOpen }) => (
+  <div className={`grid transition-all duration-500 ease-in-out ${isOpen ? 'grid-rows-[1fr] opacity-100 mt-2 mb-6' : 'grid-rows-[0fr] opacity-0 mt-0 mb-0'}`}>
+    <div className="overflow-hidden ml-7 border-l-2 border-slate-800/40 pl-3 space-y-2">
+      {children}
+    </div>
   </div>
 );
 
@@ -72,6 +73,36 @@ const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const logo = activeCompany?.logo;
   const companyName = activeCompany?.name || 'Nexus ERP';
+
+  const SUB_MENU_MAP: Record<string, any[]> = {
+    [MainMenuType.ADMINISTRATION]: ADMINISTRATION_SUB_MENUS,
+    [MainMenuType.TRANSACTION]: TRANSACTION_SUB_MENUS,
+    [MainMenuType.DISPLAY]: DISPLAY_SUB_MENUS,
+    [MainMenuType.COMMUNICATION]: COMMUNICATION_SUB_MENUS,
+    [MainMenuType.HOUSE_KEEPING]: HOUSE_KEEPING_SUB_MENUS,
+  };
+
+  const getActiveSubId = (type: MainMenuType) => {
+    switch(type) {
+      case MainMenuType.ADMINISTRATION: return activeAdminSubMenu;
+      case MainMenuType.TRANSACTION: return activeTransactionSubMenu;
+      case MainMenuType.DISPLAY: return activeDisplaySubMenu;
+      case MainMenuType.COMMUNICATION: return activeCommSubMenu;
+      case MainMenuType.HOUSE_KEEPING: return activeHouseKeepingSubMenu;
+      default: return null;
+    }
+  };
+
+  const getSubSetter = (type: MainMenuType) => {
+    switch(type) {
+      case MainMenuType.ADMINISTRATION: return setActiveAdminSubMenu;
+      case MainMenuType.TRANSACTION: return setActiveTransactionSubMenu;
+      case MainMenuType.DISPLAY: return setActiveDisplaySubMenu;
+      case MainMenuType.COMMUNICATION: return setActiveCommSubMenu;
+      case MainMenuType.HOUSE_KEEPING: return setActiveHouseKeepingSubMenu;
+      default: return () => {};
+    }
+  };
 
   return (
     <aside className={`fixed inset-y-0 left-0 z-[100] w-72 bg-slate-950 text-white transition-all duration-500 ease-in-out transform ${isOpen ? 'translate-x-0' : '-translate-x-full'} md:relative md:translate-x-0 border-r border-white/5 flex flex-col h-screen overflow-hidden shadow-2xl`}>
@@ -96,7 +127,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       <div className="px-4 mt-6 mb-2">
-         <div className="p-4 bg-white/5 border border-white/5 rounded-2xl flex items-center justify-between group hover:bg-white/10 transition-all cursor-pointer">
+         <div className="p-4 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-between group hover:bg-white/10 transition-all cursor-pointer">
             <div className="flex items-center space-x-3">
                <svg className="w-4 h-4 text-slate-500 group-hover:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                <span className="text-[9px] font-black uppercase text-slate-500 tracking-[0.2em] group-hover:text-white">Quick Find</span>
@@ -109,7 +140,10 @@ const Sidebar: React.FC<SidebarProps> = ({
       <nav className="flex-1 mt-2 px-4 space-y-2 overflow-y-auto custom-scrollbar pb-10 scroll-smooth">
         {MENU_ITEMS.map((item) => {
           const isParentActive = activeMenu === item.id;
-          const hasSub = [MainMenuType.ADMINISTRATION, MainMenuType.TRANSACTION, MainMenuType.DISPLAY, MainMenuType.COMMUNICATION, MainMenuType.HOUSE_KEEPING].includes(item.id);
+          const subItems = SUB_MENU_MAP[item.id];
+          const hasSub = !!subItems;
+          const activeSubId = getActiveSubId(item.id);
+          const subSetter = getSubSetter(item.id) as (id: any) => void;
           
           return (
             <div key={item.id} className="space-y-1">
@@ -118,112 +152,51 @@ const Sidebar: React.FC<SidebarProps> = ({
                   setActiveMenu(item.id);
                   if (window.innerWidth < 768 && !hasSub) setIsOpen(false);
                 }}
-                className={`w-full flex items-center space-x-4 px-5 py-3.5 rounded-2xl transition-all duration-300 relative group overflow-hidden border ${
+                className={`w-full flex items-center space-x-4 px-5 py-4 rounded-2xl transition-all duration-500 relative group overflow-hidden border-2 ${
                   isParentActive 
-                    ? 'bg-gradient-to-r from-indigo-600 to-indigo-900 border-indigo-500/50 text-white shadow-[0_12px_24px_rgba(79,70,229,0.4)] z-10 scale-[1.02]' 
+                    ? 'bg-indigo-600 border-indigo-400/50 text-white shadow-[0_20px_40px_-15px_rgba(79,70,229,0.5)] z-10 scale-[1.03]' 
                     : 'text-slate-500 border-transparent hover:bg-white/5 hover:text-slate-200'
                 }`}
               >
-                {/* Active Indicator Bar */}
-                {isParentActive && (
-                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-400 shadow-[0_0_12px_#818cf8]" />
-                )}
+                {/* Active Sidebar Indicator Bar */}
+                <div className={`absolute left-0 top-3 bottom-3 w-1.5 bg-white rounded-r-full shadow-[0_0_15px_#fff] transition-all duration-500 ${isParentActive ? 'opacity-100 scale-y-100' : 'opacity-0 scale-y-0'}`} />
                 
-                <span className={`${isParentActive ? 'text-white scale-110 drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]' : 'text-slate-600 group-hover:text-indigo-400'} transition-all duration-300 w-6 h-6 flex items-center justify-center shrink-0`}>
+                <span className={`${isParentActive ? 'text-white scale-125 drop-shadow-[0_0_12px_rgba(255,255,255,0.6)]' : 'text-slate-600 group-hover:text-indigo-400 group-hover:scale-110'} transition-all duration-500 w-6 h-6 flex items-center justify-center shrink-0`}>
                   {React.cloneElement(item.icon as React.ReactElement<any>, { className: 'w-6 h-6' })}
                 </span>
                 
-                <span className={`font-black text-[10px] uppercase tracking-[0.2em] flex-1 text-left truncate transition-all ${isParentActive ? 'text-white translate-x-1' : 'group-hover:translate-x-1'}`}>
+                <span className={`font-black text-[10px] uppercase tracking-[0.25em] flex-1 text-left truncate transition-all duration-500 ${isParentActive ? 'text-white translate-x-1 italic' : 'group-hover:translate-x-1'}`}>
                   {item.label}
                 </span>
 
                 {hasSub && (
-                  <div className={`transition-all duration-500 ${isParentActive ? 'rotate-180 scale-110 text-white' : 'text-slate-800 group-hover:text-slate-400'}`}>
-                    {/* Fixed missing quote after h-4 and fixed attribute separation on line 136 */}
+                  <div className={`transition-all duration-700 ${isParentActive ? 'rotate-180 scale-125 text-white' : 'text-slate-800 group-hover:text-slate-400 group-hover:translate-y-0.5'}`}>
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" />
                     </svg>
                   </div>
                 )}
                 
-                {/* Glow Overlay */}
                 {isParentActive && (
-                  <div className="absolute inset-0 bg-gradient-to-tr from-white/10 to-transparent pointer-events-none" />
+                  <div className="absolute inset-0 bg-gradient-to-tr from-white/20 via-transparent to-white/5 pointer-events-none animate-pulse" />
                 )}
               </button>
 
-              {isParentActive && (
-                <>
-                  {item.id === MainMenuType.ADMINISTRATION && (
-                    <SubMenuContainer>
-                      {ADMINISTRATION_SUB_MENUS.map(sub => (
-                        <SubMenuItem 
-                          key={sub.id} 
-                          label={sub.label} 
-                          id={sub.id} 
-                          activeId={activeAdminSubMenu} 
-                          onClick={() => { setActiveAdminSubMenu(sub.id as AdminSubMenu); if (window.innerWidth < 768) setIsOpen(false); }} 
-                        />
-                      ))}
-                    </SubMenuContainer>
-                  )}
-
-                  {item.id === MainMenuType.TRANSACTION && (
-                    <SubMenuContainer>
-                      {TRANSACTION_SUB_MENUS.map(sub => (
-                        <SubMenuItem 
-                          key={sub.id} 
-                          label={sub.label} 
-                          id={sub.id} 
-                          activeId={activeTransactionSubMenu} 
-                          onClick={() => { setActiveTransactionSubMenu(sub.id as TransactionSubMenu); if (window.innerWidth < 768) setIsOpen(false); }} 
-                        />
-                      ))}
-                    </SubMenuContainer>
-                  )}
-
-                  {item.id === MainMenuType.DISPLAY && (
-                    <SubMenuContainer>
-                      {DISPLAY_SUB_MENUS.map(sub => (
-                        <SubMenuItem 
-                          key={sub.id} 
-                          label={sub.label} 
-                          id={sub.id} 
-                          activeId={activeDisplaySubMenu} 
-                          onClick={() => { setActiveDisplaySubMenu(sub.id as DisplaySubMenu); if (window.innerWidth < 768) setIsOpen(false); }} 
-                        />
-                      ))}
-                    </SubMenuContainer>
-                  )}
-
-                  {item.id === MainMenuType.COMMUNICATION && (
-                    <SubMenuContainer>
-                      {COMMUNICATION_SUB_MENUS.map(sub => (
-                        <SubMenuItem 
-                          key={sub.id} 
-                          label={sub.label} 
-                          id={sub.id} 
-                          activeId={activeCommSubMenu} 
-                          onClick={() => { setActiveCommSubMenu(sub.id as CommunicationSubMenu); if (window.innerWidth < 768) setIsOpen(false); }} 
-                        />
-                      ))}
-                    </SubMenuContainer>
-                  )}
-
-                  {item.id === MainMenuType.HOUSE_KEEPING && (
-                    <SubMenuContainer>
-                      {HOUSE_KEEPING_SUB_MENUS.map(sub => (
-                        <SubMenuItem 
-                          key={sub.id} 
-                          label={sub.label} 
-                          id={sub.id} 
-                          activeId={activeHouseKeepingSubMenu} 
-                          onClick={() => { setActiveHouseKeepingSubMenu(sub.id as HouseKeepingSubMenu); if (window.innerWidth < 768) setIsOpen(false); }} 
-                        />
-                      ))}
-                    </SubMenuContainer>
-                  )}
-                </>
+              {hasSub && (
+                <SubMenuContainer isOpen={isParentActive}>
+                  {subItems.map(sub => (
+                    <SubMenuItem 
+                      key={sub.id} 
+                      label={sub.label} 
+                      id={sub.id} 
+                      activeId={activeSubId} 
+                      onClick={() => { 
+                        subSetter(sub.id); 
+                        if (window.innerWidth < 768) setIsOpen(false); 
+                      }} 
+                    />
+                  ))}
+                </SubMenuContainer>
               )}
             </div>
           );

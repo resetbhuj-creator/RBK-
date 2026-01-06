@@ -52,6 +52,7 @@ export enum DisplaySubMenu {
   GST_REPORTS = 'GST Reports',
   GSTR_1 = 'GSTR-1 (Sales)',
   GSTR_2 = 'GSTR-2 (Purchases)',
+  GSTR_3B = 'GSTR-3B (Summary)',
   HSN_SUMMARY = 'HSN Summary',
   LEDGER_REPORT = 'Ledger Statement',
   OUTSTANDING_REPORT = 'Bills Outstanding'

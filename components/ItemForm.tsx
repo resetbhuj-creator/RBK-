@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Item, TaxGroup, Tax, Batch } from '../types';
+/* Added import for CATEGORIES from constants */
+import { CATEGORIES } from '../constants';
 
 interface ItemFormProps {
   initialData?: Item;
@@ -10,17 +12,6 @@ interface ItemFormProps {
   onCancel: () => void;
   onSubmit: (data: Omit<Item, 'id'> & { initialBatch?: Omit<Batch, 'id' | 'itemId'> }) => void;
 }
-
-const CATEGORIES = [
-  'General',
-  'Electronics',
-  'Raw Materials',
-  'Finished Goods',
-  'Services',
-  'Consumables',
-  'Packaging',
-  'Digital Assets'
-];
 
 const GST_SLABS = [
   { label: '0% (Exempt)', value: 0 },

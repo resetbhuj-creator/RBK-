@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Voucher, Ledger, LedgerEntry, VoucherType, Attachment } from '../types';
 
@@ -24,6 +23,15 @@ const ADJ_REASONS = [
   'Defective Goods',
   'Post-purchase Rebate',
   'Other Statutory Adjustment'
+];
+
+const CURRENCIES = [
+  { code: 'USD', symbol: '$', name: 'US Dollar' },
+  { code: 'EUR', symbol: '€', name: 'Euro' },
+  { code: 'GBP', symbol: '£', name: 'British Pound' },
+  { code: 'INR', symbol: '₹', name: 'Indian Rupee' },
+  { code: 'AED', symbol: 'د.إ', name: 'UAE Dirham' },
+  { code: 'JPY', symbol: '¥', name: 'Japanese Yen' }
 ];
 
 const NARRATION_TEMPLATES: Record<string, string[]> = {
@@ -72,7 +80,7 @@ const NARRATION_TEMPLATES: Record<string, string[]> = {
   ]
 };
 
-const VoucherEntryForm: React.FC<VoucherEntryFormProps> = ({ isReadOnly, ledgers, onSubmit, onCancel, getNextId, activeCompany, forcedVType }) => {
+const VoucherEntryForm: React.FC<VoucherEntryFormProps> = ({ isReadOnly, ledgers, vouchers = [], onSubmit, onCancel, getNextId, activeCompany, forcedVType }) => {
   const [vchType, setVchType] = useState<VType>(forcedVType || 'Payment');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [reference, setReference] = useState('');
@@ -83,6 +91,10 @@ const VoucherEntryForm: React.FC<VoucherEntryFormProps> = ({ isReadOnly, ledgers
   const [isAssigning, setIsAssigning] = useState(false);
   const [supplyType, setSupplyType] = useState<'Local' | 'Central'>('Local');
   const [showTemplates, setShowTemplates] = useState(false);
+  const [previewAttachment, setPreviewAttachment] = useState<Attachment | null>(null);
+  
+  const [showSourcePicker, setShowSourcePicker] = useState(false);
+  const [sourceSearch, setSourceSearch] = useState('');
   
   const [currency, setCurrency] = useState(activeCompany?.currencyConfig?.code || 'USD');
   const [exchangeRate, setExchangeRate] = useState(1);
@@ -121,6 +133,19 @@ const VoucherEntryForm: React.FC<VoucherEntryFormProps> = ({ isReadOnly, ledgers
     return { cashBank, others };
   }, [ledgers]);
 
+  const selectedPartyName = useMemo(() => {
+    const primaryEntry = ledgerEntries.find(e => e.type === (vchType === 'Payment' ? 'Cr' : 'Dr')) || ledgerEntries[0];
+    return primaryEntry.ledgerName;
+  }, [ledgerEntries, vchType]);
+
+  const filteredVouchersForSource = useMemo(() => {
+    if (!selectedPartyName) return [];
+    return vouchers.filter(v => 
+      v.party === selectedPartyName && 
+      (v.id.toLowerCase().includes(sourceSearch.toLowerCase()))
+    ).slice(0, 10);
+  }, [vouchers, selectedPartyName, sourceSearch]);
+
   const validationViolations = useMemo(() => {
     const violations: string[] = [];
     const entriesWithLedger = ledgerEntries.filter(e => e.ledgerId);
@@ -130,18 +155,6 @@ const VoucherEntryForm: React.FC<VoucherEntryFormProps> = ({ isReadOnly, ledgers
     if (vchType === 'Contra') {
       const nonCashBank = entriesWithLedger.filter(e => !categorizedLedgers.cashBank.some(l => l.id === e.ledgerId));
       if (nonCashBank.length > 0) violations.push("Contra Protocol Violation: Only internal transfers between Cash/Bank nodes are permitted.");
-    }
-
-    if (vchType === 'Receipt') {
-      const debits = entriesWithLedger.filter(e => e.type === 'Dr');
-      const nonCashBankDebit = debits.filter(e => !categorizedLedgers.cashBank.some(l => l.id === e.ledgerId));
-      if (nonCashBankDebit.length > 0) violations.push("Receipt Protocol: Incoming funds must be debited to a Cash or Bank node.");
-    }
-
-    if (vchType === 'Payment') {
-      const credits = entriesWithLedger.filter(e => e.type === 'Cr');
-      const nonCashBankCredit = credits.filter(e => !categorizedLedgers.cashBank.some(l => l.id === e.ledgerId));
-      if (nonCashBankCredit.length > 0) violations.push("Payment Protocol: Outgoing funds must be credited from a Cash or Bank node.");
     }
 
     const dr = ledgerEntries.filter(e => e.type === 'Dr').reduce((acc, e) => acc + (e.amount || 0) + (e.taxAmount || 0), 0);
@@ -164,21 +177,16 @@ const VoucherEntryForm: React.FC<VoucherEntryFormProps> = ({ isReadOnly, ledgers
     Array.from(files).forEach((file: File) => {
       const reader = new FileReader();
       reader.onloadend = () => {
-        const newAttachment: Attachment = {
+        setAttachments(prev => [...prev, {
           id: `att-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
           name: file.name,
           type: file.type,
           size: file.size,
           data: reader.result as string
-        };
-        setAttachments(prev => [...prev, newAttachment]);
+        }]);
       };
       reader.readAsDataURL(file);
     });
-  };
-
-  const removeAttachment = (id: string) => {
-    setAttachments(prev => prev.filter(a => a.id !== id));
   };
 
   const updateEntry = (id: string, field: keyof LedgerEntry, value: any) => {
@@ -235,7 +243,7 @@ const VoucherEntryForm: React.FC<VoucherEntryFormProps> = ({ isReadOnly, ledgers
         attachments,
         supplyType,
         taxTotal: ledgerEntries.reduce((acc, e) => acc + (e.taxAmount || 0), 0),
-        gstClassification: vchType === 'Receipt' || vchType === 'Purchase Return' || vchType === 'Debit Note' ? 'Input' : (vchType === 'Payment' || vchType === 'Sales Return' || vchType === 'Credit Note' ? 'Output' : 'Input')
+        gstClassification: vchType === 'Receipt' || vchType === 'Purchase Return' || vchType === 'Debit Note' ? 'Input' : 'Output'
       });
       setIsAssigning(false);
     }, 1200);
@@ -276,53 +284,57 @@ const VoucherEntryForm: React.FC<VoucherEntryFormProps> = ({ isReadOnly, ledgers
       </div>
 
       <form onSubmit={handlePost} className="p-12 space-y-12 bg-slate-50/20">
-        {/* Validation Cockpit */}
-        {validationViolations.length > 0 && (
-          <div className="bg-rose-50 border-l-8 border-rose-500 rounded-[2rem] p-8 shadow-inner animate-in slide-in-from-top-4">
-             <h4 className="text-[10px] font-black uppercase text-rose-600 tracking-[0.3em] mb-4 flex items-center">
-                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-                Integrity Violations Found
-             </h4>
-             <ul className="space-y-2">
-                {validationViolations.map((v, i) => (
-                  <li key={i} className="text-xs font-black text-rose-900 italic flex items-center">
-                    <div className="w-1.5 h-1.5 rounded-full bg-rose-400 mr-3 shrink-0"></div>
-                    {v}
-                  </li>
-                ))}
-             </ul>
-          </div>
-        )}
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+           <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-6">
+              <div className="flex items-center space-x-4 mb-4">
+                 <div className="w-1.5 h-6 bg-indigo-600 rounded-full"></div>
+                 <h4 className="text-[10px] font-black uppercase text-slate-800 tracking-widest italic">Forex Controller</h4>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                 <div className="space-y-2">
+                    <label className="text-[8px] font-black text-slate-400 uppercase ml-1">Currency</label>
+                    <select 
+                      value={currency} 
+                      onChange={e => setCurrency(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-black text-indigo-600 outline-none shadow-inner"
+                    >
+                      {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.code} ({c.symbol})</option>)}
+                    </select>
+                 </div>
+                 <div className="space-y-2">
+                    <label className="text-[8px] font-black text-slate-400 uppercase ml-1">Exch. Rate</label>
+                    <input 
+                      type="number" step="0.0001" 
+                      value={exchangeRate} 
+                      onChange={e => setExchangeRate(parseFloat(e.target.value) || 1)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-black text-slate-800 outline-none shadow-inner text-center" 
+                    />
+                 </div>
+              </div>
+           </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-10">
-           <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-2">Posting Moment</label>
-              <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full px-8 py-5 rounded-[1.8rem] border border-slate-200 bg-white text-sm font-black shadow-sm outline-none focus:ring-8 focus:ring-indigo-500/5 transition-all" />
-           </div>
-           <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-2">Internal Reference</label>
-              <input value={reference} onChange={e => setReference(e.target.value)} placeholder="Chq / Ref / Doc ID" className="w-full px-8 py-5 rounded-[1.8rem] border border-slate-200 bg-white text-sm font-black shadow-sm outline-none focus:ring-8 focus:ring-indigo-500/5 transition-all" />
-           </div>
-           <div className="space-y-2">
-             <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-2">Operating Protocol</label>
-             <div className="flex bg-white border border-slate-200 p-1 rounded-[1.5rem] shadow-sm">
-                {(['Local', 'Central'] as const).map(s => (
-                  <button key={s} type="button" onClick={() => setSupplyType(s)} className={`flex-1 py-4 text-[10px] font-black uppercase rounded-2xl transition-all ${supplyType === s ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}>{s}</button>
-                ))}
-             </div>
-           </div>
-           <div className="p-8 bg-slate-900 rounded-[2.5rem] border-4 border-slate-800 shadow-2xl flex items-center justify-between">
-              <div>
-                <div className="text-[9px] font-black uppercase text-indigo-400 tracking-widest mb-1">Shard Balance</div>
-                <div className={`text-4xl font-black italic tracking-tighter tabular-nums ${totals.isBalanced ? 'text-white' : 'text-rose-400'}`}>
-                  ${totals.dr.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                </div>
+           <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-6">
+              <div className="flex items-center space-x-4 mb-4">
+                 <div className="w-1.5 h-6 bg-indigo-600 rounded-full"></div>
+                 <h4 className="text-[10px] font-black uppercase text-slate-800 tracking-widest italic">Temporal Stamp</h4>
               </div>
-              <div className="text-right">
-                <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase border-2 ${totals.isBalanced ? 'bg-emerald-50/20 text-emerald-400 border-emerald-500/30' : 'bg-rose-50/20 text-rose-400 border-rose-500/30'}`}>
-                  {totals.isBalanced ? 'EQUILIBRIUM' : 'VARIANCE'}
-                </span>
+              <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full px-6 py-3 rounded-xl border border-slate-200 bg-slate-50 text-sm font-black shadow-inner outline-none focus:ring-4 focus:ring-indigo-500/10" />
+           </div>
+
+           <div className="bg-slate-900 rounded-[2.5rem] p-8 text-white relative overflow-hidden shadow-2xl group border-l-8 border-indigo-500">
+              <div className="relative z-10">
+                 <div className="text-[9px] font-black uppercase text-indigo-400 tracking-widest mb-4">Verification Registry</div>
+                 <div className="flex justify-between items-end">
+                    <div className="text-4xl font-black italic tracking-tighter tabular-nums">
+                       ${totals.dr.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </div>
+                    <span className={`px-3 py-1 rounded-lg text-[8px] font-black uppercase border-2 ${totals.isBalanced ? 'bg-emerald-50/20 text-emerald-400 border-emerald-500/30' : 'bg-rose-50/20 text-rose-400 border-rose-500/30'}`}>
+                       {totals.isBalanced ? 'SYMMETRIC' : 'VARIANCE'}
+                    </span>
+                 </div>
               </div>
+              <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-600 rounded-full blur-[80px] opacity-10 -mr-16 -mt-16"></div>
            </div>
         </div>
 
@@ -335,14 +347,36 @@ const VoucherEntryForm: React.FC<VoucherEntryFormProps> = ({ isReadOnly, ledgers
                    Linking & Adjustment Protocol
                 </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                   <div className="space-y-2">
-                      <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest ml-1">Original Document Hash (Source Reference)</label>
-                      <input 
-                        value={sourceDocRef} 
-                        onChange={e => setSourceDocRef(e.target.value)} 
-                        placeholder="e.g. SL/23-24/00045"
-                        className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-sm font-black text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-inner italic" 
-                      />
+                   <div className="space-y-2 relative">
+                      <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest ml-1">Original Document Linkage</label>
+                      <div className="relative group">
+                         <input 
+                           value={sourceDocRef} 
+                           onChange={e => {setSourceDocRef(e.target.value); setSourceSearch(e.target.value); setShowSourcePicker(true); }}
+                           onFocus={() => setShowSourcePicker(true)}
+                           placeholder="Search previous transactions..."
+                           className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-sm font-black text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-inner italic" 
+                         />
+                         {showSourcePicker && selectedPartyName && filteredVouchersForSource.length > 0 && (
+                           <div className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl z-[100] overflow-hidden animate-in fade-in zoom-in-95">
+                             <div className="p-3 bg-white/5 border-b border-white/5 text-[8px] font-black text-slate-500 uppercase tracking-widest px-4">Previous Transmissions: {selectedPartyName}</div>
+                             {filteredVouchersForSource.map(v => (
+                               <div 
+                                 key={v.id} 
+                                 onClick={() => { setSourceDocRef(v.id); setShowSourcePicker(false); if(v.amount && ledgerEntries[0].amount === 0) updateEntry(ledgerEntries[0].id, 'amount', v.amount); }}
+                                 className="px-4 py-3 hover:bg-indigo-600 cursor-pointer flex justify-between items-center transition-all group/item"
+                               >
+                                 <div className="flex flex-col">
+                                   <span className="text-[10px] font-black text-white italic">#{v.id}</span>
+                                   <span className="text-[8px] font-bold text-slate-500 group-hover/item:text-indigo-100 uppercase">{v.date}</span>
+                                 </div>
+                                 <span className="text-[10px] font-black text-white italic">${v.amount.toLocaleString()}</span>
+                               </div>
+                             ))}
+                           </div>
+                         )}
+                         {showSourcePicker && <div className="fixed inset-0 z-[-1]" onClick={() => setShowSourcePicker(false)}></div>}
+                      </div>
                    </div>
                    <div className="space-y-2">
                       <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest ml-1">Statutory Adjustment Reason</label>
@@ -361,200 +395,141 @@ const VoucherEntryForm: React.FC<VoucherEntryFormProps> = ({ isReadOnly, ledgers
           </div>
         )}
 
-        <div className="space-y-6">
-           <div className="flex items-center space-x-4 px-4">
-              <div className="w-1.5 h-4 bg-slate-900 rounded-full"></div>
-              <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-800">Double-Entry Decomposition</h4>
-           </div>
-
-           <div className="bg-white rounded-[3.5rem] border-2 border-slate-100 overflow-hidden shadow-2xl">
-              <table className="w-full text-left">
-                 <thead className="bg-slate-950 text-[10px] font-black uppercase text-slate-400">
-                    <tr>
-                       <th className="px-10 py-7 text-center w-32">Polarity</th>
-                       <th className="px-10 py-7">Ledger Identity Node</th>
-                       <th className="px-10 py-7 text-right w-64">Resolved Shard ($)</th>
-                       <th className="px-10 py-7 text-center w-24">Tax Config</th>
-                       <th className="px-10 py-7 w-16"></th>
-                    </tr>
-                 </thead>
-                 <tbody className="divide-y divide-slate-100">
-                    {ledgerEntries.map((entry, idx) => {
-                      const isExpanded = expandedEntryId === entry.id;
-                      return (
-                        <React.Fragment key={entry.id}>
-                          <tr className={`hover:bg-indigo-50/20 transition-all group ${isExpanded ? 'bg-indigo-50/10' : ''}`}>
-                            <td className="px-10 py-6">
-                               <button 
-                                 type="button" 
-                                 onClick={() => updateEntry(entry.id, 'type', entry.type === 'Dr' ? 'Cr' : 'Dr')}
-                                 className={`w-full py-4 rounded-2xl text-[11px] font-black uppercase shadow-lg transition-transform active:scale-90 border-b-4 ${entry.type === 'Dr' ? 'bg-indigo-600 text-white border-indigo-900/40' : 'bg-rose-600 text-white border-rose-900/40'}`}
-                               >
-                                  {entry.type}
-                               </button>
-                            </td>
-                            <td className="px-10 py-6">
-                               <select 
-                                 value={entry.ledgerId} 
-                                 onChange={e => updateEntry(entry.id, 'ledgerId', e.target.value)}
-                                 className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-sm font-black text-slate-900 outline-none focus:ring-4 focus:ring-indigo-500/10 shadow-inner appearance-none cursor-pointer"
-                               >
-                                  <option value="">-- Choose Account --</option>
-                                  {(vchType === 'Payment' || vchType === 'Receipt' || vchType === 'Contra') ? (
-                                    <optgroup label="Cash & Bank Shards">
-                                       {categorizedLedgers.cashBank.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-                                    </optgroup>
-                                  ) : null}
-                                  <optgroup label="General Ledger Matrix">
-                                     {categorizedLedgers.others.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-                                  </optgroup>
-                               </select>
-                            </td>
-                            <td className="px-10 py-6">
-                               <input 
-                                 type="number" step="0.01" 
-                                 value={entry.amount || ''} 
-                                 onChange={e => updateEntry(entry.id, 'amount', parseFloat(e.target.value) || 0)} 
-                                 className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-right text-lg font-black text-slate-900 shadow-inner outline-none focus:bg-white transition-all"
-                                 placeholder="0.00"
-                               />
-                            </td>
-                            <td className="px-10 py-6 text-center">
-                               <button 
-                                 type="button" 
-                                 onClick={() => setExpandedEntryId(isExpanded ? null : entry.id)}
-                                 className={`p-4 rounded-2xl transition-all shadow-md ${isExpanded ? 'bg-indigo-600 text-white rotate-180' : 'bg-slate-100 text-slate-400 hover:text-indigo-600'}`}
-                               >
-                                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}><path d="M19 9l-7 7-7-7" /></svg>
-                               </button>
-                            </td>
-                            <td className="px-10 py-6 text-center">
-                               <button type="button" onClick={() => setLedgerEntries(prev => prev.filter(e => e.id !== entry.id))} className="text-slate-200 hover:text-rose-500 transition-all p-3 hover:bg-rose-50 rounded-xl"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
-                            </td>
-                          </tr>
-                          
-                          {isExpanded && (
-                            <tr className="bg-indigo-50/20 animate-in slide-in-from-top-2 duration-300">
-                              <td colSpan={5} className="px-20 py-8 border-b border-indigo-100">
-                                 <div className="grid grid-cols-1 md:grid-cols-4 gap-8 items-end">
-                                    <div className="space-y-2">
-                                       <label className="text-[9px] font-black uppercase text-indigo-400 tracking-widest ml-1">Statutory Tax Rate (%)</label>
-                                       <input type="number" step="0.1" value={entry.taxRate || ''} onChange={e => updateEntry(entry.id, 'taxRate', parseFloat(e.target.value) || 0)} className="w-full bg-white border border-indigo-200 rounded-xl px-4 py-3 text-sm font-black outline-none shadow-sm" placeholder="0.0%" />
-                                    </div>
-                                    <div className="md:col-span-3">
-                                       <div className="grid grid-cols-3 gap-4 bg-white/50 p-6 rounded-[2rem] border border-indigo-100">
-                                          <div className="text-center">
-                                             <div className="text-[8px] font-black text-slate-400 uppercase mb-1">CGST ({supplyType === 'Local' ? (entry.taxRate || 0)/2 : 0}%)</div>
-                                             <div className="text-sm font-black text-slate-800">${((entry.taxAmount || 0)/2).toLocaleString()}</div>
-                                          </div>
-                                          <div className="text-center">
-                                             <div className="text-[8px] font-black text-slate-400 uppercase mb-1">SGST ({supplyType === 'Local' ? (entry.taxRate || 0)/2 : 0}%)</div>
-                                             <div className="text-sm font-black text-slate-800">${((entry.taxAmount || 0)/2).toLocaleString()}</div>
-                                          </div>
-                                          <div className="text-center">
-                                             <div className="text-[8px] font-black text-indigo-400 uppercase mb-1">IGST ({supplyType === 'Central' ? (entry.taxRate || 0) : 0}%)</div>
-                                             <div className="text-sm font-black text-indigo-600">${(entry.igst || 0).toLocaleString()}</div>
-                                          </div>
-                                       </div>
-                                    </div>
-                                 </div>
-                              </td>
-                            </tr>
-                          )}
-                        </React.Fragment>
-                      );
-                    })}
-                 </tbody>
-              </table>
-              <div className="flex bg-slate-950 border-t border-white/5 divide-x divide-white/5">
-                 <button type="button" onClick={() => setLedgerEntries(prev => [...prev, { id: Math.random().toString(36).substr(2, 9), ledgerId: '', ledgerName: '', type: ledgerEntries[ledgerEntries.length-1].type === 'Dr' ? 'Cr' : 'Dr', amount: totals.diff || 0, taxRate: 0, taxAmount: 0, cgst: 0, sgst: 0, igst: 0, currency, exchangeRate: 1 }])} className="flex-1 py-8 text-[11px] font-black uppercase text-indigo-400 hover:bg-white/5 transition-all tracking-[0.4em]">+ Add Identity Shard</button>
-                 {totals.diff > 0 && (
-                   <button type="button" onClick={autoBalance} className="px-16 py-8 text-[11px] font-black uppercase text-emerald-400 hover:bg-emerald-600 hover:text-white transition-all tracking-[0.4em] animate-pulse">Sync Equilibrium</button>
-                 )}
-              </div>
-           </div>
+        <div className="bg-white rounded-[3.5rem] border-2 border-slate-100 overflow-hidden shadow-2xl">
+          <table className="w-full text-left">
+             <thead className="bg-slate-950 text-[10px] font-black uppercase text-slate-400">
+                <tr>
+                   <th className="px-10 py-7 text-center w-32">Polarity</th>
+                   <th className="px-10 py-7">Ledger Identity Node</th>
+                   <th className="px-10 py-7 text-right w-64">Resolved Shard ($)</th>
+                   <th className="px-10 py-7 text-center w-24">Tax</th>
+                   <th className="px-10 py-7 w-16"></th>
+                </tr>
+             </thead>
+             <tbody className="divide-y divide-slate-100">
+                {ledgerEntries.map((entry, idx) => {
+                  const isExpanded = expandedEntryId === entry.id;
+                  return (
+                    <React.Fragment key={entry.id}>
+                      <tr className={`hover:bg-indigo-50/20 transition-all group ${isExpanded ? 'bg-indigo-50/10' : ''}`}>
+                        <td className="px-10 py-6">
+                           <button 
+                             type="button" 
+                             onClick={() => updateEntry(entry.id, 'type', entry.type === 'Dr' ? 'Cr' : 'Dr')}
+                             className={`w-full py-4 rounded-2xl text-[11px] font-black uppercase shadow-lg transition-transform active:scale-90 border-b-4 ${entry.type === 'Dr' ? 'bg-indigo-600 text-white border-indigo-900/40' : 'bg-rose-600 text-white border-rose-900/40'}`}
+                           >
+                              {entry.type}
+                           </button>
+                        </td>
+                        <td className="px-10 py-6">
+                           <select 
+                             value={entry.ledgerId} 
+                             onChange={e => updateEntry(entry.id, 'ledgerId', e.target.value)}
+                             className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-sm font-black text-slate-900 outline-none focus:ring-4 focus:ring-indigo-500/10 shadow-inner appearance-none cursor-pointer"
+                           >
+                              <option value="">-- Choose Account --</option>
+                              <optgroup label="Core Liquidity Nodes">
+                                 {categorizedLedgers.cashBank.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                              </optgroup>
+                              <optgroup label="General Ledger Matrix">
+                                 {categorizedLedgers.others.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                              </optgroup>
+                           </select>
+                        </td>
+                        <td className="px-10 py-6">
+                           <input 
+                             type="number" step="0.01" 
+                             value={entry.amount || ''} 
+                             onChange={e => updateEntry(entry.id, 'amount', parseFloat(e.target.value) || 0)} 
+                             className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-right text-lg font-black text-slate-900 shadow-inner outline-none focus:bg-white transition-all"
+                             placeholder="0.00"
+                           />
+                        </td>
+                        <td className="px-10 py-6 text-center">
+                           <button 
+                             type="button" 
+                             onClick={() => setExpandedEntryId(isExpanded ? null : entry.id)}
+                             className={`p-4 rounded-2xl transition-all shadow-md ${isExpanded ? 'bg-indigo-600 text-white rotate-180' : 'bg-slate-100 text-slate-400 hover:text-indigo-600'}`}
+                           >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}><path d="M19 9l-7 7-7-7" /></svg>
+                           </button>
+                        </td>
+                        <td className="px-10 py-6 text-center">
+                           <button type="button" onClick={() => setLedgerEntries(prev => prev.filter(e => e.id !== entry.id))} className="text-slate-200 hover:text-rose-500 transition-all p-3 hover:bg-rose-50 rounded-xl"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                        </td>
+                      </tr>
+                      
+                      {isExpanded && (
+                        <tr className="bg-indigo-50/20 animate-in slide-in-from-top-2 duration-300">
+                          <td colSpan={5} className="px-20 py-8 border-b border-indigo-100">
+                             <div className="grid grid-cols-1 md:grid-cols-4 gap-8 items-end">
+                                <div className="space-y-2">
+                                   <label className="text-[9px] font-black uppercase text-indigo-400 tracking-widest ml-1">Statutory Tax Rate (%)</label>
+                                   <input type="number" step="0.1" value={entry.taxRate || ''} onChange={e => updateEntry(entry.id, 'taxRate', parseFloat(e.target.value) || 0)} className="w-full bg-white border border-indigo-200 rounded-xl px-4 py-3 text-sm font-black outline-none shadow-sm" placeholder="0.0%" />
+                                </div>
+                                <div className="md:col-span-3">
+                                   <div className="grid grid-cols-3 gap-4 bg-white/50 p-6 rounded-[2rem] border border-indigo-100">
+                                      <div className="text-center">
+                                         <div className="text-[8px] font-black text-slate-400 uppercase mb-1">CGST ({supplyType === 'Local' ? (entry.taxRate || 0)/2 : 0}%)</div>
+                                         <div className="text-sm font-black text-slate-800">${((entry.taxAmount || 0)/2).toLocaleString()}</div>
+                                      </div>
+                                      <div className="text-center">
+                                         <div className="text-[8px] font-black text-slate-400 uppercase mb-1">SGST ({supplyType === 'Local' ? (entry.taxRate || 0)/2 : 0}%)</div>
+                                         <div className="text-sm font-black text-slate-800">${((entry.taxAmount || 0)/2).toLocaleString()}</div>
+                                      </div>
+                                      <div className="text-center">
+                                         <div className="text-[8px] font-black text-indigo-400 uppercase mb-1">IGST ({supplyType === 'Central' ? (entry.taxRate || 0) : 0}%)</div>
+                                         <div className="text-sm font-black text-indigo-600">${(entry.igst || 0).toLocaleString()}</div>
+                                      </div>
+                                   </div>
+                                </div>
+                             </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+             </tbody>
+          </table>
+          <div className="flex bg-slate-950 border-t border-white/5 divide-x divide-white/5">
+             <button type="button" onClick={() => setLedgerEntries(prev => [...prev, { id: Math.random().toString(36).substr(2, 9), ledgerId: '', ledgerName: '', type: ledgerEntries[ledgerEntries.length-1].type === 'Dr' ? 'Cr' : 'Dr', amount: totals.diff || 0, taxRate: 0, taxAmount: 0, cgst: 0, sgst: 0, igst: 0, currency, exchangeRate: 1 }])} className="flex-1 py-8 text-[11px] font-black uppercase text-indigo-400 hover:bg-white/5 transition-all tracking-[0.4em]">+ Add Ledger Node</button>
+             {totals.diff > 0 && (
+               <button type="button" onClick={autoBalance} className="px-16 py-8 text-[11px] font-black uppercase text-emerald-400 hover:bg-emerald-600 hover:text-white transition-all tracking-[0.4em] animate-pulse">Sync Equilibrium</button>
+             )}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
            <div className="space-y-6">
               <div className="flex items-center justify-between px-4">
                  <label className="text-[11px] font-black uppercase text-slate-400 tracking-[0.4em]">Forensic Narrative</label>
-                 <button 
-                  type="button" 
-                  onClick={() => setShowTemplates(!showTemplates)}
-                  className="text-[9px] font-black text-indigo-600 uppercase tracking-widest hover:underline"
-                 >
-                   {showTemplates ? 'Hide Blueprints' : 'Narrative Blueprints'}
-                 </button>
+                 <button type="button" onClick={() => setShowTemplates(!showTemplates)} className="text-[9px] font-black text-indigo-600 uppercase tracking-widest hover:underline">{showTemplates ? 'Hide Blueprints' : 'Narrative Blueprints'}</button>
               </div>
-              
               {showTemplates && (
                 <div className="grid grid-cols-1 gap-2 p-4 bg-white rounded-[2rem] border border-slate-200 shadow-inner animate-in slide-in-from-top-2">
                    {NARRATION_TEMPLATES[vchType]?.map((temp, i) => (
-                     <button 
-                      key={i} 
-                      type="button" 
-                      onClick={() => { setNarration(temp); setShowTemplates(false); }}
-                      className="text-left p-3 hover:bg-indigo-50 rounded-xl text-[10px] font-bold text-slate-600 transition-colors border border-transparent hover:border-indigo-100"
-                     >
-                       "{temp}"
-                     </button>
+                     <button key={i} type="button" onClick={() => { setNarration(temp); setShowTemplates(false); }} className="text-left p-3 hover:bg-indigo-50 rounded-xl text-[10px] font-bold text-slate-600 transition-colors border border-transparent hover:border-indigo-100">"{temp}"</button>
                    ))}
                 </div>
               )}
-
-              <textarea 
-                value={narration} 
-                onChange={e => setNarration(e.target.value)} 
-                placeholder="Provide institutional context for this ledger shift..." 
-                className="w-full h-48 px-10 py-10 rounded-[3rem] border border-slate-200 bg-slate-50/50 text-sm font-medium italic outline-none focus:ring-8 focus:ring-indigo-500/5 focus:bg-white shadow-inner resize-none leading-relaxed transition-all" 
-              />
+              <textarea value={narration} onChange={e => setNarration(e.target.value)} placeholder="Provide institutional context for this ledger shift..." className="w-full h-48 px-10 py-10 rounded-[3rem] border border-slate-200 bg-slate-50/50 text-sm font-medium italic outline-none focus:ring-8 focus:ring-indigo-500/5 focus:bg-white shadow-inner resize-none leading-relaxed transition-all" />
            </div>
            
            <div className="space-y-6">
-              <label className="text-[11px] font-black uppercase text-slate-400 ml-4 tracking-[0.4em]">Document Vault (Attachments)</label>
-              <div className="bg-white border-2 border-dashed border-slate-200 rounded-[3rem] p-8 flex flex-col items-center justify-center space-y-4 group hover:border-indigo-400 hover:bg-indigo-50/20 transition-all cursor-pointer" onClick={() => fileInputRef.current?.click()}>
-                 <input type="file" multiple className="hidden" ref={fileInputRef} onChange={handleFileUpload} />
+              <label className="text-[11px] font-black uppercase text-slate-400 tracking-[0.4em] px-4">Document Vault</label>
+              <div className="bg-white border-2 border-dashed border-slate-200 rounded-[3rem] p-8 flex flex-col items-center justify-center space-y-4 hover:border-indigo-400 hover:bg-indigo-50/20 transition-all cursor-pointer group relative" onClick={() => fileInputRef.current?.click()}>
+                 <input type="file" multiple className="hidden" ref={fileInputRef} onChange={handleFileUpload} accept=".pdf,image/png,image/jpeg,image/jpg" />
                  <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">📎</div>
                  <div className="text-center">
                     <p className="text-[11px] font-black text-slate-700 uppercase">Attach Statutory Evidence</p>
-                    <p className="text-[9px] text-slate-400 font-bold uppercase mt-1">Images, PDFs or XML Shards (Max 5MB)</p>
+                    <p className="text-[9px] text-slate-400 font-bold uppercase mt-1">PDF or Images (Max 5MB per Shard)</p>
                  </div>
               </div>
-
-              {attachments.length > 0 && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-48 overflow-y-auto custom-scrollbar pr-2">
-                   {attachments.map(att => (
-                     <div key={att.id} className="flex items-center justify-between p-4 bg-white rounded-2xl border border-slate-100 shadow-sm animate-in zoom-in-95">
-                        <div className="flex items-center space-x-3 overflow-hidden">
-                           <span className="text-lg">📄</span>
-                           <div className="min-w-0">
-                              <p className="text-[10px] font-black text-slate-800 truncate uppercase">{att.name}</p>
-                              <p className="text-[8px] text-slate-400 font-bold">{(att.size / 1024).toFixed(1)} KB</p>
-                           </div>
-                        </div>
-                        <button type="button" onClick={(e) => { e.stopPropagation(); removeAttachment(att.id); }} className="text-slate-300 hover:text-rose-500 p-1">
-                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
-                        </button>
-                     </div>
-                   ))}
-                </div>
-              )}
            </div>
         </div>
 
         <div className="flex flex-col justify-end space-y-6 pt-10 border-t border-slate-100">
-           <div className="p-10 bg-indigo-950 rounded-[3.5rem] border border-white/5 shadow-2xl relative overflow-hidden group max-w-xl ml-auto">
-              <div className="relative z-10 flex justify-between items-center space-x-12">
-                 <div>
-                    <h5 className="text-[11px] font-black uppercase text-indigo-400 tracking-[0.4em] mb-2">Aggregate Value</h5>
-                    <div className="text-5xl font-black italic tracking-tighter text-white tabular-nums">${totals.dr.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
-                 </div>
-                 <div className="w-14 h-14 bg-indigo-500/20 rounded-2xl flex items-center justify-center text-2xl border border-indigo-400/20 shadow-lg group-hover:rotate-12 transition-transform">💎</div>
-              </div>
-              <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500 rounded-full blur-[100px] opacity-10"></div>
-           </div>
-           
            <div className="flex flex-col sm:flex-row gap-6 justify-end">
               <button type="button" onClick={onCancel} className="px-12 py-10 text-[11px] font-black uppercase text-slate-400 hover:text-rose-600 transition-all tracking-[0.4em]">Abort</button>
               <button 

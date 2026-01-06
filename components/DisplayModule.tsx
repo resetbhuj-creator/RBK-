@@ -9,6 +9,7 @@ import InventorySummary from './InventorySummary';
 import GstReportSystem from './GstReportSystem';
 import Gstr1Report from './Gstr1Report';
 import Gstr2Report from './Gstr2Report';
+import Gstr3BReport from './Gstr3BReport';
 import HsnSummaryReport from './HsnSummaryReport';
 import BudgetVariance from './BudgetVariance';
 import LedgerReport from './LedgerReport';
@@ -72,6 +73,8 @@ const DisplayModule: React.FC<DisplayModuleProps> = ({
         return <Gstr1Report vouchers={vouchers} activeCompany={activeCompany} ledgers={ledgers} onViewVoucher={onViewVoucher} />;
       case DisplaySubMenu.GSTR_2:
         return <Gstr2Report vouchers={vouchers} activeCompany={activeCompany} ledgers={ledgers} onViewVoucher={onViewVoucher} />;
+      case DisplaySubMenu.GSTR_3B:
+        return <Gstr3BReport vouchers={vouchers} activeCompany={activeCompany} onViewVoucher={onViewVoucher} />;
       case DisplaySubMenu.HSN_SUMMARY:
         return <HsnSummaryReport vouchers={vouchers} activeCompany={activeCompany} />;
       default:

@@ -409,6 +409,13 @@ export const DISPLAY_SUB_MENUS: SubMenuItem[] = [
     icon: <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13l-3 3m0 0l-3-3m3 3V8m0 13a9 9 0 110-18 9 9 0 010 18z" /></svg>
   },
   {
+    id: DisplaySubMenu.GSTR_3B,
+    label: 'GSTR-3B (Summary)',
+    description: 'Consolidated summary of outward supplies and eligible ITC.',
+    color: 'bg-emerald-600',
+    icon: <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+  },
+  {
     id: DisplaySubMenu.HSN_SUMMARY,
     label: 'HSN Summary',
     description: 'Code-wise aggregation of quantities and statutory values.',
@@ -417,11 +424,12 @@ export const DISPLAY_SUB_MENUS: SubMenuItem[] = [
   }
 ];
 
+// Added COMMUNICATION_SUB_MENUS to resolve missing export error
 export const COMMUNICATION_SUB_MENUS: SubMenuItem[] = [
   {
     id: CommunicationSubMenu.PRINT_CENTER,
     label: 'Print Center',
-    description: 'Managed statutory document rendering and batch physical output.',
+    description: 'Centralized high-fidelity document rendering and dispatch control.',
     color: 'bg-indigo-600',
     icon: (
       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -432,8 +440,8 @@ export const COMMUNICATION_SUB_MENUS: SubMenuItem[] = [
   {
     id: CommunicationSubMenu.EMAIL_GATEWAY,
     label: 'Email Gateway',
-    description: 'Secure SMTP relay clusters for transactional and organizational correspondence.',
-    color: 'bg-indigo-500',
+    description: 'Configure system SMTP nodes and manage bulk dispatch logs.',
+    color: 'bg-violet-600',
     icon: (
       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
@@ -443,19 +451,19 @@ export const COMMUNICATION_SUB_MENUS: SubMenuItem[] = [
   {
     id: CommunicationSubMenu.SMS_ALERTS,
     label: 'SMS Alerts',
-    description: 'Instant network notifications for high-fidelity transactional events.',
+    description: 'Low-latency mobile notification protocol for ledger shifts.',
     color: 'bg-blue-600',
     icon: (
       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
       </svg>
     )
   },
   {
     id: CommunicationSubMenu.DISPATCH_LOGS,
     label: 'Dispatch Logs',
-    description: 'Comprehensive telemetry for all outbound communication packets.',
-    color: 'bg-slate-700',
+    description: 'Comprehensive forensic stream of all outbound transmissions.',
+    color: 'bg-emerald-600',
     icon: (
       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -464,51 +472,78 @@ export const COMMUNICATION_SUB_MENUS: SubMenuItem[] = [
   }
 ];
 
+// Added HOUSE_KEEPING_SUB_MENUS to resolve missing export error
 export const HOUSE_KEEPING_SUB_MENUS: SubMenuItem[] = [
   {
     id: HouseKeepingSubMenu.DATABASE_UTILITY,
     label: 'Database Utility',
-    description: 'Optimize indices, rebuild tables and manage physical storage shards.',
+    description: 'Execute indexing protocols and shard vacuuming sequences.',
     color: 'bg-amber-600',
-    icon: <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" /></svg>
+    icon: (
+      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+      </svg>
+    )
   },
   {
     id: HouseKeepingSubMenu.INTEGRITY_CHECK,
     label: 'Data Integrity',
-    description: 'Execute deep mathematical proofing of ledgers and transactional chains.',
+    description: 'Mathematical proofing of ledger partitions and voucher flux.',
     color: 'bg-emerald-600',
-    icon: <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+    icon: (
+      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+      </svg>
+    )
   },
   {
     id: HouseKeepingSubMenu.SYSTEM_AUDIT,
     label: 'Security Audit',
-    description: 'Review granular telemetry of user activities and access patterns.',
+    description: 'Granular forensic stream of institutional administrative shifts.',
     color: 'bg-rose-600',
-    icon: <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+    icon: (
+      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+      </svg>
+    )
   },
   {
     id: HouseKeepingSubMenu.RENUMBERING,
-    label: 'Vch Renumbering',
-    description: 'Systematically re-align voucher sequences for audit compliance.',
-    color: 'bg-blue-600',
-    icon: <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" /></svg>
-  },
-  {
-    id: HouseKeepingSubMenu.DATA_PURGE,
-    label: 'Data Purge',
-    description: 'Systematically remove historical logs or orphan records to free space.',
-    color: 'bg-slate-700',
-    icon: <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+    label: 'Voucher Renumbering',
+    description: 'Chronological realignment of transactional hash identifiers.',
+    color: 'bg-indigo-600',
+    icon: (
+      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
+      </svg>
+    )
   },
   {
     id: HouseKeepingSubMenu.PREFERENCES,
     label: 'System Preferences',
     description: 'Configure global operational behavior and environment flags.',
-    color: 'bg-indigo-600',
-    icon: <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /></svg>
+    color: 'bg-slate-700',
+    icon: (
+      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+      </svg>
+    )
   }
 ];
 
 export const TAX_TYPES = ['CGST', 'SGST', 'IGST', 'Other'];
 
 export const UNIT_MEASURES = ['Pcs', 'Kg', 'Litre', 'Box', 'Nos', 'Mtrs', 'Set', 'SqFt', 'Roll'];
+
+/* Added export of CATEGORIES to resolve the missing export error in AdministrationModule.tsx */
+export const CATEGORIES = [
+  'General',
+  'Electronics',
+  'Raw Materials',
+  'Finished Goods',
+  'Services',
+  'Consumables',
+  'Packaging',
+  'Digital Assets'
+];

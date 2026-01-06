@@ -276,7 +276,7 @@ const YearChangeModule: React.FC<YearChangeModuleProps> = ({
                  <div ref={scrollRef} className="h-48 overflow-y-auto font-mono text-[11px] leading-relaxed text-slate-500 space-y-2 custom-scrollbar pr-6">
                     {shiftLogs.map((l, i) => (
                       <div key={i} className="animate-in fade-in slide-in-from-left-2 duration-300">
-                        <span className="text-slate-800 mr-4 font-bold select-none">{i.toString().padStart(2, '0')}</span>
+                        <span className="text-slate-800 mr-4 font-bold select-none">{i.toString().padStart(3, '0')}</span>
                         {l}
                       </div>
                     ))}

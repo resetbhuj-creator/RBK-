@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Voucher, Ledger, VoucherItem } from '../types';
+import { Voucher, Ledger } from '../types';
 import ActionMenu from './ActionMenu';
 
 interface Gstr1ReportProps {
@@ -11,7 +11,6 @@ interface Gstr1ReportProps {
 
 type Gstr1Section = 'B2B' | 'B2CL' | 'B2CS' | 'EXPORTS' | 'EXEMPT' | 'HSN';
 
-// Added HsnSummaryEntry interface to define the structure of HSN report rows
 interface HsnSummaryEntry {
   hsn: string;
   desc: string;
@@ -31,11 +30,10 @@ const Gstr1Report: React.FC<Gstr1ReportProps> = ({ vouchers, ledgers, activeComp
   const reportData = useMemo(() => {
     const summary = {
       b2b: [] as Voucher[],
-      b2cl: [] as Voucher[], // B2C Large: Unregistered, Central, > 2.5L
-      b2cs: [] as Voucher[], // B2C Small: Unregistered, Other
+      b2cl: [] as Voucher[],
+      b2cs: [] as Voucher[],
       exports: [] as Voucher[],
-      exempt: [] as Voucher[], // Nil rated or Exempt
-      // Explicitly typed the hsn record with the HsnSummaryEntry interface
+      exempt: [] as Voucher[],
       hsn: {} as Record<string, HsnSummaryEntry>,
       metrics: {
         totalTaxable: 0,
@@ -47,19 +45,17 @@ const Gstr1Report: React.FC<Gstr1ReportProps> = ({ vouchers, ledgers, activeComp
     const salesVouchers = vouchers.filter(v => {
       const vDate = new Date(v.date);
       const inRange = vDate >= new Date(dateRange.start) && vDate <= new Date(dateRange.end);
-      return inRange && (v.type === 'Sales' || v.type === 'Sales Return');
+      return inRange && (v.type === 'Sales' || v.type === 'Sales Return' || v.type === 'Credit Note');
     });
 
     salesVouchers.forEach(v => {
-      const isReturn = v.type === 'Sales Return';
-      const factor = isReturn ? -1 : 1;
+      const factor = (v.type === 'Sales Return' || v.type === 'Credit Note') ? -1 : 1;
       const partyLedger = ledgers.find(l => l.name === v.party);
       const gstId = partyLedger?.taxId;
       
       const taxable = (v.subTotal || v.amount) * factor;
       const tax = (v.taxTotal || 0) * factor;
 
-      // HSN Aggregation
       v.items?.forEach(item => {
         const hsnCode = item.hsn || 'N/A';
         if (!summary.hsn[hsnCode]) {
@@ -69,19 +65,16 @@ const Gstr1Report: React.FC<Gstr1ReportProps> = ({ vouchers, ledgers, activeComp
         summary.hsn[hsnCode].taxable += item.amount * factor;
         summary.hsn[hsnCode].tax += (item.taxAmount || 0) * factor;
 
-        // Exempt detection
         if (item.igstRate === 0) {
           if (!summary.exempt.includes(v)) summary.exempt.push(v);
         }
       });
 
-      // Categorization
-      if (v.party.toLowerCase().includes('export') || (v.supplyType === 'Central' && !gstId && v.party.toLowerCase().includes('global'))) {
+      if (v.party.toLowerCase().includes('export')) {
         summary.exports.push(v);
       } else if (gstId) {
         summary.b2b.push(v);
       } else {
-        // B2C Logic
         if (v.supplyType === 'Central' && v.amount > 250000) {
           summary.b2cl.push(v);
         } else {
@@ -128,7 +121,6 @@ const Gstr1Report: React.FC<Gstr1ReportProps> = ({ vouchers, ledgers, activeComp
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {/* Cast Object.values to HsnSummaryEntry[] to resolve unknown type access errors on lines 122-126 */}
               {(Object.values(reportData.hsn) as HsnSummaryEntry[]).map((row, i) => (
                 <tr key={i} className="hover:bg-indigo-50/20 transition-all border-b border-slate-50 last:border-0">
                   <td className="px-10 py-6 font-mono text-xs font-black text-indigo-600">{row.hsn}</td>
@@ -149,40 +141,53 @@ const Gstr1Report: React.FC<Gstr1ReportProps> = ({ vouchers, ledgers, activeComp
 
     return (
       <div className="overflow-x-auto">
-        <table className="w-full text-left">
-          <thead className="bg-slate-900 text-[9px] font-black uppercase text-slate-400">
+        <table className="w-full text-left border-collapse">
+          <thead className="bg-slate-900 text-[9px] font-black uppercase text-slate-400 tracking-widest">
             <tr>
-              <th className="px-10 py-6">Vch ID / Date</th>
-              <th className="px-10 py-6">Counterparty</th>
-              <th className="px-10 py-6 text-center">Supply</th>
-              <th className="px-10 py-6 text-right">Taxable</th>
-              <th className="px-10 py-6 text-right">Tax</th>
-              <th className="px-10 py-6 text-right">Action</th>
+              <th className="px-8 py-6">Recipient GSTIN</th>
+              <th className="px-8 py-6">Invoice Number</th>
+              <th className="px-8 py-6">Date</th>
+              <th className="px-8 py-6 text-right">Total Value</th>
+              <th className="px-8 py-6 text-center">Place of Supply</th>
+              <th className="px-8 py-6 text-right">Taxable Value</th>
+              <th className="px-8 py-6 text-right">Tax Amount</th>
+              <th className="px-8 py-6 text-right">Action</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
-            {list.map((v, i) => (
-              <tr key={i} onClick={() => onViewVoucher(v.id)} className="hover:bg-indigo-50/20 transition-all cursor-pointer border-b border-slate-50 last:border-0 group">
-                <td className="px-10 py-6">
-                  <div className="font-mono text-xs font-black text-indigo-600">#{v.id}</div>
-                  <div className="text-[9px] font-bold text-slate-400 uppercase mt-1">{v.date}</div>
-                </td>
-                <td className="px-10 py-6">
-                  <div className="text-sm font-black text-slate-800 uppercase italic group-hover:text-indigo-600 transition-colors">{v.party}</div>
-                  <div className="text-[8px] font-bold text-slate-400 uppercase mt-1">{ledgers.find(l => l.name === v.party)?.taxId || 'UNREGISTERED'}</div>
-                </td>
-                <td className="px-10 py-6 text-center">
-                  <span className={`px-3 py-1 rounded-xl text-[9px] font-black uppercase border ${v.supplyType === 'Local' ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>{v.supplyType}</span>
-                </td>
-                <td className="px-10 py-6 text-right font-black tabular-nums italic text-slate-900">${(v.subTotal || v.amount).toLocaleString()}</td>
-                <td className="px-10 py-6 text-right font-black tabular-nums text-indigo-600">${(v.taxTotal || 0).toLocaleString()}</td>
-                <td className="px-10 py-6 text-right" onClick={e => e.stopPropagation()}>
-                  <ActionMenu label="Forensic" actions={[{ label: 'Inspect', icon: '👁️', onClick: () => onViewVoucher(v.id), variant: 'primary' }]} />
-                </td>
-              </tr>
-            ))}
+            {list.map((v, i) => {
+              const partyLedger = ledgers.find(l => l.name === v.party);
+              const gstId = partyLedger?.taxId || 'UNREGISTERED';
+              const pos = v.supplyType === 'Local' ? activeCompany.state : 'Central / Inter-state';
+              
+              return (
+                <tr key={i} className="hover:bg-indigo-50/20 transition-all cursor-pointer group border-b border-slate-50 last:border-0" onClick={() => onViewVoucher(v.id)}>
+                  <td className="px-8 py-6">
+                    <div className="flex flex-col">
+                      <span className={`text-[10px] font-black uppercase tracking-widest ${gstId !== 'UNREGISTERED' ? 'text-indigo-600' : 'text-slate-400'}`}>
+                        {gstId}
+                      </span>
+                      <span className="text-[8px] font-bold text-slate-400 uppercase mt-1 truncate max-w-[120px]">{v.party}</span>
+                    </div>
+                  </td>
+                  <td className="px-8 py-6 font-mono text-xs font-black text-slate-700 italic group-hover:text-indigo-600 transition-colors">#{v.id}</td>
+                  <td className="px-8 py-6 text-[10px] font-bold text-slate-500 uppercase">{v.date}</td>
+                  <td className="px-8 py-6 text-right font-black tabular-nums text-slate-900">${v.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                  <td className="px-8 py-6 text-center">
+                    <span className={`px-2 py-0.5 rounded-lg text-[8px] font-black uppercase border ${v.supplyType === 'Local' ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
+                      {pos}
+                    </span>
+                  </td>
+                  <td className="px-8 py-6 text-right font-black tabular-nums italic text-slate-600">${(v.subTotal || v.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                  <td className="px-8 py-6 text-right font-black tabular-nums text-indigo-600">${(v.taxTotal || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                  <td className="px-8 py-6 text-right" onClick={e => e.stopPropagation()}>
+                    <ActionMenu label="Forensic" actions={[{ label: 'Inspect', icon: '👁️', onClick: () => onViewVoucher(v.id), variant: 'primary' }]} />
+                  </td>
+                </tr>
+              );
+            })}
             {list.length === 0 && (
-              <tr><td colSpan={6} className="py-32 text-center opacity-30 italic font-black uppercase text-[10px] tracking-widest">Buffer Empty for this Shard</td></tr>
+              <tr><td colSpan={8} className="py-32 text-center opacity-30 italic font-black uppercase text-[10px] tracking-widest">Registry Buffer Empty for this Section</td></tr>
             )}
           </tbody>
         </table>
@@ -229,7 +234,7 @@ const Gstr1Report: React.FC<Gstr1ReportProps> = ({ vouchers, ledgers, activeComp
            <div key={i} className={`p-8 rounded-[2.5rem] border border-slate-200 shadow-sm group hover:-translate-y-1 transition-all ${stat.bg}`}>
               <div className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2 group-hover:text-indigo-600 transition-colors">{stat.label}</div>
               <div className={`text-4xl font-black italic tracking-tighter tabular-nums ${stat.color}`}>
-                {stat.isValue !== false ? `$${stat.value.toLocaleString()}` : stat.value}
+                {stat.isValue !== false ? `$${stat.value.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : stat.value}
               </div>
            </div>
          ))}
