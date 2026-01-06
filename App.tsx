@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { MainMenuType, Role, User, AuditLog, AdminSubMenu, TransactionSubMenu, DisplaySubMenu, CommunicationSubMenu, HouseKeepingSubMenu, Ledger, Company, AccountGroup, Voucher } from './types';
+import { MainMenuType, Role, User, AuditLog, AdminSubMenu, TransactionSubMenu, DisplaySubMenu, CommunicationSubMenu, HouseKeepingSubMenu, Ledger, Company, AccountGroup, Voucher, Tax, TaxGroup, Item, Batch } from './types';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import RibbonMenu from './components/RibbonMenu';
@@ -31,6 +31,11 @@ const INITIAL_ACCOUNT_GROUPS: AccountGroup[] = [
   { id: 'ag7', name: 'Purchase Accounts', nature: 'Expenses', isSystem: true }
 ];
 
+const INITIAL_TAX_GROUPS: TaxGroup[] = [
+  { id: 'tg-01', name: 'GST 18%', description: 'Standard Intra-state GST (9+9)', isSystem: true },
+  { id: 'tg-02', name: 'IGST 18%', description: 'Standard Inter-state IGST', isSystem: true }
+];
+
 const INITIAL_COMPANIES = [
   { id: '1', name: 'Nexus Global Industries Ltd.', years: ['2023 - 2024'], country: 'India', state: 'Maharashtra', currency: 'INR (₹)', logo: 'N', dataPath: 'C:\\Nexus\\Data', fyStartDate: '2023-04-01', booksBeginDate: '2023-04-01' }
 ];
@@ -48,11 +53,15 @@ const App: React.FC = () => {
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [viewingVoucherId, setViewingVoucherId] = useState<string | null>(null);
 
-  // Persistence logic (Mocked for brevity)
+  // Persistence logic
   const [companies, setCompanies] = useState<Company[]>(() => JSON.parse(localStorage.getItem('nx_companies') || JSON.stringify(INITIAL_COMPANIES)));
   const [accountGroups, setAccountGroups] = useState<AccountGroup[]>(() => JSON.parse(localStorage.getItem('nx_groups') || JSON.stringify(INITIAL_ACCOUNT_GROUPS)));
+  const [taxGroups, setTaxGroups] = useState<TaxGroup[]>(() => JSON.parse(localStorage.getItem('nx_tax_groups') || JSON.stringify(INITIAL_TAX_GROUPS)));
+  const [taxes, setTaxes] = useState<Tax[]>(() => JSON.parse(localStorage.getItem('nx_taxes') || '[]'));
   const [ledgers, setLedgers] = useState<Ledger[]>(() => JSON.parse(localStorage.getItem('nx_ledgers') || '[]'));
   const [vouchers, setVouchers] = useState<Voucher[]>(() => JSON.parse(localStorage.getItem('nx_vouchers') || '[]'));
+  const [items, setItems] = useState<Item[]>(() => JSON.parse(localStorage.getItem('nx_items') || '[]'));
+  const [batches, setBatches] = useState<Batch[]>(() => JSON.parse(localStorage.getItem('nx_batches') || '[]'));
   const [users, setUsers] = useState<User[]>(() => JSON.parse(localStorage.getItem('nx_users') || JSON.stringify([{ id: 'u1', name: 'Vance Alexander', email: 'vance@nexus.net', role: 'Super Admin', status: 'Active', permissions: INITIAL_ROLES[0].permissions }])));
   const [roles, setRoles] = useState<Role[]>(() => JSON.parse(localStorage.getItem('nx_roles') || JSON.stringify(INITIAL_ROLES)));
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>(() => JSON.parse(localStorage.getItem('nx_audit') || '[]'));
@@ -64,31 +73,23 @@ const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('nx_companies', JSON.stringify(companies));
     localStorage.setItem('nx_groups', JSON.stringify(accountGroups));
+    localStorage.setItem('nx_tax_groups', JSON.stringify(taxGroups));
+    localStorage.setItem('nx_taxes', JSON.stringify(taxes));
     localStorage.setItem('nx_ledgers', JSON.stringify(ledgers));
     localStorage.setItem('nx_vouchers', JSON.stringify(vouchers));
+    localStorage.setItem('nx_items', JSON.stringify(items));
+    localStorage.setItem('nx_batches', JSON.stringify(batches));
     localStorage.setItem('nx_users', JSON.stringify(users));
     localStorage.setItem('nx_roles', JSON.stringify(roles));
     localStorage.setItem('nx_audit', JSON.stringify(auditLogs));
-  }, [companies, accountGroups, ledgers, vouchers, users, roles, auditLogs]);
-
-  // Global Keyboard Shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault();
-        setIsCommandPaletteOpen(prev => !prev);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [companies, accountGroups, taxGroups, taxes, ledgers, vouchers, items, batches, users, roles, auditLogs]);
 
   const addAuditLog = useCallback((logData: Omit<AuditLog, 'id' | 'timestamp' | 'actor'>) => {
     const newLog: AuditLog = {
       ...logData,
       id: `EV-${Date.now()}`,
       timestamp: new Date().toISOString(),
-      actor: 'Vance Alexander' // Mocked active user
+      actor: 'Vance Alexander'
     };
     setAuditLogs(prev => [newLog, ...prev]);
   }, []);
@@ -120,8 +121,8 @@ const App: React.FC = () => {
             setCurrentFY={(fy, l) => { setCurrentFY(fy); setIsFYLocked(!!l); }}
             ledgers={ledgers} setLedgers={setLedgers} 
             accountGroups={accountGroups} setAccountGroups={setAccountGroups}
-            items={[]} setItems={() => {}} batches={[]} setBatches={() => {}}
-            taxes={[]} setTaxes={() => {}} taxGroups={[]} setTaxGroups={() => {}}
+            items={items} setItems={setItems} batches={batches} setBatches={setBatches}
+            taxes={taxes} setTaxes={setTaxes} taxGroups={taxGroups} setTaxGroups={setTaxGroups}
             vouchers={vouchers} setVouchers={setVouchers}
             unitMeasures={DEFAULT_UNITS} setUnitMeasures={() => {}}
             isFYLocked={isFYLocked}
@@ -132,14 +133,14 @@ const App: React.FC = () => {
           <TransactionModule 
             activeCompany={activeCompany} currentFY={currentFY} isReadOnly={isFYLocked} 
             activeSubAction={activeTransactionSubMenu} setActiveSubAction={setActiveTransactionSubMenu}
-            ledgers={ledgers} items={[]} batches={[]} vouchers={vouchers} setVouchers={setVouchers} onViewVoucher={setViewingVoucherId}
+            ledgers={ledgers} items={items} batches={batches} vouchers={vouchers} setVouchers={setVouchers} onViewVoucher={setViewingVoucherId}
           />
         );
       case MainMenuType.DISPLAY:
         return (
           <DisplayModule 
             activeCompany={activeCompany} activeSubAction={activeDisplaySubMenu} setActiveSubAction={setActiveDisplaySubMenu}
-            ledgers={ledgers} vouchers={vouchers} items={[]} batches={[]} taxes={[]} taxGroups={[]}
+            ledgers={ledgers} vouchers={vouchers} items={items} batches={batches} taxes={taxes} taxGroups={taxGroups}
             onViewVoucher={setViewingVoucherId} onPostVoucher={(v) => setVouchers(prev => [...prev, { ...v, id: 'TBD', status: 'Posted' }])}
           />
         );

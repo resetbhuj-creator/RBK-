@@ -25,21 +25,22 @@ const SubMenuItem: React.FC<{ label: string, id: string, activeId: string | null
   return (
     <button 
       onClick={onClick} 
-      className={`w-full text-left px-4 py-2.5 rounded-xl text-[10px] uppercase tracking-widest transition-all relative group/sub flex items-center border-l-2 ${
+      className={`w-full text-left px-4 py-2.5 rounded-xl text-[10px] uppercase tracking-widest transition-all relative group/sub flex items-center ${
         isActive 
-          ? 'text-indigo-600 bg-indigo-50 border-indigo-600 font-black' 
-          : 'text-slate-500 font-bold border-transparent hover:text-indigo-600 hover:bg-indigo-50/50'
+          ? 'text-indigo-700 bg-indigo-100/80 font-black ring-1 ring-indigo-200' 
+          : 'text-slate-500 font-bold hover:text-indigo-600 hover:bg-slate-50'
       }`}
     >
       <div className={`w-1.5 h-1.5 rounded-full mr-3 transition-all ${isActive ? 'bg-indigo-600 scale-125 shadow-[0_0_8px_rgba(79,70,229,0.5)]' : 'bg-slate-300'}`} />
       <span className="truncate">{label}</span>
+      {isActive && <div className="absolute right-3 w-1 h-1 rounded-full bg-indigo-400" />}
     </button>
   );
 };
 
 const SubMenuContainer: React.FC<{ children: React.ReactNode, isOpen: boolean }> = ({ children, isOpen }) => (
-  <div className={`grid transition-all duration-300 ease-in-out ${isOpen ? 'grid-rows-[1fr] opacity-100 mt-1 mb-2' : 'grid-rows-[0fr] opacity-0'}`}>
-    <div className="overflow-hidden ml-6 border-l border-slate-100 pl-2 space-y-0.5">
+  <div className={`grid transition-all duration-300 ease-in-out ${isOpen ? 'grid-rows-[1fr] opacity-100 mt-2 mb-3' : 'grid-rows-[0fr] opacity-0'}`}>
+    <div className="overflow-hidden ml-6 border-l-2 border-slate-100 pl-3 space-y-1">
       {children}
     </div>
   </div>
@@ -94,7 +95,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <aside className={`fixed inset-y-0 left-0 z-50 w-72 bg-white text-slate-900 transition-all duration-300 transform ${isOpen ? 'translate-x-0' : '-translate-x-full'} md:relative md:translate-x-0 border-r border-slate-200 flex flex-col h-screen overflow-hidden shadow-sm`}>
-      <div className="flex items-center justify-between px-6 h-16 border-b border-slate-100 shrink-0">
+      <div className="flex items-center justify-between px-6 h-16 border-b border-slate-100 shrink-0 bg-slate-50/50">
         <div className="flex items-center space-x-3 overflow-hidden">
           <div className="w-9 h-9 shrink-0 bg-indigo-600 rounded-xl flex items-center justify-center font-black text-white shadow-lg shadow-indigo-100">
             N
@@ -118,10 +119,10 @@ const Sidebar: React.FC<SidebarProps> = ({
             <div key={item.id}>
               <button
                 onClick={() => setActiveMenu(item.id)}
-                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition-all group relative ${
+                className={`w-full flex items-center space-x-3 px-4 py-3.5 rounded-2xl transition-all group relative border-l-4 ${
                   isParentActive 
-                    ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-100' 
-                    : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'
+                    ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-100 border-indigo-900' 
+                    : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600 border-transparent'
                 }`}
               >
                 <span className={`${isParentActive ? 'text-white' : 'text-slate-400 group-hover:text-indigo-600'} transition-colors w-5 h-5 flex items-center justify-center shrink-0`}>
@@ -131,7 +132,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                   {item.label}
                 </span>
                 {hasSub && (
-                  <svg className={`w-3 h-3 transition-transform duration-300 ${isParentActive ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className={`w-3.5 h-3.5 transition-transform duration-300 ${isParentActive ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" />
                   </svg>
                 )}

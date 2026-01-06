@@ -79,7 +79,7 @@ export interface Attachment {
   name: string;
   type: string;
   size: number;
-  data: string; // Base64
+  data: string; // Base64 Shard
 }
 
 export interface Company {
@@ -192,6 +192,7 @@ export interface Voucher {
   gstClassification?: 'Input' | 'Output';
   approvedBy?: string;
   approvalDate?: string;
+  attachments?: Attachment[];
 }
 
 export interface Ledger {

@@ -91,6 +91,14 @@ const TaxForm: React.FC<TaxFormProps> = ({ initialData, taxGroups, onCancel, onS
           </div>
 
           <div className="space-y-2">
+            <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-1">Associate Umbrella (Tax Group)</label>
+            <select value={formData.groupId} onChange={e => setFormData({ ...formData, groupId: e.target.value })} className={inputClass('groupId')}>
+              <option value="">-- Independent Node --</option>
+              {taxGroups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+            </select>
+          </div>
+
+          <div className="space-y-2">
             <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-1">Classification</label>
             <select value={formData.classification} onChange={e => setFormData({ ...formData, classification: e.target.value as any })} className={inputClass('classification')}>
               <option value="Input">Input Credit</option>
