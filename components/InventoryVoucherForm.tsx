@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Item, Ledger, Voucher, VoucherItem, Adjustment, VoucherType, Batch, Attachment } from '../types';
 import { UNIT_MEASURES } from '../constants';
@@ -203,8 +204,9 @@ const InventoryVoucherForm: React.FC<InventoryVoucherFormProps> = ({ isReadOnly,
         if (isFinancial) {
           const rate = updated.igstRate || 0;
           updated.taxAmount = (updated.amount * rate) / 100;
-          updated.cgst = supplyType === 'Local' ? rate / 2 : 0;
-          updated.sgst = supplyType === 'Local' ? rate / 2 : 0;
+          // Fixed property names from cgst to cgstRate and sgst to sgstRate
+          updated.cgstRate = supplyType === 'Local' ? rate / 2 : 0;
+          updated.sgstRate = supplyType === 'Local' ? rate / 2 : 0;
         }
         
         return updated;

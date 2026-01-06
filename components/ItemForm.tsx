@@ -4,8 +4,8 @@ import { Item, TaxGroup, Tax, Batch } from '../types';
 interface ItemFormProps {
   initialData?: Item;
   unitMeasures: string[];
-  taxGroups?: TaxGroup[];
-  taxes?: Tax[];
+  taxGroups: TaxGroup[];
+  taxes: Tax[];
   onQuickUnitAdd?: (unit: string) => void;
   onCancel: () => void;
   onSubmit: (data: Omit<Item, 'id'> & { initialBatch?: Omit<Batch, 'id' | 'itemId'> }) => void;
@@ -31,12 +31,21 @@ const GST_SLABS = [
   { label: '28% (Luxury)', value: 28 }
 ];
 
-const ItemForm: React.FC<ItemFormProps> = ({ initialData, unitMeasures, taxGroups = [], taxes = [], onQuickUnitAdd, onCancel, onSubmit }) => {
+const ItemForm: React.FC<ItemFormProps> = ({ 
+  initialData, 
+  unitMeasures, 
+  taxGroups = [], 
+  taxes = [], 
+  onQuickUnitAdd, 
+  onCancel, 
+  onSubmit 
+}) => {
   const [formData, setFormData] = useState<Omit<Item, 'id'> & { isTaxInclusive: boolean }>({
     name: '',
     category: 'General',
     unit: '',
     salePrice: 0,
+    costPrice: 0,
     hsnCode: '',
     gstRate: 18, 
     taxGroupId: '',
@@ -63,6 +72,7 @@ const ItemForm: React.FC<ItemFormProps> = ({ initialData, unitMeasures, taxGroup
         category: initialData.category,
         unit: initialData.unit,
         salePrice: initialData.salePrice,
+        costPrice: initialData.costPrice || 0,
         hsnCode: initialData.hsnCode || '',
         gstRate: initialData.gstRate || 0,
         taxGroupId: initialData.taxGroupId || '',
@@ -72,12 +82,16 @@ const ItemForm: React.FC<ItemFormProps> = ({ initialData, unitMeasures, taxGroup
     }
   }, [initialData]);
 
-  // Dynamic Tax Group Logic: Update gstRate when taxGroupId changes
+  /**
+   * Statutory Logic: Selecting a group iterates through the global tax registry
+   * to aggregate the effective percentage rate.
+   */
   const handleTaxGroupChange = (groupId: string) => {
     let newRate = formData.gstRate;
     if (groupId) {
       const components = taxes.filter(t => t.groupId === groupId);
       if (components.length > 0) {
+        // Aggregated statutory rate (e.g., 9% CGST + 9% SGST = 18%)
         newRate = components.reduce((acc, t) => acc + t.rate, 0);
       }
     }
@@ -96,17 +110,12 @@ const ItemForm: React.FC<ItemFormProps> = ({ initialData, unitMeasures, taxGroup
       newErrors.hsnCode = 'HSN/SAC code is mandatory';
     } else if (!/^\d+$/.test(hsn)) {
       newErrors.hsnCode = 'Must contain only numerical digits';
-    } else if (hsn.length < 2 || hsn.length > 8) {
-      newErrors.hsnCode = 'Code must be between 2 and 8 digits';
     }
 
     if (currentData.gstRate < 0 || currentData.gstRate > 100) newErrors.gstRate = 'Invalid tax rate';
     
     if (currentData.isBatchTracked && !initialData) {
       if (!batchData.batchNo.trim()) newErrors.batchNo = 'Initial Batch No is required';
-      if (batchData.expiryDate && new Date(batchData.expiryDate) < new Date(batchData.mfgDate)) {
-        newErrors.expiryDate = 'Expiry must be after MFG date';
-      }
     }
 
     setErrors(newErrors);
@@ -131,9 +140,8 @@ const ItemForm: React.FC<ItemFormProps> = ({ initialData, unitMeasures, taxGroup
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const allFields = Object.keys(formData);
-    const allTouched = allFields.reduce((acc, key) => ({ ...acc, [key]: true }), {});
-    setTouched(allTouched);
+    const allTouched = Object.keys(formData).reduce((acc, key) => ({ ...acc, [key]: true }), {});
+    setTouched(allTouched as any);
     
     if (validate()) {
       const finalPrice = formData.isTaxInclusive 
@@ -190,7 +198,6 @@ const ItemForm: React.FC<ItemFormProps> = ({ initialData, unitMeasures, taxGroup
 
       <form onSubmit={handleSubmit} className="p-10 space-y-12 max-h-[80vh] overflow-y-auto custom-scrollbar bg-slate-50/20">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-          {/* Section: Basic Identity */}
           <div className="md:col-span-2 space-y-2">
             <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-2">Official Designation (Item Name)</label>
             <input 
@@ -208,8 +215,7 @@ const ItemForm: React.FC<ItemFormProps> = ({ initialData, unitMeasures, taxGroup
             <select 
               value={formData.category} 
               onChange={e => setFormData({...formData, category: e.target.value})} 
-              onBlur={() => handleBlur('category')}
-              className={inputClass('category') + " appearance-none cursor-pointer"}
+              className={inputClass('category')}
             >
               {CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
             </select>
@@ -221,23 +227,22 @@ const ItemForm: React.FC<ItemFormProps> = ({ initialData, unitMeasures, taxGroup
               <button type="button" onClick={() => setIsQuickUnitOpen(!isQuickUnitOpen)} className="text-[9px] font-black text-indigo-600 uppercase hover:underline tracking-widest">{isQuickUnitOpen ? 'Cancel' : '+ Quick Add'}</button>
             </div>
             {!isQuickUnitOpen ? (
-              <select value={formData.unit} onChange={e => setFormData({...formData, unit: e.target.value})} onBlur={() => handleBlur('unit')} className={inputClass('unit') + " appearance-none cursor-pointer"}>
-                <option value="" disabled>-- Select Identity Unit --</option>
+              <select value={formData.unit} onChange={e => setFormData({...formData, unit: e.target.value})} onBlur={() => handleBlur('unit')} className={inputClass('unit')}>
+                <option value="" disabled>-- Select Unit --</option>
                 {unitMeasures.map(u => <option key={u} value={u}>{u}</option>)}
               </select>
             ) : (
-              <div className="flex space-x-2 animate-in slide-in-from-top-1 duration-200">
-                <input autoFocus value={newUnitName} onChange={e => setNewUnitName(e.target.value)} placeholder="e.g. Metric Ton" className="flex-1 px-5 py-4 rounded-2xl border border-indigo-200 outline-none focus:ring-4 focus:ring-indigo-500/10 bg-indigo-50/10 text-sm font-bold shadow-inner" />
-                <button type="button" onClick={handleQuickUnitAdd} className="px-6 bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-indigo-100">Add</button>
+              <div className="flex space-x-2">
+                <input autoFocus value={newUnitName} onChange={e => setNewUnitName(e.target.value)} placeholder="e.g. Metric Ton" className="flex-1 px-5 py-4 rounded-2xl border border-indigo-200 text-sm font-bold shadow-inner outline-none" />
+                <button type="button" onClick={handleQuickUnitAdd} className="px-6 bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-lg shadow-indigo-100">Add</button>
               </div>
             )}
             {touched.unit && errors.unit && <p className="text-[10px] text-rose-500 font-bold mt-1 ml-2">{errors.unit}</p>}
           </div>
 
-          {/* Section: Statutory Config */}
           <div className="space-y-2">
-            <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-2">HSN / SAC Regulatory Code</label>
-            <input inputMode="numeric" value={formData.hsnCode} onChange={e => setFormData({...formData, hsnCode: e.target.value.replace(/\D/g, '').substring(0, 8)})} onBlur={() => handleBlur('hsnCode')} placeholder="e.g. 8471" className={inputClass('hsnCode') + " font-mono tracking-widest"} />
+            <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-2">HSN / SAC Code</label>
+            <input inputMode="numeric" value={formData.hsnCode} onChange={e => setFormData({...formData, hsnCode: e.target.value.replace(/\D/g, '')})} onBlur={() => handleBlur('hsnCode')} placeholder="e.g. 8471" className={inputClass('hsnCode') + " font-mono tracking-widest"} />
             {touched.hsnCode && errors.hsnCode && <p className="text-[10px] text-rose-500 font-bold mt-1 ml-2">{errors.hsnCode}</p>}
           </div>
 
@@ -246,29 +251,27 @@ const ItemForm: React.FC<ItemFormProps> = ({ initialData, unitMeasures, taxGroup
             <select 
               value={formData.taxGroupId} 
               onChange={e => handleTaxGroupChange(e.target.value)} 
-              onBlur={() => handleBlur('taxGroupId')} 
-              className={inputClass('taxGroupId') + " appearance-none cursor-pointer border-indigo-100"}
+              className={inputClass('taxGroupId') + " border-indigo-200 bg-indigo-50/5 focus:bg-white"}
             >
-              <option value="">-- Manual Slab Selection --</option>
+              <option value="">-- Manual Slab Assignment --</option>
               {taxGroups.map(tg => <option key={tg.id} value={tg.id}>{tg.name}</option>)}
             </select>
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-2">Active GST Rate (%)</label>
+            <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-2">Effective GST Rate (%)</label>
             <div className="flex space-x-3">
                <select 
                 value={formData.gstRate} 
                 onChange={e => setFormData({...formData, gstRate: parseFloat(e.target.value)})} 
                 disabled={!!formData.taxGroupId}
-                onBlur={() => handleBlur('gstRate')} 
-                className={inputClass('gstRate') + (formData.taxGroupId ? " bg-slate-100 cursor-not-allowed text-slate-400" : " cursor-pointer")}
+                className={inputClass('gstRate') + (formData.taxGroupId ? " bg-slate-100 cursor-not-allowed opacity-80" : "")}
                >
                  {GST_SLABS.map(slab => <option key={slab.value} value={slab.value}>{slab.label} ({slab.value}%)</option>)}
                </select>
                {formData.taxGroupId && (
-                 <div className="p-4 bg-indigo-50 border border-indigo-100 rounded-2xl flex items-center justify-center shrink-0">
-                    <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Locked by Group</span>
+                 <div className="px-4 bg-indigo-50 border border-indigo-100 rounded-2xl flex items-center justify-center shrink-0">
+                    <span className="text-[9px] font-black text-indigo-600 uppercase tracking-widest">Locked by Group</span>
                  </div>
                )}
             </div>
@@ -279,7 +282,7 @@ const ItemForm: React.FC<ItemFormProps> = ({ initialData, unitMeasures, taxGroup
                <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em]">Transaction Base Price</label>
                <label className="flex items-center space-x-3 cursor-pointer group">
                   <span className="text-[9px] font-black text-slate-400 group-hover:text-indigo-600 transition-colors uppercase tracking-tighter">Tax Inclusive?</span>
-                  <div onClick={() => setFormData({...formData, isTaxInclusive: !formData.isTaxInclusive})} className={`w-10 h-5 rounded-full relative transition-all shadow-inner ${formData.isTaxInclusive ? 'bg-indigo-600' : 'bg-slate-300'}`}>
+                  <div onClick={() => setFormData({...formData, isTaxInclusive: !formData.isTaxInclusive})} className={`w-10 h-5 rounded-full relative transition-all ${formData.isTaxInclusive ? 'bg-indigo-600' : 'bg-slate-300'}`}>
                     <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all shadow-md ${formData.isTaxInclusive ? 'right-0.5' : 'left-0.5'}`}></div>
                   </div>
                </label>
@@ -288,66 +291,43 @@ const ItemForm: React.FC<ItemFormProps> = ({ initialData, unitMeasures, taxGroup
                <input type="number" step="0.01" value={formData.salePrice} onChange={e => setFormData({...formData, salePrice: parseFloat(e.target.value) || 0})} onBlur={() => handleBlur('salePrice')} className={inputClass('salePrice') + " font-black text-lg pl-10"} />
                <span className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 font-black text-lg">$</span>
             </div>
-            {touched.salePrice && errors.salePrice && <p className="text-[10px] text-rose-500 font-bold mt-1 ml-2">{errors.salePrice}</p>}
           </div>
         </div>
 
-        {/* Section: Batching Protocols */}
+        {/* Batch Tracking Option */}
         <div className="p-8 bg-white rounded-[2.5rem] border border-slate-200 shadow-sm space-y-6">
           <div className="flex items-center justify-between">
              <div className="flex items-center space-x-4">
                 <div className="w-1.5 h-6 bg-indigo-600 rounded-full"></div>
                 <h4 className="text-xs font-black uppercase text-slate-800 tracking-widest italic">Lifecycle Tracking</h4>
              </div>
-             <div className="flex items-center space-x-4 p-2 bg-slate-50 rounded-2xl border border-slate-100">
-               <button type="button" onClick={() => setFormData({...formData, isBatchTracked: !formData.isBatchTracked})} className={`w-12 h-7 rounded-full relative transition-all shadow-md ${formData.isBatchTracked ? 'bg-indigo-600' : 'bg-slate-300'}`}>
-                  <div className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow-sm transition-all ${formData.isBatchTracked ? 'right-1' : 'left-1'}`}></div>
-               </button>
-               <span className="text-[10px] font-black uppercase text-slate-500 tracking-widest">{formData.isBatchTracked ? 'Batching Node Active' : 'Sequential Only'}</span>
-             </div>
+             <button type="button" onClick={() => setFormData({...formData, isBatchTracked: !formData.isBatchTracked})} className={`flex items-center space-x-3 px-4 py-2 rounded-xl border-2 transition-all ${formData.isBatchTracked ? 'bg-indigo-50 border-indigo-600 text-indigo-900' : 'bg-slate-50 border-slate-200 text-slate-400'}`}>
+               <span className="text-[10px] font-black uppercase tracking-widest">{formData.isBatchTracked ? 'Batch Enabled' : 'Standard Tracking'}</span>
+             </button>
           </div>
           
           {formData.isBatchTracked && !initialData && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-6 border-t border-slate-50 animate-in slide-in-from-top-4 duration-500">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-6 border-t border-slate-50 animate-in slide-in-from-top-4">
                 <div className="space-y-2">
-                   <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest ml-1">Opening Batch Node Hash</label>
-                   <input 
-                    value={batchData.batchNo} 
-                    onChange={e => setBatchData({...batchData, batchNo: e.target.value.toUpperCase()})} 
-                    className={inputClass('batchNo') + " font-mono uppercase tracking-widest"} 
-                    placeholder="e.g. LOT-4091-B"
-                   />
+                   <label className="text-[9px] font-black uppercase text-slate-400 ml-1">Initial Opening Batch</label>
+                   <input value={batchData.batchNo} onChange={e => setBatchData({...batchData, batchNo: e.target.value.toUpperCase()})} className={inputClass('batchNo')} placeholder="e.g. LOT-4091-B" />
                 </div>
                 <div className="space-y-2">
-                   <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest ml-1">Initial Opening Quantity</label>
-                   <div className="relative">
-                      <input type="number" value={batchData.currentStock} onChange={e => setBatchData({...batchData, currentStock: parseFloat(e.target.value) || 0})} className={inputClass('currentStock') + " pr-16"} />
-                      <span className="absolute right-5 top-1/2 -translate-y-1/2 text-[9px] font-black text-slate-300 uppercase">{formData.unit || 'Units'}</span>
-                   </div>
-                </div>
-                <div className="space-y-2">
-                   <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest ml-1">Manufacturing Timestamp</label>
-                   <input type="date" value={batchData.mfgDate} onChange={e => setBatchData({...batchData, mfgDate: e.target.value})} className={inputClass('mfgDate')} />
-                </div>
-                <div className="space-y-2">
-                   <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest ml-1">Statutory Expiry Deadline</label>
-                   <input type="date" value={batchData.expiryDate} onChange={e => setBatchData({...batchData, expiryDate: e.target.value})} className={inputClass('expiryDate')} />
+                   <label className="text-[9px] font-black uppercase text-slate-400 ml-1">Initial Quantity</label>
+                   <input type="number" value={batchData.currentStock} onChange={e => setBatchData({...batchData, currentStock: parseFloat(e.target.value) || 0})} className={inputClass('currentStock')} />
                 </div>
             </div>
           )}
         </div>
 
-        {/* Dynamic Calculation Nucleus */}
-        <div className="bg-slate-950 rounded-[3.5rem] p-10 text-white relative overflow-hidden shadow-2xl border-l-8 border-indigo-600 group">
+        {/* Dynamic Calculation Visualization */}
+        <div className="bg-slate-950 rounded-[3.5rem] p-10 text-white relative overflow-hidden shadow-2xl border-l-8 border-indigo-600">
            <div className="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-12">
               <div className="space-y-6 flex-1 w-full">
-                 <div className="flex items-center space-x-4 mb-4">
-                    <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-xl shadow-lg">🎯</div>
-                    <h5 className="text-[10px] font-black uppercase tracking-[0.4em] text-indigo-400">Valuation Metrics</h5>
-                 </div>
+                 <h5 className="text-[10px] font-black uppercase tracking-[0.4em] text-indigo-400">Valuation Metrics</h5>
                  <div className="grid grid-cols-2 gap-4">
                     <div className="p-6 bg-white/5 rounded-3xl border border-white/10 backdrop-blur-md">
-                       <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block mb-2">Base Ledger Value</span>
+                       <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block mb-2">Base Unit Value</span>
                        <span className="text-2xl font-black italic tabular-nums">${priceMetrics.base.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                     </div>
                     <div className="p-6 bg-white/5 rounded-3xl border border-white/10 backdrop-blur-md">
@@ -357,9 +337,9 @@ const ItemForm: React.FC<ItemFormProps> = ({ initialData, unitMeasures, taxGroup
                  </div>
                  
                  {priceMetrics.components.length > 0 && (
-                    <div className="pt-4 flex flex-wrap gap-3 animate-in fade-in">
+                    <div className="pt-4 flex flex-wrap gap-3">
                        {priceMetrics.components.map(comp => (
-                          <div key={comp.id} className="px-4 py-2 bg-indigo-500/10 rounded-xl border border-indigo-400/20 flex items-center space-x-3">
+                          <div key={comp.id} className="px-4 py-2 bg-indigo-500/10 rounded-xl border border-indigo-400/20 flex items-center space-x-2">
                              <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 shadow-[0_0_8px_#6366f1]"></div>
                              <span className="text-[9px] font-black uppercase tracking-widest">{comp.name}: {comp.rate}%</span>
                           </div>
@@ -369,18 +349,17 @@ const ItemForm: React.FC<ItemFormProps> = ({ initialData, unitMeasures, taxGroup
               </div>
 
               <div className="text-right shrink-0">
-                 <div className="text-[11px] font-black uppercase italic text-indigo-500 tracking-[0.5em] mb-3">GRAND TOTAL (LIST)</div>
-                 <div className="text-7xl font-black italic tracking-tighter tabular-nums group-hover:scale-105 transition-transform origin-right duration-500 text-white">
+                 <div className="text-[11px] font-black uppercase italic text-indigo-500 tracking-[0.5em] mb-3">GRAND TOTAL (MRP)</div>
+                 <div className="text-7xl font-black italic tracking-tighter tabular-nums text-white">
                     ${priceMetrics.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                  </div>
-                 <p className="text-[9px] text-slate-600 font-bold uppercase tracking-widest mt-4">Automated statutory rounding active</p>
               </div>
            </div>
-           <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-indigo-600 rounded-full blur-[200px] opacity-[0.03] -mr-64 -mt-64 pointer-events-none group-hover:opacity-10 transition-opacity"></div>
+           <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-indigo-600 rounded-full blur-[180px] opacity-10 -mr-64 -mt-64"></div>
         </div>
 
-        <div className="pt-8 border-t border-slate-200 flex flex-col sm:flex-row justify-end gap-6 bg-white sticky bottom-0 -mx-10 px-10 pb-10">
-          <button type="button" onClick={onCancel} className="px-12 py-5 rounded-[1.5rem] text-slate-400 font-black text-xs uppercase tracking-widest hover:bg-slate-50 transition-all transform active:scale-95">Discard Delta</button>
+        <div className="pt-8 border-t border-slate-200 flex flex-col sm:flex-row justify-end gap-6">
+          <button type="button" onClick={onCancel} className="px-12 py-5 rounded-[1.5rem] text-slate-400 font-black text-xs uppercase tracking-widest hover:bg-slate-50 transition-all">Discard Changes</button>
           <button 
             type="submit" 
             className="w-full sm:w-[480px] py-6 bg-slate-900 text-white rounded-[2rem] font-black text-sm uppercase tracking-[0.5em] shadow-2xl hover:bg-indigo-600 transition-all transform active:scale-95 border-b-8 border-slate-950"

@@ -112,7 +112,8 @@ const RibbonMenu: React.FC<RibbonMenuProps> = ({
                       }`}
                     >
                       <div className={`transition-transform group-hover/cmd:scale-110 mb-1 ${isActive ? 'text-white' : 'text-slate-400 group-hover/cmd:text-indigo-500'}`}>
-                        {React.cloneElement(item.icon as React.ReactElement, { className: 'w-6 h-6' })}
+                        {/* Cast item.icon to React.ReactElement<any> to fix TS error when passing className */}
+                        {React.cloneElement(item.icon as React.ReactElement<any>, { className: 'w-6 h-6' })}
                       </div>
                       <span className="text-[9px] font-black uppercase tracking-tight text-center leading-tight px-1">
                         {item.label}

@@ -6,9 +6,10 @@ interface AIAssistantProps {
   vouchers: Voucher[];
   ledgers: Ledger[];
   activeCompany: any;
+  onViewVoucher: (id: string) => void;
 }
 
-const AIAssistant: React.FC<AIAssistantProps> = ({ vouchers, ledgers, activeCompany }) => {
+const AIAssistant: React.FC<AIAssistantProps> = ({ vouchers, ledgers, activeCompany, onViewVoucher }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [insight, setInsight] = useState<string | null>(null);
@@ -17,7 +18,6 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ vouchers, ledgers, activeComp
     setLoading(true);
     setInsight("");
     try {
-      // Fix: Strictly following the process.env.API_KEY initialization guideline
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const context = {
         company: activeCompany.name,
@@ -35,7 +35,6 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ vouchers, ledgers, activeComp
         Keep it professional and concise. Use Markdown.`,
       });
 
-      // Fix: Accessing .text property directly as per the current SDK standard
       setInsight(response.text || "Unable to generate insights at this time.");
     } catch (err) {
       setInsight("ERR: AI Connection Interrupted. Verify API Key in environment.");
@@ -105,12 +104,22 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ vouchers, ledgers, activeComp
                  <div className="pt-8 border-t border-white/5">
                     <h5 className="text-[9px] font-black text-slate-600 uppercase tracking-[0.2em] mb-4">Anomaly Detection Logs</h5>
                     <div className="space-y-3">
-                       {vouchers.filter(v => v.amount > 5000).slice(0, 3).map(v => (
-                         <div key={v.id} className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/5">
-                            <span className="text-[10px] font-black text-slate-400">HIGH VALUE: {v.id}</span>
-                            <span className="text-[10px] font-black text-rose-400">${v.amount.toLocaleString()}</span>
+                       {vouchers.filter(v => v.amount > 5000).slice(0, 5).map(v => (
+                         <div 
+                           key={v.id} 
+                           onClick={() => onViewVoucher(v.id)}
+                           className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/5 hover:border-indigo-500/50 hover:bg-white/10 cursor-pointer group transition-all"
+                         >
+                            <div className="flex flex-col">
+                               <span className="text-[10px] font-black text-slate-400 group-hover:text-indigo-400">HIGH VALUE: {v.id}</span>
+                               <span className="text-[8px] font-bold text-slate-600 uppercase mt-0.5">{v.party}</span>
+                            </div>
+                            <span className="text-[10px] font-black text-rose-400 group-hover:scale-110 transition-transform">${v.amount.toLocaleString()}</span>
                          </div>
                        ))}
+                       {vouchers.filter(v => v.amount > 5000).length === 0 && (
+                          <div className="py-10 text-center opacity-20 italic text-[10px] font-black uppercase tracking-widest">No anomalies detected</div>
+                       )}
                     </div>
                  </div>
               </div>

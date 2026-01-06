@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
+import { Voucher } from '../types';
 
 interface HeaderProps {
   onMenuToggle?: () => void;
@@ -6,9 +7,30 @@ interface HeaderProps {
   activeCompanyName?: string;
   currentFY?: string;
   isFYLocked?: boolean;
+  vouchers?: Voucher[];
+  onViewVoucher?: (id: string) => void;
+  onOpenPalette?: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ title, activeCompanyName, currentFY, isFYLocked }) => {
+const Header: React.FC<HeaderProps> = ({ title, activeCompanyName, currentFY, isFYLocked, vouchers = [], onViewVoucher, onOpenPalette }) => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showSearch, setShowSearch] = useState(false);
+
+  const searchResults = useMemo(() => {
+    if (!searchQuery || searchQuery.length < 2) return [];
+    const term = searchQuery.toLowerCase();
+    return vouchers.filter(v => 
+      v.id.toLowerCase().includes(term) || 
+      v.party.toLowerCase().includes(term)
+    ).slice(0, 5);
+  }, [searchQuery, vouchers]);
+
+  const handleSelectVoucher = (id: string) => {
+    onViewVoucher?.(id);
+    setSearchQuery('');
+    setShowSearch(false);
+  };
+
   return (
     <header className="h-14 bg-indigo-950 flex items-center justify-between px-6 shrink-0 z-[60] select-none border-b border-white/5 shadow-2xl relative overflow-hidden">
       {/* Background Decor Shards */}
@@ -41,9 +63,49 @@ const Header: React.FC<HeaderProps> = ({ title, activeCompanyName, currentFY, is
         </div>
       </div>
 
+      {/* Center: Global Search Engine */}
+      <div className="flex-1 max-w-md mx-10 relative z-50">
+        <div className="relative group">
+          <div className="absolute right-3 top-2.5 hidden md:flex items-center space-x-1 opacity-50 group-focus-within:opacity-0 transition-opacity">
+             <kbd className="px-1.5 py-0.5 bg-slate-800 text-[8px] font-black text-slate-400 rounded border border-slate-700">⌘</kbd>
+             <kbd className="px-1.5 py-0.5 bg-slate-800 text-[8px] font-black text-slate-400 rounded border border-slate-700">K</kbd>
+          </div>
+          <input 
+            type="text" 
+            placeholder="GLOBAL QUICK LOOKUP..." 
+            value={searchQuery}
+            onChange={(e) => { setSearchQuery(e.target.value.toUpperCase()); setShowSearch(true); }}
+            onFocus={() => setShowSearch(true)}
+            onClick={onOpenPalette}
+            className="w-full h-9 bg-white/5 border border-white/10 rounded-full px-10 text-[10px] font-black text-indigo-100 tracking-[0.2em] outline-none focus:bg-white/10 focus:border-indigo-500/50 transition-all placeholder:text-slate-600 shadow-inner cursor-pointer"
+          />
+          <svg className="w-4 h-4 absolute left-3.5 top-2.5 text-slate-500 group-focus-within:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+          
+          {showSearch && searchResults.length > 0 && (
+            <div className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-white/10 rounded-3xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2">
+              <div className="p-3 bg-white/5 border-b border-white/5 text-[8px] font-black text-slate-500 uppercase tracking-widest px-6">Found {searchResults.length} Match Nodes</div>
+              {searchResults.map(v => (
+                <div 
+                  key={v.id} 
+                  onClick={() => handleSelectVoucher(v.id)}
+                  className="px-6 py-3 hover:bg-indigo-600 group cursor-pointer flex justify-between items-center transition-all"
+                >
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-black text-white italic group-hover:translate-x-1 transition-transform">#{v.id}</span>
+                    <span className="text-[8px] font-bold text-slate-500 group-hover:text-indigo-100 uppercase mt-0.5">{v.party}</span>
+                  </div>
+                  <span className="text-[8px] font-black text-slate-600 bg-white/5 px-2 py-0.5 rounded group-hover:bg-white/20 group-hover:text-white uppercase">{v.type}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        {showSearch && <div className="fixed inset-0 z-[-1]" onClick={() => setShowSearch(false)}></div>}
+      </div>
+
       {/* Right Section: Session Telemetry & Integrity Cockpit */}
       <div className="flex items-center space-x-5 relative z-10">
-        {/* Session Card - Enhanced Visuals */}
+        {/* Session Card */}
         <div className="hidden lg:flex items-center bg-white/5 backdrop-blur-md rounded-xl border border-white/10 px-5 py-2 transition-all hover:bg-white/10 hover:border-white/20 shadow-inner group">
           <div className="flex flex-col mr-6">
              <span className="text-[8px] font-black text-slate-500 uppercase tracking-[0.25em] leading-none mb-1.5 group-hover:text-indigo-400 transition-colors">Session Period</span>
@@ -66,15 +128,6 @@ const Header: React.FC<HeaderProps> = ({ title, activeCompanyName, currentFY, is
                 <div className="flex flex-col">
                    <span className="text-[9px] font-black uppercase tracking-widest leading-none">Audit Lock</span>
                    <span className="text-[7px] font-bold text-rose-400/60 uppercase tracking-tighter mt-0.5">Read Only Mode</span>
-                </div>
-                
-                {/* Enhanced Tooltip */}
-                <div className="absolute top-full right-0 mt-3 w-64 p-4 bg-slate-900 text-white text-[9px] font-medium rounded-2xl opacity-0 scale-95 group-hover/status:opacity-100 group-hover/status:scale-100 transition-all pointer-events-none border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-50 normal-case leading-relaxed">
-                  <div className="flex items-center space-x-2 mb-2 border-b border-white/5 pb-2">
-                    <span className="text-rose-500">🛡️</span>
-                    <span className="font-black uppercase tracking-widest text-rose-400">Statutory Lock Active</span>
-                  </div>
-                  "Historical ledger data for this period is cryptographically sealed for regulatory compliance. Direct mutation is restricted."
                 </div>
               </div>
             ) : (

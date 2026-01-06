@@ -130,11 +130,24 @@ const AdministrationModule: React.FC<AdministrationModuleProps> = ({
       setEditingId(null);
     };
 
+    const handleBatchSubmit = (data: Omit<Batch, 'id'>) => {
+      if (editingId) {
+        setBatches(prev => prev.map(b => b.id === editingId ? { ...data, id: editingId } : b));
+        addAuditLog({ action: 'UPDATE', entityType: 'MASTER', entityName: data.batchNo, details: `Batch ${data.batchNo} modified.` });
+      } else {
+        const newBatch: Batch = { ...data, id: `b-${Date.now()}` };
+        setBatches(prev => [...prev, newBatch]);
+        addAuditLog({ action: 'CREATE', entityType: 'MASTER', entityName: data.batchNo, details: `New batch ${data.batchNo} registered.` });
+      }
+      setIsModalOpen(false);
+      setEditingId(null);
+    };
+
     const getRowActions = (row: any): ActionItem[] => {
       const actions: ActionItem[] = [
         { 
           label: row.isSystem ? 'View Details' : 'Edit', 
-          icon: row.isSystem ? <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg> : <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>,
+          icon: row.isSystem ? '👁️' : '✏️',
           onClick: () => { setEditingId(row.id); setIsModalOpen(true); },
           variant: row.isSystem ? 'default' : 'primary'
         }
@@ -143,13 +156,13 @@ const AdministrationModule: React.FC<AdministrationModuleProps> = ({
       if (activeTab === 'ITEMS' && row.isBatchTracked) {
         actions.push({
           label: 'View Batches',
-          icon: <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>,
+          icon: '📜',
           onClick: () => { setItemFilterId(row.id); setActiveTab('BATCHES'); },
           variant: 'primary'
         });
         actions.push({
           label: 'Add Batch',
-          icon: <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>,
+          icon: '➕',
           onClick: () => { setItemFilterId(row.id); setEditingId(null); setActiveTab('BATCHES'); setIsModalOpen(true); },
           variant: 'success'
         });
@@ -158,7 +171,7 @@ const AdministrationModule: React.FC<AdministrationModuleProps> = ({
       if (!row.isSystem) {
         actions.push({ 
           label: 'Delete', 
-          icon: <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>,
+          icon: '🗑️',
           onClick: () => { 
             const msg = activeTab === 'TAX_GROUPS' 
               ? `Purge tax group "${row.name}"? This will detach all linked statutory ledgers.`
@@ -171,7 +184,10 @@ const AdministrationModule: React.FC<AdministrationModuleProps> = ({
             if(confirm(msg)) {
                 if (activeTab === 'TAX_CONFIGS') setTaxes(prev => prev.filter(t => t.id !== row.id));
                 else if (activeTab === 'TAX_GROUPS') setTaxGroups(prev => prev.filter(tg => tg.id !== row.id));
-                else if (activeTab === 'ITEMS') setItems(prev => prev.filter(i => i.id !== row.id));
+                else if (activeTab === 'ITEMS') {
+                   setItems(prev => prev.filter(i => i.id !== row.id));
+                   setBatches(prev => prev.filter(b => b.itemId !== row.id));
+                }
                 else if (activeTab === 'BATCHES') setBatches(prev => prev.filter(b => b.id !== row.id));
                 else if (activeTab === 'GROUPS') setAccountGroups(prev => prev.filter(ag => ag.id !== row.id));
             }
@@ -292,7 +308,12 @@ const AdministrationModule: React.FC<AdministrationModuleProps> = ({
                                 <svg className="w-2.5 h-2.5 ml-2 text-slate-300" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" clipRule="evenodd" /></svg>
                               )}
                               {activeTab === 'ITEMS' && row.isBatchTracked && (
-                                <span className="ml-3 px-1.5 py-0.5 bg-indigo-100 text-indigo-700 text-[8px] font-black uppercase rounded tracking-widest border border-indigo-200">Batch Tracked</span>
+                                <button 
+                                  onClick={() => { setItemFilterId(row.id); setActiveTab('BATCHES'); }}
+                                  className="ml-3 px-1.5 py-0.5 bg-indigo-100 text-indigo-700 text-[8px] font-black uppercase rounded tracking-widest border border-indigo-200 hover:bg-indigo-200 transition-all"
+                                >
+                                  Batch Tracked
+                                </button>
                               )}
                             </div>
                             {row.hsnCode && <div className="text-[8px] font-bold text-slate-300 uppercase mt-0.5">HSN/SAC: {row.hsnCode}</div>}
@@ -305,7 +326,7 @@ const AdministrationModule: React.FC<AdministrationModuleProps> = ({
                             )}
                          </td>
                          <td className="px-6 py-3.5">
-                            <span className="px-2.5 py-0.5 bg-indigo-50 text-indigo-500 rounded text-[9px] font-black uppercase tracking-tighter border border-indigo-100">
+                            <span className="px-2.5 py-1 bg-indigo-50 text-indigo-500 rounded text-[9px] font-black uppercase tracking-tighter border border-indigo-100">
                                 {activeTab === 'BATCHES' ? 'Lot/Batch' : (row.group || row.category || row.nature || row.type || 'Consolidated')}
                             </span>
                          </td>
@@ -380,7 +401,7 @@ const AdministrationModule: React.FC<AdministrationModuleProps> = ({
                     defaultItemId={itemFilterId || undefined}
                     items={items}
                     onCancel={() => setIsModalOpen(false)}
-                    onSubmit={(data) => { if (editingId) setBatches(prev => prev.map(b => b.id === editingId ? { ...data, id: editingId } : b)); else setBatches(prev => [...prev, { ...data, id: `b-${Date.now()}` }]); setIsModalOpen(false); }}
+                    onSubmit={handleBatchSubmit}
                   />
                )}
                {activeTab === 'TAX_CONFIGS' && (

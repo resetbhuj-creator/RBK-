@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { MainMenuType, Role, User, AuditLog, AdminSubMenu, TransactionSubMenu, DisplaySubMenu, CommunicationSubMenu, HouseKeepingSubMenu, Ledger, Item, Voucher, Tax, TaxGroup, Company, Task, AccountGroup, Batch } from './types';
 import Header from './components/Header';
@@ -13,6 +14,7 @@ import CommunicationModule from './components/CommunicationModule';
 import HouseKeepingModule from './components/HouseKeepingModule';
 import VoucherModal from './components/VoucherModal';
 import AIAssistant from './components/AIAssistant';
+import CommandPalette from './components/CommandPalette';
 import { UNIT_MEASURES as DEFAULT_UNITS } from './constants';
 
 const INITIAL_ROLES: Role[] = [
@@ -49,7 +51,23 @@ const INITIAL_ACCOUNT_GROUPS: AccountGroup[] = [
   { id: 'ag2', name: 'Cash-in-hand', nature: 'Assets', isSystem: true },
   { id: 'ag3', name: 'Indirect Expenses', nature: 'Expenses', isSystem: true },
   { id: 'ag4', name: 'Sundry Debtors', nature: 'Assets', isSystem: true },
-  { id: 'ag5', name: 'Sundry Creditors', nature: 'Liabilities', isSystem: true }
+  { id: 'ag5', name: 'Sundry Creditors', nature: 'Liabilities', isSystem: true },
+  { id: 'ag6', name: 'Sales Accounts', nature: 'Income', isSystem: true },
+  { id: 'ag7', name: 'Purchase Accounts', nature: 'Expenses', isSystem: true }
+];
+
+const INITIAL_TAX_GROUPS: TaxGroup[] = [
+  { id: 'tg1', name: 'GST 18%', description: 'Standard GST slab for services and most electronic goods.', isSystem: true },
+  { id: 'tg2', name: 'GST 12%', description: 'GST slab for processed food and standard consumer goods.', isSystem: true },
+  { id: 'tg3', name: 'GST 5%', description: 'GST slab for essential commodities.', isSystem: true }
+];
+
+const INITIAL_TAXES: Tax[] = [
+  { id: 't1', name: 'Output CGST @ 9%', rate: 9, type: 'CGST', classification: 'Output', supplyType: 'Local', groupId: 'tg1' },
+  { id: 't2', name: 'Output SGST @ 9%', rate: 9, type: 'SGST', classification: 'Output', supplyType: 'Local', groupId: 'tg1' },
+  { id: 't3', name: 'Output IGST @ 18%', rate: 18, type: 'IGST', classification: 'Output', supplyType: 'Central', groupId: 'tg1' },
+  { id: 't4', name: 'Input CGST @ 6%', rate: 6, type: 'CGST', classification: 'Input', supplyType: 'Local', groupId: 'tg2' },
+  { id: 't5', name: 'Input SGST @ 6%', rate: 6, type: 'SGST', classification: 'Input', supplyType: 'Local', groupId: 'tg2' }
 ];
 
 const INITIAL_LEDGERS: Ledger[] = [
@@ -61,9 +79,9 @@ const INITIAL_LEDGERS: Ledger[] = [
 ];
 
 const INITIAL_ITEMS: Item[] = [
-  { id: 'i1', name: 'MacBook Pro M3', category: 'Electronics', unit: 'Nos', salePrice: 2400, costPrice: 1800, hsnCode: '8471', gstRate: 18, currentStock: 45, isBatchTracked: true },
-  { id: 'i2', name: 'iPhone 15 Pro', category: 'Electronics', unit: 'Nos', salePrice: 1100, costPrice: 750, hsnCode: '8517', gstRate: 18, currentStock: 120, isBatchTracked: true },
-  { id: 'i3', name: 'Leather Messenger Bag', category: 'Consumables', unit: 'Nos', salePrice: 150, costPrice: 45, hsnCode: '4202', gstRate: 12, currentStock: 12, isBatchTracked: false }
+  { id: 'i1', name: 'MacBook Pro M3', category: 'Electronics', unit: 'Nos', salePrice: 2400, costPrice: 1800, hsnCode: '8471', gstRate: 18, taxGroupId: 'tg1', currentStock: 45, isBatchTracked: true },
+  { id: 'i2', name: 'iPhone 15 Pro', category: 'Electronics', unit: 'Nos', salePrice: 1100, costPrice: 750, hsnCode: '8517', gstRate: 18, taxGroupId: 'tg1', currentStock: 120, isBatchTracked: true },
+  { id: 'i3', name: 'Leather Messenger Bag', category: 'Consumables', unit: 'Nos', salePrice: 150, costPrice: 45, hsnCode: '4202', gstRate: 12, taxGroupId: 'tg2', currentStock: 12, isBatchTracked: false }
 ];
 
 const INITIAL_BATCHES: Batch[] = [
@@ -87,6 +105,7 @@ const App: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isRibbonCollapsed, setIsRibbonCollapsed] = useState(false);
   const [viewingVoucherId, setViewingVoucherId] = useState<string | null>(null);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
 
   // Core Data State
   const [companies, setCompanies] = useState<Company[]>(() => JSON.parse(localStorage.getItem('nexus_erp_companies') || JSON.stringify(INITIAL_COMPANIES)));
@@ -95,6 +114,8 @@ const App: React.FC = () => {
   const [items, setItems] = useState<Item[]>(() => JSON.parse(localStorage.getItem('nexus_erp_items') || JSON.stringify(INITIAL_ITEMS)));
   const [batches, setBatches] = useState<Batch[]>(() => JSON.parse(localStorage.getItem('nexus_erp_batches') || JSON.stringify(INITIAL_BATCHES)));
   const [vouchers, setVouchers] = useState<Voucher[]>(() => JSON.parse(localStorage.getItem('nexus_erp_vouchers') || JSON.stringify(INITIAL_VOUCHERS)));
+  const [taxes, setTaxes] = useState<Tax[]>(() => JSON.parse(localStorage.getItem('nexus_erp_taxes') || JSON.stringify(INITIAL_TAXES)));
+  const [taxGroups, setTaxGroups] = useState<TaxGroup[]>(() => JSON.parse(localStorage.getItem('nexus_erp_tax_groups') || JSON.stringify(INITIAL_TAX_GROUPS)));
   
   // IAM State
   const [users, setUsers] = useState<User[]>(() => JSON.parse(localStorage.getItem('nexus_erp_users') || JSON.stringify(INITIAL_USERS)));
@@ -114,13 +135,27 @@ const App: React.FC = () => {
     localStorage.setItem('nexus_erp_items', JSON.stringify(items));
     localStorage.setItem('nexus_erp_batches', JSON.stringify(batches));
     localStorage.setItem('nexus_erp_vouchers', JSON.stringify(vouchers));
+    localStorage.setItem('nexus_erp_taxes', JSON.stringify(taxes));
+    localStorage.setItem('nexus_erp_tax_groups', JSON.stringify(taxGroups));
     localStorage.setItem('nexus_erp_users', JSON.stringify(users));
     localStorage.setItem('nexus_erp_roles', JSON.stringify(roles));
     localStorage.setItem('nexus_erp_audit_logs', JSON.stringify(auditLogs));
     localStorage.setItem('nexus_erp_current_company_id', currentCompanyId);
     localStorage.setItem('nexus_erp_current_fy', currentFY);
     localStorage.setItem('nexus_erp_fy_locked', String(isFYLocked));
-  }, [companies, accountGroups, ledgers, items, batches, vouchers, users, roles, auditLogs, currentCompanyId, currentFY, isFYLocked]);
+  }, [companies, accountGroups, ledgers, items, batches, vouchers, taxes, taxGroups, users, roles, auditLogs, currentCompanyId, currentFY, isFYLocked]);
+
+  // Global Key Handler
+  useEffect(() => {
+    const handleGlobalKeys = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setIsCommandPaletteOpen(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeys);
+    return () => window.removeEventListener('keydown', handleGlobalKeys);
+  }, []);
 
   const addAuditLog = useCallback((logData: Omit<AuditLog, 'id' | 'timestamp' | 'actor'> & { actor?: string }) => {
     const newLog: AuditLog = {
@@ -200,7 +235,7 @@ const App: React.FC = () => {
             accountGroups={accountGroups} setAccountGroups={setAccountGroups}
             items={items} setItems={setItems}
             batches={batches} setBatches={setBatches}
-            taxes={[]} setTaxes={() => {}} taxGroups={[]} setTaxGroups={() => {}} vouchers={vouchers} setVouchers={setVouchers}
+            taxes={taxes} setTaxes={setTaxes} taxGroups={taxGroups} setTaxGroups={setTaxGroups} vouchers={vouchers} setVouchers={setVouchers}
             unitMeasures={unitMeasures} setUnitMeasures={setUnitMeasures}
             isFYLocked={isFYLocked}
           />
@@ -208,6 +243,7 @@ const App: React.FC = () => {
       case MainMenuType.TRANSACTION:
         return (
           <TransactionModule 
+            /* Fixed missing setActiveSubAction parameter on line 246 by passing setActiveTransactionSubMenu */
             activeCompany={activeCompany} currentFY={currentFY} isReadOnly={isFYLocked} activeSubAction={activeTransactionSubMenu} setActiveSubAction={setActiveTransactionSubMenu}
             ledgers={ledgers} items={items} batches={batches} vouchers={vouchers} setVouchers={setVouchers} onViewVoucher={setViewingVoucherId}
           />
@@ -216,7 +252,7 @@ const App: React.FC = () => {
         return (
           <DisplayModule 
             activeCompany={activeCompany} activeSubAction={activeDisplaySubMenu} setActiveSubAction={setActiveDisplaySubMenu}
-            ledgers={ledgers} vouchers={vouchers} items={items} batches={batches} taxes={[]} taxGroups={[]}
+            ledgers={ledgers} vouchers={vouchers} items={items} batches={batches} taxes={taxes} taxGroups={taxGroups}
             onViewVoucher={setViewingVoucherId}
             onPostVoucher={handlePostVoucher}
           />
@@ -224,7 +260,8 @@ const App: React.FC = () => {
       case MainMenuType.COMMUNICATION:
         return <CommunicationModule activeCompany={activeCompany} activeSubAction={activeCommSubMenu} setActiveSubAction={setActiveCommSubMenu} vouchers={vouchers} ledgers={ledgers} onViewVoucher={setViewingVoucherId} />;
       case MainMenuType.HOUSE_KEEPING:
-        return <HouseKeepingModule activeCompany={activeCompany} activeSubAction={activeHouseKeepingSubMenu} setActiveHouseKeepingSubMenu={setActiveHouseKeepingSubMenu} auditLogs={auditLogs} ledgers={ledgers} vouchers={vouchers} setVouchers={setVouchers} />;
+        /* Fixed property name from setActiveHouseKeepingSubMenu to setActiveSubAction on line 261 and corrected missing state setter value */
+        return <HouseKeepingModule activeCompany={activeCompany} activeSubAction={activeHouseKeepingSubMenu} setActiveSubAction={setActiveHouseKeepingSubMenu} auditLogs={auditLogs} ledgers={ledgers} vouchers={vouchers} setVouchers={setVouchers} onViewVoucher={setViewingVoucherId} />;
       default:
         return <ModulePlaceholder type={activeMenu} />;
     }
@@ -260,7 +297,10 @@ const App: React.FC = () => {
           activeCompanyName={activeCompany.name} 
           currentFY={currentFY} 
           isFYLocked={isFYLocked} 
+          vouchers={vouchers}
+          onViewVoucher={setViewingVoucherId}
           onMenuToggle={() => setIsSidebarOpen(!isSidebarOpen)}
+          onOpenPalette={() => setIsCommandPaletteOpen(true)}
         />
         
         <RibbonMenu 
@@ -281,7 +321,17 @@ const App: React.FC = () => {
           </div>
         </main>
 
-        <AIAssistant vouchers={vouchers} ledgers={ledgers} activeCompany={activeCompany} />
+        <AIAssistant vouchers={vouchers} ledgers={ledgers} activeCompany={activeCompany} onViewVoucher={setViewingVoucherId} />
+        
+        <CommandPalette 
+          isOpen={isCommandPaletteOpen}
+          onClose={() => setIsCommandPaletteOpen(false)}
+          vouchers={vouchers}
+          ledgers={ledgers}
+          onNavigate={handleSidebarMenuChange}
+          onViewVoucher={setViewingVoucherId}
+        />
+
         {voucherToView && (
           <VoucherModal voucher={voucherToView} activeCompany={activeCompany} onClose={() => setViewingVoucherId(null)} />
         )}
@@ -291,6 +341,7 @@ const App: React.FC = () => {
               <span className="flex items-center"><div className="w-1.5 h-1.5 bg-emerald-400 rounded-full mr-2 animate-pulse"></div> Secure Node: Operational</span>
               <span className="opacity-30">|</span>
               <span>Draft Buffer: {vouchers.filter(v => v.status === 'Draft').length} Objects</span>
+              <span className="opacity-30 ml-4">Press CMD+K for Global Search</span>
            </div>
            <div className="flex items-center space-x-4">
               <span>Thread Integrity: Verified</span>

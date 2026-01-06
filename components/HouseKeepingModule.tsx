@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { HouseKeepingSubMenu, AuditLog, Ledger, Voucher } from '../types';
 import { HOUSE_KEEPING_SUB_MENUS } from '../constants';
@@ -15,10 +16,11 @@ interface HouseKeepingModuleProps {
   ledgers: Ledger[];
   vouchers: Voucher[];
   setVouchers?: React.Dispatch<React.SetStateAction<Voucher[]>>;
+  onViewVoucher: (id: string) => void;
 }
 
 const HouseKeepingModule: React.FC<HouseKeepingModuleProps> = ({ 
-  activeCompany, activeSubAction, setActiveSubAction, auditLogs, ledgers, vouchers, setVouchers 
+  activeCompany, activeSubAction, setActiveSubAction, auditLogs, ledgers, vouchers, setVouchers, onViewVoucher 
 }) => {
 
   const renderContent = () => {
@@ -28,7 +30,7 @@ const HouseKeepingModule: React.FC<HouseKeepingModuleProps> = ({
       case HouseKeepingSubMenu.INTEGRITY_CHECK:
         return <IntegrityCheck ledgers={ledgers} vouchers={vouchers} />;
       case HouseKeepingSubMenu.SYSTEM_AUDIT:
-        return <SystemAudit auditLogs={auditLogs} />;
+        return <SystemAudit auditLogs={auditLogs} onViewVoucher={onViewVoucher} />;
       case HouseKeepingSubMenu.RENUMBERING:
         return <VoucherRenumbering vouchers={vouchers} setVouchers={setVouchers} activeCompany={activeCompany} />;
       case HouseKeepingSubMenu.PREFERENCES:
@@ -93,17 +95,8 @@ const HouseKeepingModule: React.FC<HouseKeepingModuleProps> = ({
     </div>
   );
 
-  return (
-    <div className="space-y-8 min-h-[70vh]">
-      {activeSubAction && (
-        <button onClick={() => setActiveSubAction(null)} className="flex items-center space-x-2 text-[10px] font-black uppercase text-slate-400 hover:text-amber-600 transition-colors">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7" /></svg>
-          <span>Return to Engineering Hub</span>
-        </button>
-      )}
-      {renderContent()}
-    </div>
-  );
+  // Added return statement to fix 'Type void is not assignable to ReactNode' error
+  return renderContent();
 };
 
 export default HouseKeepingModule;
