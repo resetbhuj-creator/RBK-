@@ -27,21 +27,16 @@ const SubMenuItem: React.FC<{ label: string, id: string, activeId: string | null
       onClick={onClick} 
       className={`w-full text-left px-4 py-3 rounded-xl text-[9px] uppercase tracking-[0.2em] transition-all relative group/sub flex items-center border-l-2 ${
         isActive 
-          ? 'text-white bg-indigo-500/20 border-indigo-400 shadow-[0_4px_20px_rgba(79,70,229,0.15)] font-black italic translate-x-2' 
+          ? 'text-white bg-indigo-500/40 border-indigo-400 shadow-[0_4px_20px_rgba(79,70,229,0.3)] font-black italic translate-x-2' 
           : 'text-slate-500 font-bold border-transparent hover:text-slate-200 hover:bg-white/5 hover:translate-x-1'
       }`}
     >
       <div className={`w-1.5 h-1.5 rounded-full mr-3 transition-all duration-500 ${
         isActive 
-          ? 'bg-indigo-400 scale-125 shadow-[0_0_10px_#818cf8] ring-2 ring-white/10' 
+          ? 'bg-indigo-400 scale-125 shadow-[0_0_10px_#818cf8]' 
           : 'bg-slate-700 scale-75 group-hover/sub:bg-slate-500'
       }`} />
-      
-      <span className={`truncate block flex-1 ${isActive ? 'drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]' : ''}`}>{label}</span>
-      
-      {isActive && (
-        <div className="absolute right-3 w-1.5 h-1.5 bg-indigo-300 rounded-full animate-pulse shadow-[0_0_8px_#a5b4fc]" />
-      )}
+      <span className="truncate block flex-1">{label}</span>
     </button>
   );
 };
@@ -71,7 +66,6 @@ const Sidebar: React.FC<SidebarProps> = ({
   setIsOpen, 
   activeCompany 
 }) => {
-  const logo = activeCompany?.logo;
   const companyName = activeCompany?.name || 'Nexus ERP';
 
   const SUB_MENU_MAP: Record<string, any[]> = {
@@ -106,38 +100,19 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <aside className={`fixed inset-y-0 left-0 z-[100] w-72 bg-slate-950 text-white transition-all duration-500 ease-in-out transform ${isOpen ? 'translate-x-0' : '-translate-x-full'} md:relative md:translate-x-0 border-r border-white/5 flex flex-col h-screen overflow-hidden shadow-2xl`}>
-      {/* Brand Node */}
       <div className="flex items-center justify-between px-6 h-20 border-b border-white/5 bg-slate-950/80 backdrop-blur-2xl shrink-0">
         <div className="flex items-center space-x-4 overflow-hidden">
-          <div className="w-11 h-11 shrink-0 bg-indigo-600 rounded-xl flex items-center justify-center font-black text-2xl overflow-hidden shadow-2xl border-2 border-indigo-400/40 transform -rotate-3 transition-transform hover:rotate-0 cursor-pointer group/logo">
-            {logo && logo.length > 1 ? (
-              <img src={logo} alt={companyName} className="w-full h-full object-cover group-hover/logo:scale-110 transition-transform" />
-            ) : (
-              <span className="text-white text-base">{logo || companyName.charAt(0)}</span>
-            )}
+          <div className="w-11 h-11 shrink-0 bg-indigo-600 rounded-xl flex items-center justify-center font-black text-white shadow-2xl border-2 border-indigo-400/40">
+            N
           </div>
           <div className="flex flex-col min-w-0">
             <span className="text-sm font-black tracking-tighter truncate italic uppercase text-white">Nexus Core</span>
-            <span className="text-[8px] font-bold text-indigo-500 uppercase tracking-[0.4em] leading-none mt-1">Enterprise v4.4</span>
+            <span className="text-[8px] font-bold text-indigo-500 uppercase tracking-[0.4em] leading-none mt-1">v4.4</span>
           </div>
         </div>
-        <button onClick={() => setIsOpen(false)} className="md:hidden text-slate-500 hover:text-white transition-all p-2 hover:bg-white/5 rounded-xl">
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-        </button>
       </div>
 
-      <div className="px-4 mt-6 mb-2">
-         <div className="p-4 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-between group hover:bg-white/10 transition-all cursor-pointer">
-            <div className="flex items-center space-x-3">
-               <svg className="w-4 h-4 text-slate-500 group-hover:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-               <span className="text-[9px] font-black uppercase text-slate-500 tracking-[0.2em] group-hover:text-white">Quick Find</span>
-            </div>
-            <kbd className="px-2 py-0.5 bg-slate-900 text-[8px] font-black text-slate-500 rounded border border-white/5 group-hover:border-indigo-500/50">⌘K</kbd>
-         </div>
-      </div>
-
-      {/* Navigation Tree */}
-      <nav className="flex-1 mt-2 px-4 space-y-2 overflow-y-auto custom-scrollbar pb-10 scroll-smooth">
+      <nav className="flex-1 mt-6 px-4 space-y-2 overflow-y-auto custom-scrollbar">
         {MENU_ITEMS.map((item) => {
           const isParentActive = activeMenu === item.id;
           const subItems = SUB_MENU_MAP[item.id];
@@ -146,40 +121,22 @@ const Sidebar: React.FC<SidebarProps> = ({
           const subSetter = getSubSetter(item.id) as (id: any) => void;
           
           return (
-            <div key={item.id} className="space-y-1">
+            <div key={item.id}>
               <button
-                onClick={() => {
-                  setActiveMenu(item.id);
-                  if (window.innerWidth < 768 && !hasSub) setIsOpen(false);
-                }}
+                onClick={() => setActiveMenu(item.id)}
                 className={`w-full flex items-center space-x-4 px-5 py-4 rounded-2xl transition-all duration-500 relative group overflow-hidden border-2 ${
                   isParentActive 
-                    ? 'bg-indigo-600 border-indigo-400/50 text-white shadow-[0_20px_40px_-15px_rgba(79,70,229,0.5)] z-10 scale-[1.03]' 
+                    ? 'bg-indigo-600 border-indigo-400/50 text-white shadow-[0_20px_40px_-15px_rgba(79,70,229,0.5)] scale-[1.03]' 
                     : 'text-slate-500 border-transparent hover:bg-white/5 hover:text-slate-200'
                 }`}
               >
-                {/* Active Sidebar Indicator Bar */}
-                <div className={`absolute left-0 top-3 bottom-3 w-1.5 bg-white rounded-r-full shadow-[0_0_15px_#fff] transition-all duration-500 ${isParentActive ? 'opacity-100 scale-y-100' : 'opacity-0 scale-y-0'}`} />
-                
-                <span className={`${isParentActive ? 'text-white scale-125 drop-shadow-[0_0_12px_rgba(255,255,255,0.6)]' : 'text-slate-600 group-hover:text-indigo-400 group-hover:scale-110'} transition-all duration-500 w-6 h-6 flex items-center justify-center shrink-0`}>
-                  {React.cloneElement(item.icon as React.ReactElement<any>, { className: 'w-6 h-6' })}
+                <div className={`absolute left-0 top-3 bottom-3 w-1.5 bg-white rounded-r-full transition-all duration-500 ${isParentActive ? 'opacity-100 scale-y-100' : 'opacity-0 scale-y-0'}`} />
+                <span className={`${isParentActive ? 'text-white scale-125' : 'text-slate-600 group-hover:text-indigo-400'} transition-all duration-500 w-6 h-6 flex items-center justify-center shrink-0`}>
+                  {item.icon}
                 </span>
-                
-                <span className={`font-black text-[10px] uppercase tracking-[0.25em] flex-1 text-left truncate transition-all duration-500 ${isParentActive ? 'text-white translate-x-1 italic' : 'group-hover:translate-x-1'}`}>
+                <span className={`font-black text-[10px] uppercase tracking-[0.25em] flex-1 text-left truncate transition-all duration-500 ${isParentActive ? 'text-white italic translate-x-1' : ''}`}>
                   {item.label}
                 </span>
-
-                {hasSub && (
-                  <div className={`transition-all duration-700 ${isParentActive ? 'rotate-180 scale-125 text-white' : 'text-slate-800 group-hover:text-slate-400 group-hover:translate-y-0.5'}`}>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </div>
-                )}
-                
-                {isParentActive && (
-                  <div className="absolute inset-0 bg-gradient-to-tr from-white/20 via-transparent to-white/5 pointer-events-none animate-pulse" />
-                )}
               </button>
 
               {hasSub && (
@@ -190,10 +147,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                       label={sub.label} 
                       id={sub.id} 
                       activeId={activeSubId} 
-                      onClick={() => { 
-                        subSetter(sub.id); 
-                        if (window.innerWidth < 768) setIsOpen(false); 
-                      }} 
+                      onClick={() => subSetter(sub.id)} 
                     />
                   ))}
                 </SubMenuContainer>
@@ -203,20 +157,10 @@ const Sidebar: React.FC<SidebarProps> = ({
         })}
       </nav>
 
-      {/* Identity Node Footer */}
-      <div className="p-4 border-t border-white/5 bg-slate-950 shrink-0">
-        <div className="flex items-center space-x-3 p-3 bg-white/5 rounded-2xl border border-white/5 hover:bg-white/10 transition-all duration-300 cursor-pointer group">
-          <div className="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center overflow-hidden border border-white/10 shadow-xl group-hover:border-indigo-50/50 transition-all">
-            <img src="https://picsum.photos/64/64?random=vance" alt="User" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
-          </div>
-          <div className="flex flex-col min-w-0">
-            <span className="text-[11px] font-black truncate text-white uppercase tracking-tighter italic leading-none group-hover:text-indigo-400 transition-colors">Vance Alexander</span>
-            <span className="text-[8px] text-slate-500 truncate font-bold uppercase tracking-widest mt-1.5 flex items-center">
-              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-2 animate-pulse" />
-              Super Admin
-            </span>
-          </div>
-        </div>
+      <div className="p-4 border-t border-white/5">
+         <div className="p-3 bg-white/5 border border-white/5 rounded-2xl text-center">
+            <span className="text-[9px] font-black uppercase text-slate-500 tracking-widest">CMD+K Global Query</span>
+         </div>
       </div>
     </aside>
   );

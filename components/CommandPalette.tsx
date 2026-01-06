@@ -84,10 +84,7 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose, vouche
   const handleSelect = (item: any) => {
     if (item.type === 'NAVIGATION') onNavigate(item.id as MainMenuType);
     if (item.type === 'VOUCHER') onViewVoucher(item.id);
-    if (item.type === 'LEDGER') {
-        // For ledger, we navigate to display -> ledger report
-        onNavigate(MainMenuType.DISPLAY);
-    }
+    if (item.type === 'LEDGER') onNavigate(MainMenuType.DISPLAY);
     onClose();
   };
 

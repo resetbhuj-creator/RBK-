@@ -126,6 +126,18 @@ const App: React.FC = () => {
   const [currentFY, setCurrentFY] = useState(() => localStorage.getItem('nexus_erp_current_fy') || '2023 - 2024');
   const [isFYLocked, setIsFYLocked] = useState(() => localStorage.getItem('nexus_erp_fy_locked') === 'true');
 
+  // Global CMD+K Listener
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setIsCommandPaletteOpen(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   // Persistence Sync
   useEffect(() => {
     localStorage.setItem('nexus_erp_companies', JSON.stringify(companies));
@@ -143,18 +155,6 @@ const App: React.FC = () => {
     localStorage.setItem('nexus_erp_current_fy', currentFY);
     localStorage.setItem('nexus_erp_fy_locked', String(isFYLocked));
   }, [companies, accountGroups, ledgers, items, batches, vouchers, taxes, taxGroups, users, roles, auditLogs, currentCompanyId, currentFY, isFYLocked]);
-
-  // Global Key Handler
-  useEffect(() => {
-    const handleGlobalKeys = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault();
-        setIsCommandPaletteOpen(prev => !prev);
-      }
-    };
-    window.addEventListener('keydown', handleGlobalKeys);
-    return () => window.removeEventListener('keydown', handleGlobalKeys);
-  }, []);
 
   const addAuditLog = useCallback((logData: Omit<AuditLog, 'id' | 'timestamp' | 'actor'> & { actor?: string }) => {
     const newLog: AuditLog = {
@@ -215,6 +215,15 @@ const App: React.FC = () => {
     if (locked !== undefined) setIsFYLocked(locked);
   };
 
+  const handleNavigate = (menu: MainMenuType) => {
+    setActiveMenu(menu);
+    setActiveAdminSubMenu(null);
+    setActiveTransactionSubMenu(null);
+    setActiveDisplaySubMenu(null);
+    setActiveCommSubMenu(null);
+    setActiveHouseKeepingSubMenu(null);
+  };
+
   const renderContent = () => {
     switch (activeMenu) {
       case MainMenuType.DASHBOARD:
@@ -242,7 +251,6 @@ const App: React.FC = () => {
       case MainMenuType.TRANSACTION:
         return (
           <TransactionModule 
-            /* Fixed missing setActiveSubAction parameter on line 246 by passing setActiveTransactionSubMenu */
             activeCompany={activeCompany} currentFY={currentFY} isReadOnly={isFYLocked} activeSubAction={activeTransactionSubMenu} setActiveSubAction={setActiveTransactionSubMenu}
             ledgers={ledgers} items={items} batches={batches} vouchers={vouchers} setVouchers={setVouchers} onViewVoucher={setViewingVoucherId}
           />
@@ -259,27 +267,17 @@ const App: React.FC = () => {
       case MainMenuType.COMMUNICATION:
         return <CommunicationModule activeCompany={activeCompany} activeSubAction={activeCommSubMenu} setActiveSubAction={setActiveCommSubMenu} vouchers={vouchers} ledgers={ledgers} onViewVoucher={setViewingVoucherId} />;
       case MainMenuType.HOUSE_KEEPING:
-        /* Fixed property name from setActiveHouseKeepingSubMenu to setActiveSubAction on line 261 and corrected missing state setter value */
         return <HouseKeepingModule activeCompany={activeCompany} activeSubAction={activeHouseKeepingSubMenu} setActiveSubAction={setActiveHouseKeepingSubMenu} auditLogs={auditLogs} ledgers={ledgers} vouchers={vouchers} setVouchers={setVouchers} onViewVoucher={setViewingVoucherId} />;
       default:
         return <ModulePlaceholder type={activeMenu} />;
     }
   };
 
-  const handleSidebarMenuChange = (menu: MainMenuType) => {
-    setActiveMenu(menu);
-    setActiveAdminSubMenu(null);
-    setActiveTransactionSubMenu(null);
-    setActiveDisplaySubMenu(null);
-    setActiveCommSubMenu(null);
-    setActiveHouseKeepingSubMenu(null);
-  };
-
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden font-sans">
       <Sidebar 
         activeMenu={activeMenu} 
-        setActiveMenu={handleSidebarMenuChange}
+        setActiveMenu={handleNavigate}
         activeAdminSubMenu={activeAdminSubMenu} setActiveAdminSubMenu={setActiveAdminSubMenu}
         activeTransactionSubMenu={activeTransactionSubMenu} setActiveTransactionSubMenu={setActiveTransactionSubMenu}
         activeDisplaySubMenu={activeDisplaySubMenu} setActiveDisplaySubMenu={setActiveDisplaySubMenu}
@@ -327,7 +325,7 @@ const App: React.FC = () => {
           onClose={() => setIsCommandPaletteOpen(false)}
           vouchers={vouchers}
           ledgers={ledgers}
-          onNavigate={handleSidebarMenuChange}
+          onNavigate={handleNavigate}
           onViewVoucher={setViewingVoucherId}
         />
 
@@ -341,11 +339,6 @@ const App: React.FC = () => {
               <span className="opacity-30">|</span>
               <span>Draft Buffer: {vouchers.filter(v => v.status === 'Draft').length} Objects</span>
               <span className="opacity-30 ml-4">Press CMD+K for Global Search</span>
-           </div>
-           <div className="flex items-center space-x-4">
-              <span>Thread Integrity: Verified</span>
-              <span className="opacity-30">|</span>
-              <span>Cluster: US-EAST-1</span>
            </div>
         </footer>
       </div>
