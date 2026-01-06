@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { MainMenuType, CompanySubMenu, AdminSubMenu, TransactionSubMenu, DisplaySubMenu, CommunicationSubMenu, HouseKeepingSubMenu } from '../types';
 import { MENU_ITEMS, COMPANY_SUB_MENUS, ADMINISTRATION_SUB_MENUS, TRANSACTION_SUB_MENUS, DISPLAY_SUB_MENUS, COMMUNICATION_SUB_MENUS, HOUSE_KEEPING_SUB_MENUS } from '../constants';
@@ -52,14 +53,20 @@ const RibbonMenu: React.FC<RibbonMenuProps> = ({
         groups = [
           { label: 'System Masters', items: ADMINISTRATION_SUB_MENUS.filter(m => [AdminSubMenu.MASTERS, AdminSubMenu.USERS].includes(m.id as AdminSubMenu)) },
           { label: 'Data Flow', items: ADMINISTRATION_SUB_MENUS.filter(m => [AdminSubMenu.IMPORT_EXPORT, AdminSubMenu.BACKUP].includes(m.id as AdminSubMenu)) },
-          { label: 'Utilities', items: ADMINISTRATION_SUB_MENUS.filter(m => [AdminSubMenu.YEAR_CHANGE, AdminSubMenu.COMMUNICATION].includes(m.id as AdminSubMenu)) }
+          { label: 'Utilities', items: ADMINISTRATION_SUB_MENUS.filter(m => [AdminSubMenu.YEAR_CHANGE, AdminSubMenu.EMAIL_GATEWAY].includes(m.id as AdminSubMenu)) }
         ];
         break;
       case MainMenuType.TRANSACTION:
         activeId = activeTransactionSubMenu;
         setter = setActiveTransactionSubMenu;
         groups = [
-          { label: 'Vouchers', items: TRANSACTION_SUB_MENUS.filter(m => [TransactionSubMenu.ACCOUNTING_VOUCHERS, TransactionSubMenu.INVENTORY_VOUCHERS].includes(m.id as TransactionSubMenu)) },
+          { label: 'Vouchers', items: TRANSACTION_SUB_MENUS.filter(m => [
+            TransactionSubMenu.ACCOUNTING_VOUCHERS, 
+            TransactionSubMenu.INVENTORY_VOUCHERS, 
+            TransactionSubMenu.SALES_RETURN,
+            TransactionSubMenu.PURCHASE_RETURN,
+            TransactionSubMenu.PURCHASE_ORDER
+          ].includes(m.id as TransactionSubMenu)) },
           { label: 'Reconciliation', items: TRANSACTION_SUB_MENUS.filter(m => [TransactionSubMenu.BANK_RECONCILIATION, TransactionSubMenu.DAY_BOOK].includes(m.id as TransactionSubMenu)) }
         ];
         break;

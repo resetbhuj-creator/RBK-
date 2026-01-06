@@ -183,6 +183,17 @@ export const ADMINISTRATION_SUB_MENUS: SubMenuItem[] = [
     )
   },
   {
+    id: AdminSubMenu.AUTOMATIC_BACKUP,
+    label: 'Auto Backups',
+    description: 'Schedule recurring vault snapshots at custom frequencies.',
+    color: 'bg-sky-600',
+    icon: (
+      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    )
+  },
+  {
     id: AdminSubMenu.IMPORT_EXPORT,
     label: 'Import / Export',
     description: 'Bulk upload master data or export reports for external audit.',
@@ -205,13 +216,13 @@ export const ADMINISTRATION_SUB_MENUS: SubMenuItem[] = [
     )
   },
   {
-    id: AdminSubMenu.COMMUNICATION,
-    label: 'Communication',
-    description: 'Configure system gateways for Email and SMS services.',
+    id: AdminSubMenu.EMAIL_GATEWAY,
+    label: 'Email Gateway',
+    description: 'Configure system SMTP nodes and manage high-fidelity bulk dispatch logs.',
     color: 'bg-violet-600',
     icon: (
       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
       </svg>
     )
   }
@@ -221,7 +232,7 @@ export const TRANSACTION_SUB_MENUS: SubMenuItem[] = [
   {
     id: TransactionSubMenu.ACCOUNTING_VOUCHERS,
     label: 'Financial Vouchers',
-    description: 'Record Payments, Receipts, Contra entries, Journals, Credit and Debit Notes.',
+    description: 'Record Payments, Receipts, Contra entries, Journals.',
     color: 'bg-indigo-600',
     icon: (
       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -230,10 +241,32 @@ export const TRANSACTION_SUB_MENUS: SubMenuItem[] = [
     )
   },
   {
+    id: TransactionSubMenu.SALES_RETURN,
+    label: 'Sales Return',
+    description: 'Record outward supplies returned by counterparty node.',
+    color: 'bg-emerald-600',
+    icon: (
+      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 15l-3-3m0 0l3-3m-3 3h8M3 12a9 9 0 1118 0 9 9 0 01-18 0z" />
+      </svg>
+    )
+  },
+  {
+    id: TransactionSubMenu.PURCHASE_RETURN,
+    label: 'Purchase Return',
+    description: 'Record inward supplies returned to supplier node.',
+    color: 'bg-rose-600',
+    icon: (
+      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 9l3 3m0 0l-3 3m3-3H8m13 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    )
+  },
+  {
     id: TransactionSubMenu.INVENTORY_VOUCHERS,
     label: 'Inventory Vouchers',
-    description: 'Execute Orders, Returns, Stock Movements, Deliveries, and Receipts.',
-    color: 'bg-emerald-600',
+    description: 'Execute Orders, Stock Movements, Deliveries, and Receipts.',
+    color: 'bg-blue-600',
     icon: (
       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
@@ -241,10 +274,32 @@ export const TRANSACTION_SUB_MENUS: SubMenuItem[] = [
     )
   },
   {
+    id: TransactionSubMenu.CREDIT_NOTE,
+    label: 'Credit Note',
+    description: 'Authorize credits for statutory post-sale adjustments.',
+    color: 'bg-rose-600',
+    icon: (
+      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    )
+  },
+  {
+    id: TransactionSubMenu.DEBIT_NOTE,
+    label: 'Debit Note',
+    description: 'Charge debits for price escalations or statutory shifts.',
+    color: 'bg-amber-600',
+    icon: (
+      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    )
+  },
+  {
     id: TransactionSubMenu.PURCHASE_ORDER,
     label: 'Purchase Orders',
     description: 'Issue procurement requests and track authorization status.',
-    color: 'bg-rose-600',
+    color: 'bg-indigo-700',
     icon: (
       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
@@ -352,6 +407,13 @@ export const DISPLAY_SUB_MENUS: SubMenuItem[] = [
     description: 'Audit report of all inward supplies and input tax credit (ITC).',
     color: 'bg-emerald-600',
     icon: <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13l-3 3m0 0l-3-3m3 3V8m0 13a9 9 0 110-18 9 9 0 010 18z" /></svg>
+  },
+  {
+    id: DisplaySubMenu.HSN_SUMMARY,
+    label: 'HSN Summary',
+    description: 'Code-wise aggregation of quantities and statutory values.',
+    color: 'bg-sky-600',
+    icon: <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
   }
 ];
 

@@ -10,15 +10,20 @@ interface VoucherEntryFormProps {
   onCancel: () => void;
   getNextId: (type: string) => string;
   activeCompany?: any;
+  forcedVType?: VType;
 }
 
-type VType = Extract<VoucherType, 'Payment' | 'Receipt' | 'Contra' | 'Journal' | 'Credit Note' | 'Debit Note'>;
+type VType = Extract<VoucherType, 'Payment' | 'Receipt' | 'Contra' | 'Journal' | 'Credit Note' | 'Debit Note' | 'Sales Return' | 'Purchase Return'>;
 
-const CURRENCIES = [
-  { code: 'USD', symbol: '$', name: 'US Dollar' },
-  { code: 'EUR', symbol: '€', name: 'Euro' },
-  { code: 'GBP', symbol: '£', name: 'British Pound' },
-  { code: 'INR', symbol: '₹', name: 'Indian Rupee' }
+const ADJ_REASONS = [
+  'Sales Return',
+  'Purchase Return',
+  'Post-sale Discount',
+  'Correction of Pricing',
+  'Quantity Variance',
+  'Defective Goods',
+  'Post-purchase Rebate',
+  'Other Statutory Adjustment'
 ];
 
 const NARRATION_TEMPLATES: Record<string, string[]> = {
@@ -54,13 +59,25 @@ const NARRATION_TEMPLATES: Record<string, string[]> = {
     "Being debit charged for purchase return to supplier.",
     "Being adjustment for short-supply of inventory shards.",
     "Being escalation of pricing for revised statutory rates."
+  ],
+  'Sales Return': [
+    "Being goods returned by counterparty node due to technical variance.",
+    "Being credit authorized against historical outward supply.",
+    "Being statutory reversal of sales tax liability committed."
+  ],
+  'Purchase Return': [
+    "Being goods returned to supplier node due to quality failure.",
+    "Being debit authorized against historical inward supply.",
+    "Being statutory reversal of input tax credit committed."
   ]
 };
 
-const VoucherEntryForm: React.FC<VoucherEntryFormProps> = ({ isReadOnly, ledgers, onSubmit, onCancel, getNextId, activeCompany }) => {
-  const [vchType, setVchType] = useState<VType>('Payment');
+const VoucherEntryForm: React.FC<VoucherEntryFormProps> = ({ isReadOnly, ledgers, onSubmit, onCancel, getNextId, activeCompany, forcedVType }) => {
+  const [vchType, setVchType] = useState<VType>(forcedVType || 'Payment');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [reference, setReference] = useState('');
+  const [sourceDocRef, setSourceDocRef] = useState('');
+  const [returnReason, setReturnReason] = useState('');
   const [narration, setNarration] = useState('');
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [isAssigning, setIsAssigning] = useState(false);
@@ -80,6 +97,10 @@ const VoucherEntryForm: React.FC<VoucherEntryFormProps> = ({ isReadOnly, ledgers
 
   const baseCurrencyCode = activeCompany?.currencyConfig?.code || 'USD';
   const nextIdPreview = useMemo(() => getNextId(vchType), [vchType, getNextId]);
+
+  useEffect(() => {
+    if (forcedVType) setVchType(forcedVType);
+  }, [forcedVType]);
 
   useEffect(() => {
     setLedgerEntries(prev => prev.map(e => {
@@ -140,8 +161,6 @@ const VoucherEntryForm: React.FC<VoucherEntryFormProps> = ({ isReadOnly, ledgers
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
-
-    // Fix: Explicitly type 'file' as 'File' to resolve 'unknown' type errors for name, type, size, and Blob usage
     Array.from(files).forEach((file: File) => {
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -210,34 +229,38 @@ const VoucherEntryForm: React.FC<VoucherEntryFormProps> = ({ isReadOnly, ledgers
         currency,
         exchangeRate,
         reference,
-        narration,
+        sourceDocRef,
+        returnReason,
         entries: ledgerEntries,
         attachments,
         supplyType,
         taxTotal: ledgerEntries.reduce((acc, e) => acc + (e.taxAmount || 0), 0),
-        gstClassification: vchType === 'Receipt' ? 'Input' : (vchType === 'Payment' ? 'Output' : 'Input')
+        gstClassification: vchType === 'Receipt' || vchType === 'Purchase Return' || vchType === 'Debit Note' ? 'Input' : (vchType === 'Payment' || vchType === 'Sales Return' || vchType === 'Credit Note' ? 'Output' : 'Input')
       });
       setIsAssigning(false);
     }, 1200);
   };
 
-  const activeColor = vchType === 'Payment' ? 'rose' : vchType === 'Receipt' ? 'emerald' : vchType === 'Contra' ? 'blue' : vchType === 'Journal' ? 'amber' : 'indigo';
+  const activeColor = vchType === 'Payment' || vchType === 'Credit Note' || vchType === 'Sales Return' ? 'rose' : vchType === 'Receipt' || vchType === 'Purchase Return' || vchType === 'Debit Note' ? 'emerald' : vchType === 'Contra' ? 'blue' : vchType === 'Journal' ? 'amber' : 'indigo';
+
+  const isNote = vchType === 'Credit Note' || vchType === 'Debit Note' || vchType === 'Sales Return' || vchType === 'Purchase Return';
 
   return (
     <div className="bg-white rounded-[3.5rem] border border-slate-200 shadow-2xl overflow-hidden max-w-7xl mx-auto animate-in zoom-in-95 duration-300 pb-10">
       <div className={`px-10 py-12 bg-${activeColor}-600 text-white flex justify-between items-center transition-all duration-700 relative overflow-hidden`}>
         <div className="flex items-center space-x-8 relative z-10">
           <div className="w-20 h-20 bg-white/20 rounded-[2.2rem] flex items-center justify-center text-4xl border border-white/10 backdrop-blur-md shadow-2xl transform -rotate-3 hover:rotate-0 transition-transform">
-             {vchType === 'Contra' ? '🔄' : vchType === 'Receipt' ? '📥' : vchType === 'Journal' ? '⚖️' : '💸'}
+             {vchType === 'Contra' ? '🔄' : vchType === 'Receipt' ? '📥' : vchType === 'Journal' ? '⚖️' : vchType === 'Credit Note' || vchType === 'Sales Return' ? '📉' : vchType === 'Debit Note' || vchType === 'Purchase Return' ? '📈' : '💸'}
           </div>
           <div>
             <div className="flex items-center space-x-6">
               <select 
                 value={vchType} 
                 onChange={e => setVchType(e.target.value as VType)}
-                className="bg-transparent border-none text-4xl font-black uppercase italic tracking-tighter outline-none cursor-pointer p-0"
+                disabled={!!forcedVType}
+                className={`bg-transparent border-none text-4xl font-black uppercase italic tracking-tighter outline-none p-0 ${forcedVType ? 'cursor-default' : 'cursor-pointer'}`}
               >
-                {['Payment', 'Receipt', 'Contra', 'Journal', 'Credit Note', 'Debit Note'].map(v => <option key={v} value={v} className="bg-slate-900 text-base">{v} Shard</option>)}
+                {['Payment', 'Receipt', 'Contra', 'Journal', 'Credit Note', 'Debit Note', 'Sales Return', 'Purchase Return'].map(v => <option key={v} value={v} className="bg-slate-900 text-base">{v} Shard</option>)}
               </select>
               <div className="px-5 py-2 bg-black/20 rounded-2xl border border-white/10 font-mono text-sm font-black tracking-widest text-white/90 shadow-inner">
                 # {nextIdPreview}
@@ -296,12 +319,47 @@ const VoucherEntryForm: React.FC<VoucherEntryFormProps> = ({ isReadOnly, ledgers
                 </div>
               </div>
               <div className="text-right">
-                <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase border-2 ${totals.isBalanced ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : 'bg-rose-500/20 text-rose-400 border-rose-500/30'}`}>
+                <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase border-2 ${totals.isBalanced ? 'bg-emerald-50/20 text-emerald-400 border-emerald-500/30' : 'bg-rose-50/20 text-rose-400 border-rose-500/30'}`}>
                   {totals.isBalanced ? 'EQUILIBRIUM' : 'VARIANCE'}
                 </span>
               </div>
            </div>
         </div>
+
+        {/* Note Specific Linking Metadata */}
+        {isNote && (
+          <div className="bg-indigo-950 rounded-[2.5rem] p-10 text-white relative overflow-hidden shadow-2xl border-l-8 border-indigo-500 animate-in slide-in-from-left-4">
+             <div className="relative z-10">
+                <h4 className="text-[10px] font-black uppercase tracking-[0.4em] text-indigo-300 mb-8 flex items-center">
+                   <svg className="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
+                   Linking & Adjustment Protocol
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                   <div className="space-y-2">
+                      <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest ml-1">Original Document Hash (Source Reference)</label>
+                      <input 
+                        value={sourceDocRef} 
+                        onChange={e => setSourceDocRef(e.target.value)} 
+                        placeholder="e.g. SL/23-24/00045"
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-sm font-black text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-inner italic" 
+                      />
+                   </div>
+                   <div className="space-y-2">
+                      <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest ml-1">Statutory Adjustment Reason</label>
+                      <select 
+                        value={returnReason} 
+                        onChange={e => setReturnReason(e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-sm font-black text-white outline-none cursor-pointer hover:bg-white/10 transition-all"
+                      >
+                         <option value="" className="bg-slate-900">-- Choose Reason --</option>
+                         {ADJ_REASONS.map(r => <option key={r} value={r} className="bg-slate-900">{r}</option>)}
+                      </select>
+                   </div>
+                </div>
+             </div>
+             <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-600 rounded-full blur-[100px] opacity-10 -mr-32 -mt-32"></div>
+          </div>
+        )}
 
         <div className="space-y-6">
            <div className="flex items-center space-x-4 px-4">

@@ -291,7 +291,7 @@ const UsersModule: React.FC<UsersModuleProps> = ({ users, setUsers, roles, setRo
              </div>
 
              <div className="pt-4 flex justify-end">
-                <button onClick={() => setSelectedLog(null)} className="px-14 py-5 bg-slate-900 text-white rounded-[2rem] font-black text-[10px] uppercase tracking-widest shadow-2xl hover:bg-indigo-600 transition-all transform active:scale-95 border-b-8 border-slate-950">Seal Inspector</button>
+                <button onClick={() => setSelectedLog(null)} className="px-14 py-5 bg-slate-900 text-white rounded-[2rem] font-black text-[10px] uppercase tracking-widest shadow-2xl hover:bg-indigo-600 transition-all transform active:scale-95 border-b-4 border-slate-950">Seal Inspector</button>
              </div>
           </div>
         </div>
@@ -318,7 +318,7 @@ const UsersModule: React.FC<UsersModuleProps> = ({ users, setUsers, roles, setRo
             onClick={() => { setEditingUser(undefined); setEditingRole(undefined); setIsModalOpen(true); }}
             className={`flex items-center justify-center space-x-3 px-10 py-5 rounded-[1.5rem] font-black shadow-2xl transition-all transform active:scale-95 text-[10px] uppercase tracking-[0.2em] ${activeTab === 'AUDIT' ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-200'}`}
            >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 6v6m0 v6m0-6h6m-6 0H6" /></svg>
             <span>{activeTab === 'ROLES' ? 'Provision Blueprint' : 'Authorize Identity'}</span>
            </button>
         </div>

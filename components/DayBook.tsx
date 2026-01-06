@@ -13,6 +13,7 @@ interface DayBookProps {
 const DayBook: React.FC<DayBookProps> = ({ vouchers, onClone, onDelete, onViewVoucher }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('All');
+  const [filterStatus, setFilterStatus] = useState('All');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [showAdvanced, setShowAdvanced] = useState(false);
   
@@ -25,6 +26,7 @@ const DayBook: React.FC<DayBookProps> = ({ vouchers, onClone, onDelete, onViewVo
       const matchesSearch = v.party.toLowerCase().includes(searchTerm.toLowerCase()) || 
                            v.id.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesType = filterType === 'All' || v.type === filterType;
+      const matchesStatus = filterStatus === 'All' || v.status === filterStatus;
       
       const vDate = new Date(v.date);
       const matchesStart = !dateRange.start || vDate >= new Date(dateRange.start);
@@ -33,9 +35,9 @@ const DayBook: React.FC<DayBookProps> = ({ vouchers, onClone, onDelete, onViewVo
       const matchesMin = !amountRange.min || v.amount >= parseFloat(amountRange.min);
       const matchesMax = !amountRange.max || v.amount <= parseFloat(amountRange.max);
 
-      return matchesSearch && matchesType && matchesStart && matchesEnd && matchesMin && matchesMax;
+      return matchesSearch && matchesType && matchesStatus && matchesStart && matchesEnd && matchesMin && matchesMax;
     });
-  }, [vouchers, searchTerm, filterType, dateRange, amountRange]);
+  }, [vouchers, searchTerm, filterType, filterStatus, dateRange, amountRange]);
 
   const stats = useMemo(() => {
     const gross = filtered.reduce((acc, v) => acc + v.amount, 0);
@@ -44,6 +46,14 @@ const DayBook: React.FC<DayBookProps> = ({ vouchers, onClone, onDelete, onViewVo
     const peak = count > 0 ? Math.max(...filtered.map(v => v.amount)) : 0;
     return { gross, count, avg, peak };
   }, [filtered]);
+
+  const resetFilters = () => {
+    setSearchTerm('');
+    setFilterType('All');
+    setFilterStatus('All');
+    setDateRange({ start: '', end: '' });
+    setAmountRange({ min: '', max: '' });
+  };
 
   const handleExportXLSX = () => {
     const data = filtered.map(v => ({
@@ -87,15 +97,17 @@ const DayBook: React.FC<DayBookProps> = ({ vouchers, onClone, onDelete, onViewVo
     setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   };
 
+  const hasActiveFilters = searchTerm !== '' || filterType !== 'All' || filterStatus !== 'All' || dateRange.start || dateRange.end || amountRange.min || amountRange.max;
+
   return (
     <div className="space-y-10 animate-in fade-in duration-500 pb-20">
       {/* Telemetry Dashboard Row */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
          {[
-           { label: 'Cumulative Turnover', value: `$${stats.gross.toLocaleString()}`, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-           { label: 'Voucher Density', value: stats.count, color: 'text-slate-800', bg: 'bg-slate-50' },
-           { label: 'Transmission Peak', value: `$${stats.peak.toLocaleString()}`, color: 'text-rose-600', bg: 'bg-rose-50' },
-           { label: 'Unit Efficiency', value: `$${stats.avg.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, color: 'text-emerald-600', bg: 'bg-emerald-50' }
+           { label: 'Filtered Volume', value: `$${stats.gross.toLocaleString()}`, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+           { label: 'Transmission Count', value: stats.count, color: 'text-slate-800', bg: 'bg-slate-50' },
+           { label: 'Highest Dispatch', value: `$${stats.peak.toLocaleString()}`, color: 'text-rose-600', bg: 'bg-rose-50' },
+           { label: 'Symmetry Score', value: '100%', color: 'text-emerald-600', bg: 'bg-emerald-50' }
          ].map((s, i) => (
            <div key={i} className={`p-8 rounded-[2.5rem] border border-slate-200 shadow-sm group hover:-translate-y-1 transition-all ${s.bg}`}>
               <div className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2 group-hover:text-indigo-600 transition-colors">{s.label}</div>
@@ -111,7 +123,7 @@ const DayBook: React.FC<DayBookProps> = ({ vouchers, onClone, onDelete, onViewVo
                <div className="relative flex-1 group">
                   <input 
                     type="text" 
-                    placeholder="Query Reconciled Stream (Party, Hash, Type)..." 
+                    placeholder="Search by Counterparty or Txn Hash..." 
                     value={searchTerm} 
                     onChange={(e) => setSearchTerm(e.target.value)} 
                     className="w-full pl-16 pr-8 py-5 rounded-3xl border border-slate-200 bg-white text-sm font-bold shadow-inner outline-none focus:ring-8 focus:ring-indigo-500/5 transition-all italic" 
@@ -120,13 +132,18 @@ const DayBook: React.FC<DayBookProps> = ({ vouchers, onClone, onDelete, onViewVo
                </div>
                <button onClick={() => setShowAdvanced(!showAdvanced)} className={`p-5 rounded-[1.5rem] transition-all border-2 flex items-center space-x-3 ${showAdvanced ? 'bg-slate-900 border-slate-900 text-white shadow-2xl' : 'bg-white text-slate-400 border-slate-200 hover:border-indigo-400 hover:text-indigo-600 shadow-sm'}`}>
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m12 4a2 2 0 100-4m0 4a2 2 0 110-4" /></svg>
-                  <span className="text-[10px] font-black uppercase tracking-widest">Filter Matrix</span>
+                  <span className="text-[10px] font-black uppercase tracking-widest">Filters</span>
                </button>
+               {hasActiveFilters && (
+                 <button onClick={resetFilters} className="p-5 bg-rose-50 text-rose-600 border border-rose-100 rounded-[1.5rem] hover:bg-rose-100 transition-all group" title="Clear All Filters">
+                    <svg className="w-5 h-5 group-hover:rotate-90 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
+                 </button>
+               )}
             </div>
             
             <div className="flex items-center space-x-4">
               <div className="flex bg-slate-200/50 p-1.5 rounded-[1.8rem] border border-slate-200 overflow-x-auto no-scrollbar shadow-inner">
-                {['All', 'Sales', 'Purchase', 'Sales Return', 'Purchase Return', 'Payment', 'Receipt', 'Contra', 'Journal', 'Delivery Note', 'Goods Receipt Note (GRN)', 'Stock Adjustment'].map(t => (
+                {['All', 'Sales', 'Purchase', 'Payment', 'Receipt', 'Contra', 'Journal'].map(t => (
                   <button key={t} onClick={() => setFilterType(t)} className={`px-6 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all whitespace-nowrap ${filterType === t ? 'bg-white text-indigo-600 shadow-xl scale-[1.02] border border-slate-100' : 'text-slate-500 hover:text-slate-800'}`}>{t}</button>
                 ))}
               </div>
@@ -137,22 +154,34 @@ const DayBook: React.FC<DayBookProps> = ({ vouchers, onClone, onDelete, onViewVo
           </div>
 
           {showAdvanced && (
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-8 p-10 bg-white rounded-[2.5rem] border-2 border-indigo-100 shadow-2xl animate-in slide-in-from-top-4 duration-500 relative overflow-hidden">
-               <div className="space-y-1.5 relative z-10">
-                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-2">Temporal Opening</label>
-                  <input type="date" value={dateRange.start} onChange={e => setDateRange({...dateRange, start: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3 text-xs font-black outline-none focus:ring-4 focus:ring-indigo-500/10 shadow-inner" />
-               </div>
-               <div className="space-y-1.5 relative z-10">
-                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-2">Temporal Closing</label>
-                  <input type="date" value={dateRange.end} onChange={e => setDateRange({...dateRange, end: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3 text-xs font-black outline-none focus:ring-4 focus:ring-indigo-500/10 shadow-inner" />
-               </div>
-               <div className="space-y-1.5 relative z-10">
-                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-2">Monetary Floor ($)</label>
-                  <input type="number" placeholder="0.00" value={amountRange.min} onChange={e => setAmountRange({...amountRange, min: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3 text-xs font-black outline-none focus:ring-4 focus:ring-indigo-500/10 shadow-inner" />
-               </div>
-               <div className="space-y-1.5 relative z-10">
-                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-2">Monetary Ceiling ($)</label>
-                  <input type="number" placeholder="∞" value={amountRange.max} onChange={e => setAmountRange({...amountRange, max: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3 text-xs font-black outline-none focus:ring-4 focus:ring-indigo-500/10 shadow-inner" />
+            <div className="p-10 bg-white rounded-[2.5rem] border-2 border-indigo-100 shadow-2xl animate-in slide-in-from-top-4 duration-500 relative overflow-hidden">
+               <div className="grid grid-cols-1 md:grid-cols-5 gap-8 relative z-10">
+                  <div className="space-y-1.5">
+                     <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-2">Opening Date</label>
+                     <input type="date" value={dateRange.start} onChange={e => setDateRange({...dateRange, start: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3 text-xs font-black outline-none focus:ring-4 focus:ring-indigo-500/10 shadow-inner" />
+                  </div>
+                  <div className="space-y-1.5">
+                     <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-2">Closing Date</label>
+                     <input type="date" value={dateRange.end} onChange={e => setDateRange({...dateRange, end: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3 text-xs font-black outline-none focus:ring-4 focus:ring-indigo-500/10 shadow-inner" />
+                  </div>
+                  <div className="space-y-1.5">
+                     <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-2">Min Value ($)</label>
+                     <input type="number" placeholder="0.00" value={amountRange.min} onChange={e => setAmountRange({...amountRange, min: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3 text-xs font-black outline-none focus:ring-4 focus:ring-indigo-500/10 shadow-inner" />
+                  </div>
+                  <div className="space-y-1.5">
+                     <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-2">Max Value ($)</label>
+                     <input type="number" placeholder="∞" value={amountRange.max} onChange={e => setAmountRange({...amountRange, max: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3 text-xs font-black outline-none focus:ring-4 focus:ring-indigo-500/10 shadow-inner" />
+                  </div>
+                  <div className="space-y-1.5">
+                     <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-2">Integrity State</label>
+                     <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3 text-xs font-black text-indigo-600 outline-none focus:ring-4 focus:ring-indigo-500/10 shadow-inner appearance-none cursor-pointer">
+                        <option value="All">All Statuses</option>
+                        <option value="Posted">Posted</option>
+                        <option value="Draft">Draft</option>
+                        <option value="Pending Approval">Pending Approval</option>
+                        <option value="Cancelled">Cancelled</option>
+                     </select>
+                  </div>
                </div>
                <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-600 rounded-full blur-3xl opacity-5 -mr-16 -mt-16"></div>
             </div>
@@ -194,7 +223,7 @@ const DayBook: React.FC<DayBookProps> = ({ vouchers, onClone, onDelete, onViewVo
                          v.type === 'Purchase' || v.type === 'Payment' ? 'bg-rose-50 text-rose-600 border-rose-100' : 
                          'bg-indigo-50 text-indigo-600 border-indigo-100'
                        }`}>{v.type}</span>
-                       <span className={`text-[9px] font-black uppercase tracking-[0.3em] ml-1 ${v.status === 'Pending Approval' ? 'text-rose-500' : 'text-slate-300'}`}>{v.status}</span>
+                       <span className={`text-[9px] font-black uppercase tracking-[0.3em] ml-1 ${v.status === 'Pending Approval' ? 'text-amber-600' : v.status === 'Cancelled' ? 'text-rose-400' : 'text-slate-300'}`}>{v.status}</span>
                     </div>
                   </td>
                   <td className="px-12 py-8">
@@ -220,8 +249,8 @@ const DayBook: React.FC<DayBookProps> = ({ vouchers, onClone, onDelete, onViewVo
                <div className="w-32 h-32 bg-slate-100 rounded-[3rem] flex items-center justify-center mb-8 border border-slate-200 shadow-inner">
                   <svg className="w-16 h-16 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                </div>
-               <h5 className="text-xl font-black uppercase tracking-[0.5em] text-slate-500 italic">Audit Stream Exhausted</h5>
-               <p className="text-xs font-bold text-slate-400 uppercase mt-4 tracking-widest">Zero matching transactional objects in buffer.</p>
+               <h5 className="text-xl font-black uppercase tracking-[0.5em] text-slate-500 italic">No Matching Objects</h5>
+               <p className="text-xs font-bold text-slate-400 uppercase mt-4 tracking-widest">Refine your filter parameters or clear all settings.</p>
             </div>
           )}
         </div>
@@ -229,17 +258,17 @@ const DayBook: React.FC<DayBookProps> = ({ vouchers, onClone, onDelete, onViewVo
         <div className="px-12 py-6 bg-slate-950 text-white flex items-center justify-between shrink-0">
            <div className="flex items-center space-x-10">
               <div className="flex flex-col">
-                 <span className="text-[9px] font-black text-slate-600 uppercase tracking-[0.3em]">Aggregate Output</span>
-                 <span className="text-lg font-black italic tracking-tighter">${stats.gross.toLocaleString()}</span>
+                 <span className="text-[9px] font-black text-slate-600 uppercase tracking-[0.3em]">Showing Range</span>
+                 <span className="text-lg font-black italic tracking-tighter">{filtered.length} of {vouchers.length} Shards</span>
               </div>
               <div className="w-px h-8 bg-white/10"></div>
               <div className="flex flex-col">
-                 <span className="text-[9px] font-black text-slate-600 uppercase tracking-[0.3em]">Line Count</span>
-                 <span className="text-lg font-black italic tracking-tighter">{stats.count}</span>
+                 <span className="text-[9px] font-black text-slate-600 uppercase tracking-[0.3em]">Result Volume</span>
+                 <span className="text-lg font-black italic tracking-tighter text-indigo-400">${stats.gross.toLocaleString()}</span>
               </div>
            </div>
            <div className="flex items-center space-x-4">
-              <span className="text-[10px] font-black uppercase text-indigo-400 tracking-widest">Integrity Checked ✓</span>
+              <span className="text-[10px] font-black uppercase text-indigo-400 tracking-widest">Filter Sync Active ✓</span>
               <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse shadow-[0_0_8px_#6366f1]"></div>
            </div>
         </div>

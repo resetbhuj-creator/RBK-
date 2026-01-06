@@ -12,9 +12,9 @@ interface TaxFormProps {
 const TaxForm: React.FC<TaxFormProps> = ({ initialData, taxGroups, onCancel, onSubmit }) => {
   const [formData, setFormData] = useState<Omit<Tax, 'id'>>({
     name: '',
-    rate: 0,
+    rate: 18,
     type: 'CGST',
-    classification: 'Output',
+    classification: 'Input',
     supplyType: 'Local',
     groupId: ''
   });
@@ -25,11 +25,16 @@ const TaxForm: React.FC<TaxFormProps> = ({ initialData, taxGroups, onCancel, onS
 
   useEffect(() => {
     if (initialData) {
-      setFormData({ ...initialData });
-      // Intelligent mapping for custom or legacy types
-      if (!TAX_TYPES.includes(initialData.type)) {
+      // Check if the current type is one of the standard ones
+      const isStandard = ['CGST', 'SGST', 'IGST'].includes(initialData.type);
+      
+      setFormData({ 
+        ...initialData,
+        type: isStandard ? initialData.type : 'Other'
+      });
+      
+      if (!isStandard) {
         setCustomTypeName(initialData.type);
-        setFormData(prev => ({ ...prev, type: 'Other' }));
       }
     }
   }, [initialData]);
@@ -38,7 +43,11 @@ const TaxForm: React.FC<TaxFormProps> = ({ initialData, taxGroups, onCancel, onS
     const newErrors: Record<string, string> = {};
     if (!formData.name.trim()) newErrors.name = 'Tax ledger name is required';
     if (formData.rate < 0) newErrors.rate = 'Rate cannot be negative';
-    if (formData.type === 'Other' && !customTypeName.trim()) newErrors.type = 'Custom tax identifier is required';
+    
+    if (formData.type === 'Other' && !customTypeName.trim()) {
+      newErrors.customType = 'Custom tax identifier is required';
+    }
+    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -71,7 +80,10 @@ const TaxForm: React.FC<TaxFormProps> = ({ initialData, taxGroups, onCancel, onS
     return null;
   }, [formData.rate, formData.type, customTypeName]);
 
-  const inputClass = (name: string) => `w-full px-4 py-3 rounded-2xl border outline-none transition-all text-sm font-bold bg-white focus:ring-4 focus:ring-indigo-500/10 ${touched[name] && errors[name] ? 'border-rose-500 bg-rose-50/50' : 'border-slate-200 shadow-sm'}`;
+  const inputClass = (name: string) => `
+    w-full px-6 py-4 rounded-2xl border outline-none transition-all text-sm font-bold bg-white focus:ring-4 focus:ring-indigo-500/10 
+    ${(touched[name] && errors[name]) || (name === 'customType' && errors.customType) ? 'border-rose-500 bg-rose-50/50' : 'border-slate-200 shadow-sm'}
+  `;
 
   return (
     <div className="bg-white rounded-[3rem] border border-slate-200 shadow-2xl overflow-hidden max-w-4xl mx-auto animate-in zoom-in-95 duration-300">
@@ -88,10 +100,10 @@ const TaxForm: React.FC<TaxFormProps> = ({ initialData, taxGroups, onCancel, onS
 
       <form onSubmit={handleSubmit} className="p-10 space-y-10">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-          {/* Classification */}
+          {/* Classification Toggle */}
           <div className="space-y-2">
             <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Statutory Classification</label>
-            <div className="flex p-1 bg-slate-100 rounded-2xl border border-slate-200">
+            <div className="flex p-1 bg-slate-100 rounded-2xl border border-slate-200 shadow-inner">
               {(['Input', 'Output'] as const).map(c => (
                 <button
                   key={c}
@@ -105,10 +117,10 @@ const TaxForm: React.FC<TaxFormProps> = ({ initialData, taxGroups, onCancel, onS
             </div>
           </div>
 
-          {/* Supply Type */}
+          {/* Supply Type Toggle */}
           <div className="space-y-2">
-            <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Operating Jurisdiction</label>
-            <div className="flex p-1 bg-slate-100 rounded-2xl border border-slate-200">
+            <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Jurisdiction Node</label>
+            <div className="flex p-1 bg-slate-100 rounded-2xl border border-slate-200 shadow-inner">
               {(['Local', 'Central'] as const).map(s => (
                 <button
                   key={s}
@@ -123,7 +135,7 @@ const TaxForm: React.FC<TaxFormProps> = ({ initialData, taxGroups, onCancel, onS
           </div>
 
           <div className="md:col-span-2 space-y-2">
-            <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-1">Tax Ledger Display Name</label>
+            <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-1">Tax Ledger Designation</label>
             <input 
               value={formData.name} 
               onChange={e => setFormData({ ...formData, name: e.target.value })} 
@@ -136,7 +148,7 @@ const TaxForm: React.FC<TaxFormProps> = ({ initialData, taxGroups, onCancel, onS
 
           <div className="space-y-6">
             <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-1">Tax Component Type</label>
+              <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-1">Regulatory Tax Type</label>
               <select 
                 value={formData.type} 
                 onChange={e => setFormData({ ...formData, type: e.target.value })}
@@ -151,16 +163,16 @@ const TaxForm: React.FC<TaxFormProps> = ({ initialData, taxGroups, onCancel, onS
             </div>
 
             {formData.type === 'Other' && (
-              <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
-                <label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest ml-1">Custom Tax Identifier</label>
+              <div className="space-y-2 animate-in slide-in-from-top-4 duration-500">
+                <label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest ml-1">Custom Identifier Node</label>
                 <input 
                   value={customTypeName} 
                   onChange={e => setCustomTypeName(e.target.value)} 
-                  onBlur={() => handleBlur('type')}
-                  placeholder="e.g. VAT, Cess, LBT"
-                  className={inputClass('type') + " border-indigo-200 ring-2 ring-indigo-50"} 
+                  onBlur={() => handleBlur('customType')}
+                  placeholder="e.g. VAT, Cess, Luxury Tax"
+                  className={inputClass('customType') + " border-indigo-200 ring-2 ring-indigo-50 shadow-lg"} 
                 />
-                {touched.type && errors.type && <p className="text-[10px] text-rose-500 font-black mt-1 ml-1">{errors.type}</p>}
+                {touched.customType && errors.customType && <p className="text-[10px] text-rose-500 font-black mt-1 ml-1">{errors.customType}</p>}
               </div>
             )}
           </div>
@@ -173,23 +185,23 @@ const TaxForm: React.FC<TaxFormProps> = ({ initialData, taxGroups, onCancel, onS
                 step="0.01"
                 value={formData.rate} 
                 onChange={e => setFormData({ ...formData, rate: parseFloat(e.target.value) || 0 })}
-                className={inputClass('rate') + " pr-10"} 
+                className={inputClass('rate') + " pr-12 text-center"} 
               />
-              <span className="absolute right-4 top-3.5 text-slate-400 font-black text-xs">%</span>
+              <span className="absolute right-6 top-4 text-slate-400 font-black text-xs">%</span>
             </div>
           </div>
 
           <div className="md:col-span-2 space-y-2">
             <label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest ml-1 flex items-center">
                <svg className="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
-               Associate with Tax Group
+               Financial Umbrella (Tax Group)
             </label>
             <select 
               value={formData.groupId || ''} 
               onChange={e => setFormData({ ...formData, groupId: e.target.value })}
               className={inputClass('groupId')}
             >
-              <option value="">-- Standalone (No Grouping) --</option>
+              <option value="">-- Independent Statutory Node --</option>
               {taxGroups.map(tg => (
                 <option key={tg.id} value={tg.id}>{tg.name}</option>
               ))}
@@ -198,25 +210,23 @@ const TaxForm: React.FC<TaxFormProps> = ({ initialData, taxGroups, onCancel, onS
         </div>
 
         {gstMath && (
-          <div className="p-8 bg-slate-900 rounded-[2.5rem] border-l-8 border-indigo-500 shadow-2xl animate-in zoom-in-95 duration-500">
-             <div className="flex items-center justify-between">
-                <div className="space-y-2">
-                  <h4 className="text-[10px] font-black uppercase tracking-[0.4em] text-indigo-400">Statutory Proofing Rule</h4>
-                  <div className="text-3xl font-black text-white italic tracking-tighter">{gstMath.formula}</div>
-                  <p className="text-[10px] text-slate-500 font-medium">Auto-derived components for regulatory compliance.</p>
-                </div>
-                <div className="hidden lg:block text-right">
-                   <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Implied IGST</div>
-                   <div className="text-4xl font-black text-indigo-500">{gstMath.igst}%</div>
-                </div>
+          <div className="p-8 bg-slate-950 rounded-[2.5rem] border-l-8 border-indigo-500 shadow-2xl animate-in zoom-in-95 duration-500 flex items-center justify-between group">
+             <div className="space-y-2">
+                <h4 className="text-[10px] font-black uppercase tracking-[0.4em] text-indigo-400">Statutory Decomposition Rule</h4>
+                <div className="text-4xl font-black text-white italic tracking-tighter group-hover:scale-105 transition-transform origin-left">{gstMath.formula}</div>
+                <p className="text-[10px] text-slate-500 font-medium italic">Auto-calculated components for portal reconciliation.</p>
+             </div>
+             <div className="hidden lg:block text-right border-l border-white/10 pl-10">
+                <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Impact Probability</div>
+                <div className="text-4xl font-black text-indigo-500">100%</div>
              </div>
           </div>
         )}
 
-        <div className="pt-10 border-t border-slate-100 flex justify-end space-x-4">
-          <button type="button" onClick={onCancel} className="px-10 py-4 rounded-2xl text-slate-400 font-black text-[10px] uppercase tracking-widest hover:bg-slate-50 transition-all">Cancel</button>
-          <button type="submit" className="px-14 py-4 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-2xl shadow-indigo-900/20 hover:bg-indigo-700 transition-all transform active:scale-95">
-            {initialData ? 'Update Master Record' : 'Authorize Tax Master'}
+        <div className="pt-10 border-t border-slate-100 flex flex-col sm:flex-row justify-end space-y-4 sm:space-y-0 sm:space-x-4">
+          <button type="button" onClick={onCancel} className="px-10 py-4 rounded-2xl text-slate-400 font-black text-[10px] uppercase tracking-widest hover:bg-slate-50 transition-all">Abort Changes</button>
+          <button type="submit" className="px-16 py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-2xl hover:bg-indigo-600 transition-all transform active:scale-95 border-b-8 border-slate-950">
+            {initialData ? 'Update Statutory Shard' : 'Provision Tax Master'}
           </button>
         </div>
       </form>

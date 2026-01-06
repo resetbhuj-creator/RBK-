@@ -9,6 +9,7 @@ import InventorySummary from './InventorySummary';
 import GstReportSystem from './GstReportSystem';
 import Gstr1Report from './Gstr1Report';
 import Gstr2Report from './Gstr2Report';
+import HsnSummaryReport from './HsnSummaryReport';
 import BudgetVariance from './BudgetVariance';
 import LedgerReport from './LedgerReport';
 import OutstandingReport from './OutstandingReport';
@@ -33,7 +34,6 @@ const DisplayModule: React.FC<DisplayModuleProps> = ({
   const [drillDownLedgerId, setDrillDownLedgerId] = useState<string | undefined>(undefined);
 
   const handleDrillDown = (id: string) => {
-    // If id is a ledgerId, set it. If it's a category from P&L, try to find a representative ledger or just switch to Ledger Statement
     setDrillDownLedgerId(id);
     setActiveSubAction(DisplaySubMenu.LEDGER_REPORT);
   };
@@ -44,8 +44,6 @@ const DisplayModule: React.FC<DisplayModuleProps> = ({
         return <BalanceSheet ledgers={ledgers} vouchers={vouchers} onDrillDown={handleDrillDown} />;
       case DisplaySubMenu.PROFIT_LOSS:
         return <ProfitAndLoss ledgers={ledgers} vouchers={vouchers} onDrillDown={(field) => {
-          // If a category is clicked, we could potentially filter LedgerReport by multiple ledgers, 
-          // but for now we'll just open the general Ledger Statement view.
           setActiveSubAction(DisplaySubMenu.LEDGER_REPORT);
         }} />;
       case DisplaySubMenu.BUDGET_VARIANCE:
@@ -74,6 +72,8 @@ const DisplayModule: React.FC<DisplayModuleProps> = ({
         return <Gstr1Report vouchers={vouchers} activeCompany={activeCompany} ledgers={ledgers} onViewVoucher={onViewVoucher} />;
       case DisplaySubMenu.GSTR_2:
         return <Gstr2Report vouchers={vouchers} activeCompany={activeCompany} ledgers={ledgers} onViewVoucher={onViewVoucher} />;
+      case DisplaySubMenu.HSN_SUMMARY:
+        return <HsnSummaryReport vouchers={vouchers} activeCompany={activeCompany} />;
       default:
         return <DisplayDashboard />;
     }

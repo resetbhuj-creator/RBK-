@@ -83,10 +83,21 @@ const TransactionModule: React.FC<TransactionModuleProps> = ({
 
   const PurchaseOrderManager = () => {
     const [view, setView] = useState<'LIST' | 'CREATE'>('LIST');
+    const [statusFilter, setStatusFilter] = useState<'ALL' | 'Pending Approval' | 'Posted'>('ALL');
     
-    const purchaseOrders = useMemo(() => 
-      vouchers.filter(v => v.type === 'Purchase Order').sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    , [vouchers]);
+    const purchaseOrders = useMemo(() => {
+      let filtered = vouchers.filter(v => v.type === 'Purchase Order');
+      if (statusFilter !== 'ALL') {
+        filtered = filtered.filter(v => v.status === statusFilter);
+      }
+      return filtered.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    }, [vouchers, statusFilter]);
+
+    const poMetrics = useMemo(() => {
+      const pending = purchaseOrders.filter(v => v.status === 'Pending Approval');
+      const value = pending.reduce((acc, v) => acc + v.amount, 0);
+      return { count: pending.length, value };
+    }, [purchaseOrders]);
 
     const getPoActions = (v: Voucher): ActionItem[] => [
       { label: 'Inspect PO', icon: '👁️', onClick: () => onViewVoucher(v.id), variant: 'primary' },
@@ -114,69 +125,114 @@ const TransactionModule: React.FC<TransactionModuleProps> = ({
 
     return (
       <div className="space-y-8 animate-in fade-in duration-500">
-        <div className="flex justify-between items-center bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
-           <div>
-              <h3 className="text-2xl font-black italic text-slate-800 uppercase tracking-tighter">Purchase Order Registry</h3>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2">Manage procurement lifecycle and authorization flows.</p>
+        {/* PO Metrics Header */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+           <div className="p-8 bg-white rounded-[2.5rem] border border-slate-200 shadow-sm">
+              <div className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Registry Shards</div>
+              <div className="text-4xl font-black italic text-slate-800 tabular-nums">{purchaseOrders.length}</div>
+           </div>
+           <div className="p-8 bg-amber-50 rounded-[2.5rem] border border-amber-100 shadow-sm">
+              <div className="text-[10px] font-black uppercase text-amber-600 tracking-widest mb-2">Pending Authorization</div>
+              <div className="text-4xl font-black italic text-amber-900 tabular-nums">{poMetrics.count}</div>
+           </div>
+           <div className="p-8 bg-indigo-50 rounded-[2.5rem] border border-indigo-100 shadow-sm">
+              <div className="text-[10px] font-black uppercase text-indigo-400 tracking-widest mb-1">Staged Commitment</div>
+              <div className="text-4xl font-black italic text-indigo-900 tabular-nums">${poMetrics.value.toLocaleString()}</div>
+           </div>
+        </div>
+
+        <div className="flex flex-col md:flex-row justify-between items-center bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm gap-6">
+           <div className="flex flex-col md:flex-row items-center gap-8">
+              <div>
+                <h3 className="text-2xl font-black italic text-slate-800 uppercase tracking-tighter">Purchase Order Hub</h3>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1 italic">Procurement Lifecycle Management</p>
+              </div>
+              <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200">
+                 {(['ALL', 'Pending Approval', 'Posted'] as const).map(s => (
+                   <button 
+                     key={s} 
+                     onClick={() => setStatusFilter(s)}
+                     className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${statusFilter === s ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
+                   >
+                     {s === 'Posted' ? 'Authorized' : s}
+                   </button>
+                 ))}
+              </div>
            </div>
            <button 
              onClick={() => setView('CREATE')}
-             className="px-10 py-4 bg-rose-600 text-white rounded-[1.5rem] font-black text-xs uppercase tracking-widest shadow-xl hover:bg-rose-700 transition-all transform active:scale-95 border-b-4 border-rose-900/40"
+             className="px-12 py-5 bg-rose-600 text-white rounded-[1.8rem] font-black text-xs uppercase tracking-widest shadow-2xl hover:bg-rose-700 transition-all transform active:scale-95 border-b-8 border-rose-900/40 flex items-center space-x-4"
            >
-             + Generate New PO
+             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" /></svg>
+             <span>Generate Procurement Shard</span>
            </button>
         </div>
 
-        <div className="bg-white rounded-[3.5rem] border border-slate-200 shadow-sm overflow-hidden">
-           <table className="w-full text-left">
-              <thead className="bg-slate-950 text-[10px] font-black uppercase text-slate-500 tracking-widest border-b border-slate-900">
-                 <tr>
-                    <th className="px-10 py-7">PO Hash / Date</th>
-                    <th className="px-10 py-7">Supplier Node</th>
-                    <th className="px-10 py-7 text-right">Commitment Value</th>
-                    <th className="px-10 py-7 text-center">Status</th>
-                    <th className="px-10 py-7 text-right">Operations</th>
-                 </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                 {purchaseOrders.map(v => (
-                   <tr key={v.id} className="hover:bg-rose-50/20 transition-all group cursor-pointer" onClick={() => onViewVoucher(v.id)}>
-                      <td className="px-10 py-6">
-                         <div className="text-sm font-black text-indigo-600 italic">#{v.id}</div>
-                         <div className="text-[9px] font-bold text-slate-400 uppercase mt-1">{v.date}</div>
-                      </td>
-                      <td className="px-10 py-6">
-                         <div className="text-sm font-black text-slate-800 uppercase italic group-hover:text-rose-600 transition-colors">{v.party}</div>
-                      </td>
-                      <td className="px-10 py-6 text-right font-black text-slate-900 tabular-nums italic text-base">
-                         ${v.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                      </td>
-                      <td className="px-10 py-6 text-center">
-                         <span className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase border shadow-sm ${
-                           v.status === 'Pending Approval' ? 'bg-amber-50 text-amber-600 border-amber-100 animate-pulse' : 
-                           v.status === 'Posted' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
-                           'bg-slate-50 text-slate-400 border-slate-200'
-                         }`}>
-                           {v.status}
-                         </span>
-                      </td>
-                      <td className="px-10 py-6 text-right" onClick={e => e.stopPropagation()}>
-                         <ActionMenu actions={getPoActions(v)} label="Lifecycle" />
-                      </td>
-                   </tr>
-                 ))}
-                 {purchaseOrders.length === 0 && (
+        <div className="bg-white rounded-[3.5rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-[400px]">
+           <div className="overflow-x-auto custom-scrollbar flex-1">
+              <table className="w-full text-left">
+                <thead className="bg-slate-950 text-[10px] font-black uppercase text-slate-500 tracking-widest border-b border-slate-900 sticky top-0 z-10">
                    <tr>
-                      <td colSpan={5} className="py-40 text-center">
-                         <div className="w-24 h-24 bg-slate-50 rounded-[3rem] flex items-center justify-center mx-auto mb-8 border border-slate-100">
-                            <span className="text-4xl grayscale opacity-30">📦</span>
-                         </div>
-                         <h4 className="text-xl font-black uppercase tracking-[0.4em] text-slate-300 italic">No PO Shards found</h4>
-                      </td>
+                      <th className="px-10 py-7">PO Signature / Date</th>
+                      <th className="px-10 py-7">Supplier Node Identity</th>
+                      <th className="px-10 py-7 text-right">Commitment Value</th>
+                      <th className="px-10 py-7 text-center">Protocol Status</th>
+                      <th className="px-10 py-7 text-right">Operations</th>
                    </tr>
-                 )}
-              </tbody>
-           </table>
+                </thead>
+                <tbody className="divide-y divide-slate-50 bg-white">
+                   {purchaseOrders.map(v => (
+                     <tr key={v.id} className="hover:bg-rose-50/20 transition-all group cursor-pointer" onClick={() => onViewVoucher(v.id)}>
+                        <td className="px-10 py-6">
+                           <div className="text-sm font-black text-indigo-600 italic">#{v.id}</div>
+                           <div className="text-[9px] font-bold text-slate-400 uppercase mt-1.5">{v.date}</div>
+                        </td>
+                        <td className="px-10 py-6">
+                           <div className="text-sm font-black text-slate-800 uppercase italic group-hover:text-rose-600 transition-colors">{v.party}</div>
+                           <div className="flex items-center space-x-2 mt-1.5">
+                              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
+                              <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Verified Master Ledger</span>
+                           </div>
+                        </td>
+                        <td className="px-10 py-6 text-right font-black text-slate-900 tabular-nums italic text-base">
+                           ${v.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        </td>
+                        <td className="px-10 py-6 text-center">
+                           <span className={`px-5 py-2 rounded-xl text-[9px] font-black uppercase border shadow-sm transition-all ${
+                             v.status === 'Pending Approval' ? 'bg-amber-50 text-amber-600 border-amber-100 animate-pulse scale-105' : 
+                             v.status === 'Posted' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
+                             'bg-slate-50 text-slate-400 border-slate-200'
+                           }`}>
+                             {v.status === 'Posted' ? 'Authorized' : v.status}
+                           </span>
+                        </td>
+                        <td className="px-10 py-6 text-right" onClick={e => e.stopPropagation()}>
+                           <ActionMenu actions={getPoActions(v)} label="Lifecycle" />
+                        </td>
+                     </tr>
+                   ))}
+                   {purchaseOrders.length === 0 && (
+                     <tr>
+                        <td colSpan={5} className="py-48 text-center opacity-30 italic animate-pulse">
+                           <div className="w-24 h-24 bg-slate-50 rounded-[3rem] flex items-center justify-center mx-auto mb-8 border border-slate-100 shadow-inner">
+                              <span className="text-4xl grayscale">📦</span>
+                           </div>
+                           <h4 className="text-xl font-black uppercase tracking-[0.5em] text-slate-300">No PO Shards found</h4>
+                           <p className="text-[10px] font-black uppercase tracking-widest mt-4">Adjust filters or initialize a new procurement sequence.</p>
+                        </td>
+                     </tr>
+                   )}
+                </tbody>
+              </table>
+           </div>
+           <div className="bg-slate-950 px-10 py-4 flex justify-between items-center text-[9px] font-black uppercase tracking-widest text-slate-500">
+              <div className="flex items-center space-x-6">
+                 <span>Vault Registry: NX-PUR-001</span>
+                 <span className="w-px h-3 bg-white/10"></span>
+                 <span>Active FY: {currentFY}</span>
+              </div>
+              <span className="text-indigo-400">Secure Shard Node Active ✓</span>
+           </div>
         </div>
       </div>
     );
@@ -205,6 +261,30 @@ const TransactionModule: React.FC<TransactionModuleProps> = ({
             getNextId={generateVoucherId}
           />
         );
+      case TransactionSubMenu.SALES_RETURN:
+        return (
+          <VoucherEntryForm 
+            isReadOnly={isReadOnly} 
+            ledgers={ledgers} 
+            activeCompany={activeCompany}
+            forcedVType="Sales Return"
+            onSubmit={handlePostVoucher} 
+            onCancel={() => setActiveSubAction(null)}
+            getNextId={generateVoucherId}
+          />
+        );
+      case TransactionSubMenu.PURCHASE_RETURN:
+        return (
+          <VoucherEntryForm 
+            isReadOnly={isReadOnly} 
+            ledgers={ledgers} 
+            activeCompany={activeCompany}
+            forcedVType="Purchase Return"
+            onSubmit={handlePostVoucher} 
+            onCancel={() => setActiveSubAction(null)}
+            getNextId={generateVoucherId}
+          />
+        );
       case TransactionSubMenu.INVENTORY_VOUCHERS:
         return (
           <InventoryVoucherForm 
@@ -213,6 +293,30 @@ const TransactionModule: React.FC<TransactionModuleProps> = ({
             batches={batches}
             ledgers={ledgers} 
             activeCompany={activeCompany}
+            onSubmit={handlePostVoucher} 
+            onCancel={() => setActiveSubAction(null)}
+            getNextId={generateVoucherId}
+          />
+        );
+      case TransactionSubMenu.CREDIT_NOTE:
+        return (
+          <VoucherEntryForm 
+            isReadOnly={isReadOnly} 
+            ledgers={ledgers} 
+            activeCompany={activeCompany}
+            forcedVType="Credit Note"
+            onSubmit={handlePostVoucher} 
+            onCancel={() => setActiveSubAction(null)}
+            getNextId={generateVoucherId}
+          />
+        );
+      case TransactionSubMenu.DEBIT_NOTE:
+        return (
+          <VoucherEntryForm 
+            isReadOnly={isReadOnly} 
+            ledgers={ledgers} 
+            activeCompany={activeCompany}
+            forcedVType="Debit Note"
             onSubmit={handlePostVoucher} 
             onCancel={() => setActiveSubAction(null)}
             getNextId={generateVoucherId}

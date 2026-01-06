@@ -1,9 +1,10 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Voucher, Ledger } from '../types';
+import { Voucher, Ledger, AccountGroup } from '../types';
 
 interface EmailGatewayProps {
   vouchers: Voucher[];
   ledgers: Ledger[];
+  accountGroups?: AccountGroup[];
   activeCompany: any;
   forceTab?: 'CAMPAIGNS' | 'LOGS' | 'CONFIG';
 }
@@ -13,7 +14,7 @@ interface DispatchLog {
   timestamp: string;
   recipient: string;
   subject: string;
-  type: 'TRANSACTIONAL' | 'BULK' | 'ALERT' | 'SYSTEM_TEST';
+  type: 'TRANSACTIONAL' | 'BULK' | 'ALERT' | 'SYSTEM_TEST' | 'GROUP_BURST';
   status: 'SENT' | 'FAILED' | 'OPENED' | 'VERIFIED';
   details?: string;
 }
@@ -27,7 +28,7 @@ const VAR_TOKENS = [
   { tag: '{{closing_bal}}', desc: 'Ledger Position' }
 ];
 
-const EmailGateway: React.FC<EmailGatewayProps> = ({ vouchers, ledgers, activeCompany, forceTab }) => {
+const EmailGateway: React.FC<EmailGatewayProps> = ({ vouchers, ledgers, accountGroups = [], activeCompany, forceTab }) => {
   const [activeTab, setActiveTab] = useState<'CAMPAIGNS' | 'LOGS' | 'CONFIG'>(forceTab || 'CAMPAIGNS');
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
   
@@ -46,7 +47,7 @@ const EmailGateway: React.FC<EmailGatewayProps> = ({ vouchers, ledgers, activeCo
   });
 
   // Sequencer State
-  const [targetMode, setTargetMode] = useState<'VOUCHERS' | 'LEDGERS'>('VOUCHERS');
+  const [targetMode, setTargetMode] = useState<'VOUCHERS' | 'LEDGERS' | 'GROUPS'>('VOUCHERS');
   const [selectedEntityIds, setSelectedEntityIds] = useState<string[]>([]);
   const [bulkSubject, setBulkSubject] = useState('Transaction Confirmation: {{vch_id}}');
   const [bulkBody, setBulkBody] = useState('Dear {{party_name}},\n\nThis is to verify that a transaction of {{amount}} was committed on {{date}} against reference {{vch_id}}.\n\nPlease find the statutory documents attached for your records.\n\nThank you.');
@@ -76,10 +77,10 @@ const EmailGateway: React.FC<EmailGatewayProps> = ({ vouchers, ledgers, activeCo
 
   const entitiesToMap = useMemo(() => {
     if (targetMode === 'VOUCHERS') return vouchers.slice(0, 50).map(v => ({ id: v.id, label: `${v.party} (${v.id})`, sub: v.date }));
-    return ledgers.slice(0, 50).map(l => ({ id: l.id, label: l.name, sub: l.group }));
-  }, [vouchers, ledgers, targetMode]);
+    if (targetMode === 'LEDGERS') return ledgers.slice(0, 50).map(l => ({ id: l.id, label: l.name, sub: l.group }));
+    return accountGroups.map(g => ({ id: g.name, label: g.name, sub: `${g.nature} Classification` }));
+  }, [vouchers, ledgers, accountGroups, targetMode]);
 
-  // Added utility to log events locally in the component for the gateway telemetry
   const addLog = (msg: string) => {
     const newLog: DispatchLog = {
       id: `SYS-${Date.now()}`,
@@ -96,23 +97,45 @@ const EmailGateway: React.FC<EmailGatewayProps> = ({ vouchers, ledgers, activeCo
   const executeDispatch = () => {
     if (selectedEntityIds.length === 0) return;
     setIsProcessing(true);
+
     setTimeout(() => {
-      const newLogs: DispatchLog[] = selectedEntityIds.map((id, i) => ({
+      let finalRecipients: { name: string, email: string, ref?: string }[] = [];
+
+      if (targetMode === 'GROUPS') {
+        selectedEntityIds.forEach(groupName => {
+          const groupLedgers = ledgers.filter(l => l.group === groupName && l.email);
+          groupLedgers.forEach(l => {
+            finalRecipients.push({ name: l.name, email: l.email || 'no-email@nexus.io', ref: groupName });
+          });
+        });
+      } else if (targetMode === 'LEDGERS') {
+        selectedEntityIds.forEach(id => {
+          const l = ledgers.find(lx => lx.id === id);
+          if (l) finalRecipients.push({ name: l.name, email: l.email || 'no-email@nexus.io', ref: l.group });
+        });
+      } else {
+        selectedEntityIds.forEach(id => {
+          const v = vouchers.find(vx => vx.id === id);
+          if (v) finalRecipients.push({ name: v.party, email: 'counterparty@nexus.io', ref: v.id });
+        });
+      }
+
+      const newLogs: DispatchLog[] = finalRecipients.map((rec, i) => ({
         id: `MAIL-${Date.now()}-${i}`,
         timestamp: new Date().toLocaleString(),
-        recipient: `counterparty-${i}@corporate-node.com`,
-        subject: bulkSubject.replace('{{vch_id}}', id),
-        type: targetMode === 'VOUCHERS' ? 'TRANSACTIONAL' : 'BULK',
+        recipient: rec.email,
+        subject: bulkSubject.replace('{{vch_id}}', rec.ref || 'N/A').replace('{{party_name}}', rec.name),
+        type: targetMode === 'GROUPS' ? 'GROUP_BURST' : (targetMode === 'VOUCHERS' ? 'TRANSACTIONAL' : 'BULK'),
         status: 'SENT'
       }));
+
       setDispatchLogs(prev => [...newLogs, ...prev]);
       setIsProcessing(false);
-      alert(`Sequencer Finalized: ${selectedEntityIds.length} payloads injected into SMTP cluster.`);
+      alert(`Sequencer Finalized: ${newLogs.length} payloads injected into SMTP cluster.`);
       setActiveTab('LOGS');
     }, 2000);
   };
 
-  // Fix: Implemented the missing runGatewayTest function to handle infrastructure verification
   const runGatewayTest = () => {
     setIsTesting(true);
     addLog(`GATEWAY TEST: Initiating SMTP handshake with ${config.smtpHost}:${config.smtpPort}...`);
@@ -185,8 +208,8 @@ const EmailGateway: React.FC<EmailGatewayProps> = ({ vouchers, ledgers, activeCo
                   <div className="flex items-center justify-between mb-10">
                      <h3 className="text-xl font-black uppercase italic text-slate-800">Mail Compositor</h3>
                      <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200">
-                        {['VOUCHERS', 'LEDGERS'].map(m => (
-                          <button key={m} onClick={() => { setTargetMode(m as any); setSelectedEntityIds([]); }} className={`px-4 py-2 text-[9px] font-black uppercase rounded-xl transition-all ${targetMode === m ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-400'}`}>{m}</button>
+                        {(['VOUCHERS', 'LEDGERS', 'GROUPS'] as const).map(m => (
+                          <button key={m} onClick={() => { setTargetMode(m as any); setSelectedEntityIds([]); }} className={`px-4 py-2 text-[9px] font-black uppercase rounded-xl transition-all ${targetMode === m ? 'bg-white text-indigo-600 shadow-md scale-105' : 'text-slate-400 hover:text-slate-600'}`}>{m}</button>
                         ))}
                      </div>
                   </div>
@@ -242,8 +265,11 @@ const EmailGateway: React.FC<EmailGatewayProps> = ({ vouchers, ledgers, activeCo
                            <div className={`w-4 h-4 rounded border-2 transition-all flex items-center justify-center ${selectedEntityIds.includes(item.id) ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-slate-200'}`}>
                               {selectedEntityIds.includes(item.id) && <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={4}><path d="M5 13l4 4L19 7" /></svg>}
                            </div>
-                           <div className="min-w-0">
-                              <div className="text-[11px] font-black text-slate-800 uppercase italic truncate">{item.label}</div>
+                           <div className="min-w-0 flex-1">
+                              <div className="flex items-center space-x-2">
+                                 {targetMode === 'GROUPS' && <span className="text-base">📁</span>}
+                                 <div className="text-[11px] font-black text-slate-800 uppercase italic truncate">{item.label}</div>
+                              </div>
                               <div className="text-[8px] font-bold text-slate-400 uppercase mt-1">{item.sub}</div>
                            </div>
                         </div>
@@ -280,7 +306,12 @@ const EmailGateway: React.FC<EmailGatewayProps> = ({ vouchers, ledgers, activeCo
                    <tbody className="divide-y divide-slate-100">
                       {dispatchLogs.map(log => (
                         <tr key={log.id} className="hover:bg-indigo-50/10 transition-colors group">
-                           <td className="px-10 py-6 font-mono text-[10px] font-black text-indigo-500 italic">{log.id}</td>
+                           <td className="px-10 py-6">
+                              <div className="flex items-center space-x-2">
+                                 <span className={`w-1.5 h-1.5 rounded-full ${log.type === 'GROUP_BURST' ? 'bg-amber-500' : 'bg-indigo-500'}`}></span>
+                                 <span className="font-mono text-[10px] font-black text-indigo-500 italic">{log.id}</span>
+                              </div>
+                           </td>
                            <td className="px-10 py-6 font-black text-slate-800 text-xs truncate max-w-[200px]">{log.recipient}</td>
                            <td className="px-10 py-6 text-xs text-slate-500 font-medium italic">"{log.subject}"</td>
                            <td className="px-10 py-6 text-center">

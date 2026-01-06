@@ -24,14 +24,19 @@ export enum AdminSubMenu {
   MASTERS = 'Masters',
   USERS = 'Users',
   BACKUP = 'Backup',
+  AUTOMATIC_BACKUP = 'Automatic Backup',
   IMPORT_EXPORT = 'Import / Export',
   YEAR_CHANGE = 'Year Change',
-  COMMUNICATION = 'Communication'
+  EMAIL_GATEWAY = 'Email Gateway'
 }
 
 export enum TransactionSubMenu {
   ACCOUNTING_VOUCHERS = 'Accounting Vouchers',
   INVENTORY_VOUCHERS = 'Inventory Vouchers',
+  SALES_RETURN = 'Sales Return',
+  PURCHASE_RETURN = 'Purchase Return',
+  CREDIT_NOTE = 'Credit Note',
+  DEBIT_NOTE = 'Debit Note',
   PURCHASE_ORDER = 'Purchase Orders',
   BANK_RECONCILIATION = 'Bank Reconciliation',
   DAY_BOOK = 'Day Book'
@@ -47,6 +52,7 @@ export enum DisplaySubMenu {
   GST_REPORTS = 'GST Reports',
   GSTR_1 = 'GSTR-1 (Sales)',
   GSTR_2 = 'GSTR-2 (Purchases)',
+  HSN_SUMMARY = 'HSN Summary',
   LEDGER_REPORT = 'Ledger Statement',
   OUTSTANDING_REPORT = 'Bills Outstanding'
 }
@@ -219,6 +225,7 @@ export interface Ledger {
   budget?: number;
   taxId?: string; // Statutory identifier for GSTR categorization
   address?: string;
+  email?: string; // Added for Email Gateway functionality
 }
 
 export interface Item {
