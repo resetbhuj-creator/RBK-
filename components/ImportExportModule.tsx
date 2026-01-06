@@ -1,611 +1,86 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Voucher, Item, Ledger, Company, VoucherItem, LedgerEntry } from '../types';
+import { Voucher, Item, Ledger, Company } from '../types';
 import * as XLSX from 'xlsx';
-
-interface TransferJob {
-  id: string;
-  type: 'IMPORT' | 'EXPORT';
-  entity: string;
-  timestamp: string;
-  status: 'Completed' | 'Failed' | 'Processing';
-  records: number;
-  format: string;
-}
-
-type Stage = 'SETUP' | 'MAP' | 'EXECUTE';
 
 interface ImportExportModuleProps {
   vouchers?: Voucher[];
-  setVouchers?: React.Dispatch<React.SetStateAction<Voucher[]>>;
   items?: Item[];
   setItems?: React.Dispatch<React.SetStateAction<Item[]>>;
-  ledgers?: Ledger[];
-  setLedgers?: React.Dispatch<React.SetStateAction<Ledger[]>>;
-  companies?: Company[];
-  setCompanies?: React.Dispatch<React.SetStateAction<Company[]>>;
   forcedEntity?: string;
-  initialTab?: 'IMPORT' | 'EXPORT';
-  initialFormat?: string;
-  onClose?: () => void;
 }
 
 const ImportExportModule: React.FC<ImportExportModuleProps> = ({ 
   vouchers = [],
-  setVouchers,
   items = [],
   setItems,
-  ledgers = [],
-  setLedgers,
-  companies = [],
-  setCompanies,
-  forcedEntity, 
-  initialTab = 'IMPORT', 
-  initialFormat = 'CSV',
-  onClose 
+  forcedEntity
 }) => {
-  const [activeTab, setActiveTab] = useState<'IMPORT' | 'EXPORT'>(initialTab);
-  const [currentStage, setCurrentStage] = useState<Stage>('SETUP');
-  const [selectedEntity, setSelectedEntity] = useState(forcedEntity || 'Accounting Vouchers');
-  const [targetFormat, setTargetFormat] = useState(initialFormat);
+  const [activeTab, setActiveTab] = useState<'IMPORT' | 'EXPORT'>('EXPORT');
+  const [selectedEntity, setSelectedEntity] = useState(forcedEntity || 'Inventory Items');
+  const [targetFormat, setTargetFormat] = useState('CSV');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [logs, setLogs] = useState<string[]>([]);
-  const [selectedFile, setSelectedFile] = useState<string | null>(null);
-  const [fileContent, setFileContent] = useState<any | null>(null);
-  const [mapping, setMapping] = useState<Record<string, string>>({});
-  const consoleEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
-  const [detectedHeaders, setDetectedHeaders] = useState<string[]>([]);
-  const [csvDelimiter, setCsvDelimiter] = useState(',');
 
-  const [jobs, setJobs] = useState<TransferJob[]>([
-    { id: 'JOB-901', type: 'EXPORT', entity: 'Sales Vouchers', timestamp: '2023-11-23 10:15 AM', status: 'Completed', records: 1240, format: 'XLSX' },
-    { id: 'JOB-902', type: 'IMPORT', entity: 'Accounting Vouchers', timestamp: '2023-11-25 09:30 AM', status: 'Completed', records: 850, format: 'CSV' },
-  ]);
+  const ENTITIES = ['Accounting Vouchers', 'Inventory Items', 'Ledgers'];
+  const FORMATS = ['CSV', 'JSON', 'XLSX'];
 
-  const ENTITIES = [
-    'Accounting Vouchers',
-    'Inventory Vouchers',
-    'Ledgers', 
-    'Inventory Items'
-  ];
-  
-  const FORMATS = ['CSV', 'XML', 'XLSX', 'JSON'];
-
-  const ENTITY_SCHEMAS: Record<string, { source: string; target: string; type: string; required?: boolean }[]> = {
-    'Accounting Vouchers': [
-      { source: 'id', target: 'VoucherID', type: 'String', required: true },
-      { source: 'date', target: 'PostDate', type: 'Date', required: true },
-      { source: 'type', target: 'Class', type: 'Enum', required: true },
-      { source: 'party', target: 'PartyNode', type: 'String', required: true },
-      { source: 'amount', target: 'AggregateValue', type: 'Float', required: true },
-      { source: 'narration', target: 'AuditNarration', type: 'String' },
-      { source: 'ledgerName', target: 'EntryLedger', type: 'String' },
-      { source: 'entryType', target: 'EntryPolarity', type: 'String' },
-      { source: 'entryAmount', target: 'EntryValue', type: 'Float' }
-    ],
-    'Inventory Vouchers': [
-      { source: 'id', target: 'VoucherID', type: 'String', required: true },
-      { source: 'date', target: 'ExecutionDate', type: 'Date', required: true },
-      { source: 'type', target: 'ProtocolType', type: 'Enum', required: true },
-      { source: 'party', target: 'ConsigneeNode', type: 'String', required: true },
-      { source: 'amount', target: 'GrandTotal', type: 'Float', required: true },
-      { source: 'itemName', target: 'ItemDesignation', type: 'String' },
-      { source: 'itemQty', target: 'Quantity', type: 'Float' },
-      { source: 'itemRate', target: 'UnitRate', type: 'Float' }
-    ],
-    'Inventory Items': [
-      { source: 'name', target: 'ItemName', type: 'String', required: true },
-      { source: 'category', target: 'Category', type: 'String', required: true },
-      { source: 'unit', target: 'UoM', type: 'String', required: true },
-      { source: 'salePrice', target: 'SalePrice', type: 'Float', required: true },
-      { source: 'hsnCode', target: 'HSNCode', type: 'String', required: true },
-      { source: 'gstRate', target: 'GSTRate', type: 'Float', required: true }
-    ],
-    'Ledgers': [
-      { source: 'name', target: 'LedgerName', type: 'String', required: true },
-      { source: 'group', target: 'GroupName', type: 'String', required: true },
-      { source: 'openingBalance', target: 'OpeningPosition', type: 'Float', required: true },
-      { source: 'type', target: 'Polarity', type: 'Enum', required: true }
-    ]
-  };
-
-  useEffect(() => {
-    if (consoleEndRef.current) {
-      consoleEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [logs]);
-
-  const addLog = (msg: string) => {
-    const timestamp = new Date().toLocaleTimeString();
-    setLogs(prev => [...prev, `[${timestamp}] ${msg}`]);
-  };
-
-  const parseCSV = (content: string): any[] => {
-    const lines = content.split(/\r?\n/);
-    if (lines.length < 1) return [];
-    
-    const headers = lines[0].split(csvDelimiter).map(h => h.trim().replace(/^"|"$/g, ''));
-    const rows = lines.slice(1).filter(line => line.trim() !== '');
-    
-    return rows.map(line => {
-      const values = line.split(csvDelimiter).map(v => v.trim().replace(/^"|"$/g, ''));
-      const obj: any = {};
-      headers.forEach((h, i) => {
-        obj[h] = values[i];
-      });
-      return obj;
-    });
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setSelectedFile(file.name);
-    addLog(`System Probe: File "${file.name}" linked. Initializing ${targetFormat} parser...`);
-    
-    const reader = new FileReader();
-    
-    if (targetFormat === 'XLSX') {
-      reader.onload = (evt) => {
-        const bstr = evt.target?.result;
-        const wb = XLSX.read(bstr, { type: 'binary' });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
-        if (data.length > 0) {
-          const headers = data[0].map(h => String(h));
-          setDetectedHeaders(headers);
-          autoMapHeaders(headers);
-          setFileContent(XLSX.utils.sheet_to_json(ws));
-          setCurrentStage('MAP');
-        }
-      };
-      reader.readAsBinaryString(file);
-    } else {
-      reader.onload = (event) => {
-        const content = event.target?.result as string;
-        try {
-          if (targetFormat === 'CSV') {
-            const firstLine = content.split('\n')[0];
-            const headers = firstLine.split(csvDelimiter).map(h => h.trim().replace(/^"|"$/g, ''));
-            setDetectedHeaders(headers);
-            autoMapHeaders(headers);
-            setFileContent(content);
-          } else if (targetFormat === 'XML') {
-            const parser = new DOMParser();
-            const xmlDoc = parser.parseFromString(content, "text/xml");
-            const firstNode = xmlDoc.documentElement.firstElementChild;
-            if (firstNode) {
-              const headers = Array.from(firstNode.children).map(c => c.tagName);
-              setDetectedHeaders(headers);
-              autoMapHeaders(headers);
-              setFileContent(content);
-            }
-          } else if (targetFormat === 'JSON') {
-            const parsedJson = JSON.parse(content);
-            const dataArr = Array.isArray(parsedJson) ? parsedJson : [parsedJson];
-            if (dataArr.length > 0) {
-              const headers = Object.keys(dataArr[0]);
-              setDetectedHeaders(headers);
-              autoMapHeaders(headers);
-              setFileContent(dataArr);
-            }
-          }
-          setCurrentStage('MAP');
-        } catch (err: any) {
-          addLog(`CRITICAL ERROR: ${err.message}`);
-          resetStage();
-        }
-      };
-      reader.readAsText(file);
-    }
-  };
-
-  const autoMapHeaders = (headers: string[]) => {
-    const initialMapping: Record<string, string> = {};
-    const schema = ENTITY_SCHEMAS[selectedEntity];
-    schema.forEach(field => {
-      const match = headers.find(h => 
-        h.toLowerCase() === field.target.toLowerCase() || 
-        h.toLowerCase().replace(/[_\s]/g, '').includes(field.target.toLowerCase().replace(/[_\s]/g, ''))
-      );
-      if (match) initialMapping[field.target] = match;
-    });
-    setMapping(initialMapping);
-  };
-
-  const generateXML = (data: any[]) => {
-    const rootName = selectedEntity.replace(/\s/g, '') + 'Root';
-    const itemName = selectedEntity.replace(/\s/g, '').slice(0, -1) || 'Record';
-    
-    let xml = `<?xml version="1.0" encoding="UTF-8"?>\n<${rootName}>\n`;
-    data.forEach(item => {
-      xml += `  <${itemName}>\n`;
-      Object.entries(item).forEach(([key, val]) => {
-        if (Array.isArray(val)) {
-           xml += `    <${key}>\n`;
-           val.forEach(subItem => {
-             xml += `      <${key.slice(0, -1) || 'Entry'}>\n`;
-             Object.entries(subItem).forEach(([sk, sv]) => {
-               xml += `        <${sk}>${sv}</${sk}>\n`;
-             });
-             xml += `      </${key.slice(0, -1) || 'Entry'}>\n`;
-           });
-           xml += `    </${key}>\n`;
-        } else {
-          xml += `    <${key}>${val}</${key}>\n`;
-        }
-      });
-      xml += `  </${itemName}>\n`;
-    });
-    xml += `</${rootName}>`;
-    return xml;
-  };
-
-  const parseXML = (content: string): any[] => {
-    const parser = new DOMParser();
-    const xmlDoc = parser.parseFromString(content, "text/xml");
-    const itemsNodes = Array.from(xmlDoc.documentElement.children);
-    
-    return itemsNodes.map(node => {
-      const obj: any = {};
-      Array.from(node.children).forEach(child => {
-        if (child.children.length > 0) {
-           obj[child.tagName] = Array.from(child.children).map(subChild => {
-              const subObj: any = {};
-              Array.from(subChild.children).forEach(gc => {
-                let val: any = gc.textContent;
-                if (!isNaN(val as any) && val.trim() !== '') val = parseFloat(val);
-                subObj[gc.tagName] = val;
-              });
-              return subObj;
-           });
-        } else {
-           let val: any = child.textContent;
-           if (!isNaN(val as any) && val.trim() !== '') val = parseFloat(val);
-           obj[child.tagName] = val;
-        }
-      });
-      return obj;
-    });
-  };
-
-  const parseMappedData = (data: any[]): any[] => {
-    const schema = ENTITY_SCHEMAS[selectedEntity];
-    const isVoucher = selectedEntity.includes('Voucher');
-    
-    if (!isVoucher) {
-      return data.map(row => {
-        const obj: any = {};
-        schema.forEach(s => {
-          const sourceHeader = mapping[s.target];
-          let val = row[sourceHeader];
-          if (s.type === 'Float') val = parseFloat(val) || 0;
-          obj[s.source] = val;
-        });
-        obj.id = `import-${Math.random().toString(36).substr(2, 7)}`;
-        return obj;
-      });
-    }
-
-    // Hierarchical Rehydration Logic for Vouchers
-    const voucherMap = new Map<string, Voucher>();
-    data.forEach(row => {
-      const vId = row[mapping['VoucherID']];
-      if (!vId) return;
-
-      if (!voucherMap.has(vId)) {
-        const vObj: any = { status: 'Posted' };
-        schema.forEach(s => {
-          if (!['ledgerName', 'entryType', 'entryAmount', 'itemName', 'itemQty', 'itemRate'].includes(s.source)) {
-             let val = row[mapping[s.target]];
-             if (s.type === 'Float') val = parseFloat(val) || 0;
-             vObj[s.source] = val;
-          }
-        });
-        if (selectedEntity === 'Accounting Vouchers') vObj.entries = [];
-        if (selectedEntity === 'Inventory Vouchers') vObj.items = [];
-        voucherMap.set(vId, vObj as Voucher);
-      }
-
-      const v = voucherMap.get(vId)!;
-      if (selectedEntity === 'Accounting Vouchers') {
-        const lName = row[mapping['EntryLedger']];
-        const lType = row[mapping['EntryPolarity']];
-        const lAmt = parseFloat(row[mapping['EntryValue']]) || 0;
-        if (lName) {
-           v.entries = v.entries || [];
-           v.entries.push({ id: `e-${Date.now()}-${Math.random()}`, ledgerName: lName, ledgerId: '', type: lType === 'Cr' ? 'Cr' : 'Dr', amount: lAmt });
-        }
-      } else {
-        const iName = row[mapping['ItemDesignation']];
-        const iQty = parseFloat(row[mapping['Quantity']]) || 0;
-        const iRate = parseFloat(row[mapping['UnitRate']]) || 0;
-        if (iName) {
-           v.items = v.items || [];
-           v.items.push({ id: `i-${Date.now()}-${Math.random()}`, itemId: '', name: iName, hsn: '', qty: iQty, unit: 'Nos', rate: iRate, amount: iQty * iRate });
-        }
-      }
-    });
-
-    return Array.from(voucherMap.values());
-  };
-
-  const startOperation = () => {
-    setCurrentStage('EXECUTE');
+  const executeExport = () => {
     setIsProcessing(true);
-    setProgress(0);
-    setLogs([]);
-    
-    addLog(`TRANSACTION START: ${activeTab} sequence for ${selectedEntity} initiated.`);
+    let data: any[] = [];
+    if (selectedEntity === 'Inventory Items') data = items;
+    else if (selectedEntity === 'Accounting Vouchers') data = vouchers;
 
-    let currentProgress = 0;
-    const interval = setInterval(() => {
-      currentProgress += 5;
-      if (currentProgress >= 100) {
-        currentProgress = 100;
-        clearInterval(interval);
-        
-        if (activeTab === 'IMPORT') {
-          let parsed: any[] = [];
-          if (targetFormat === 'CSV') {
-            const rawCsv = parseCSV(fileContent);
-            parsed = parseMappedData(rawCsv);
-          } else if (targetFormat === 'XML') {
-            const rawXml = parseXML(fileContent);
-            parsed = parseMappedData(rawXml);
-          } else {
-            parsed = parseMappedData(fileContent);
-          }
-          
-          if (selectedEntity === 'Inventory Items' && setItems) setItems(prev => [...parsed, ...prev]);
-          else if (selectedEntity === 'Ledgers' && setLedgers) setLedgers(prev => [...parsed, ...prev]);
-          else if (setVouchers) setVouchers(prev => [...parsed, ...prev]);
-
-          addLog(`Sequence Verified. ${parsed.length} objects committed to organizational ledger.`);
-        } else {
-          finalizeExport();
-        }
-        
-        setIsProcessing(false);
+    setTimeout(() => {
+      if (targetFormat === 'CSV') {
+        const headers = Object.keys(data[0] || {}).join(',');
+        const rows = data.map(item => Object.values(item).map(v => `"${v}"`).join(','));
+        const csvContent = [headers, ...rows].join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `export_${selectedEntity.toLowerCase().replace(' ', '_')}.csv`;
+        link.click();
+      } else if (targetFormat === 'JSON') {
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `export_${selectedEntity.toLowerCase().replace(' ', '_')}.json`;
+        link.click();
       }
-      setProgress(currentProgress);
-      if (currentProgress % 20 === 0) addLog(`Processing data shard at block ${currentProgress * 8}...`);
-    }, 50);
+      setIsProcessing(false);
+    }, 1000);
   };
-
-  const finalizeExport = () => {
-    let dataSource: any[] = [];
-    if (selectedEntity === 'Inventory Items') dataSource = items;
-    else if (selectedEntity === 'Ledgers') dataSource = ledgers;
-    else dataSource = vouchers;
-
-    if (targetFormat === 'XML') {
-      const content = generateXML(dataSource);
-      const blob = new Blob([content], { type: 'text/xml' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `nexus_export_${selectedEntity.toLowerCase().replace(/\s/g, '_')}.xml`;
-      a.click();
-    } else if (targetFormat === 'CSV') {
-      // Flatten logic for Vouchers
-      let rows: any[] = [];
-      if (selectedEntity.includes('Vouchers')) {
-        dataSource.forEach(v => {
-           if (selectedEntity === 'Accounting Vouchers' && v.entries) {
-             v.entries.forEach((e: any) => rows.push({ ...v, ...e, entries: undefined }));
-           } else if (selectedEntity === 'Inventory Vouchers' && v.items) {
-             v.items.forEach((i: any) => rows.push({ ...v, ...i, items: undefined }));
-           } else {
-             rows.push(v);
-           }
-        });
-      } else {
-        rows = dataSource;
-      }
-
-      if (rows.length > 0) {
-        const headers = Object.keys(rows[0]).join(csvDelimiter);
-        const csvRows = rows.map(r => Object.values(r).map(v => `"${v || ''}"`).join(csvDelimiter));
-        const content = [headers, ...csvRows].join('\n');
-        const blob = new Blob([content], { type: 'text/csv' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `nexus_export_${selectedEntity.toLowerCase().replace(/\s/g, '_')}.csv`;
-        a.click();
-      }
-    } else if (targetFormat === 'XLSX') {
-       const ws = XLSX.utils.json_to_sheet(dataSource);
-       const wb = XLSX.utils.book_new();
-       XLSX.utils.book_append_sheet(wb, ws, "Export");
-       XLSX.writeFile(wb, `nexus_export_${selectedEntity.toLowerCase().replace(/\s/g, '_')}.xlsx`);
-    } else {
-      const content = JSON.stringify(dataSource, null, 2);
-      const blob = new Blob([content], { type: 'application/json' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `nexus_export_${selectedEntity.toLowerCase().replace(/\s/g, '_')}.json`;
-      a.click();
-    }
-    addLog(`Binary blob transmitted to local storage node.`);
-  };
-
-  const resetStage = () => {
-    setCurrentStage('SETUP');
-    setProgress(0);
-    setLogs([]);
-    setSelectedFile(null);
-    setFileContent(null);
-    setMapping({});
-  };
-
-  const activeSchema = ENTITY_SCHEMAS[selectedEntity] || ENTITY_SCHEMAS['Accounting Vouchers'];
-  const allRequiredMapped = activeSchema.filter(s => s.required).every(s => mapping[s.target]);
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 max-w-7xl mx-auto">
-      <div className="bg-slate-950 rounded-[3rem] p-10 text-white relative overflow-hidden shadow-2xl border-b-8 border-indigo-600">
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-8">
-          <div className="flex items-center space-x-6">
-            <div className="w-20 h-20 bg-indigo-600 rounded-[2rem] flex items-center justify-center shadow-2xl border-4 border-indigo-400/20 group">
-              <svg className="w-10 h-10 text-white group-hover:rotate-12 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>
-            </div>
-            <div>
-              <h2 className="text-3xl font-black tracking-tighter uppercase italic">Integrity Bridge Hub</h2>
-              <div className="flex items-center space-x-4 mt-2">
-                <span className="bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border border-emerald-500/30">Protocol: {targetFormat} Engine</span>
-                <span className="text-slate-500 text-[10px] font-black uppercase tracking-widest">Shard Sync Active</span>
-              </div>
-            </div>
-          </div>
-          <div className="flex bg-white/5 p-1.5 rounded-[1.5rem] border border-white/10 backdrop-blur-md">
-            {['IMPORT', 'EXPORT'].map(tab => (
-              <button key={tab} onClick={() => { setActiveTab(tab as any); resetStage(); }} className={`px-10 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === tab ? 'bg-indigo-600 text-white shadow-xl' : 'text-slate-400 hover:text-white'}`}>{tab}</button>
-            ))}
-          </div>
+    <div className="bg-white rounded-[3rem] border border-slate-200 p-12 shadow-sm animate-in fade-in duration-500 max-w-4xl mx-auto">
+      <div className="flex items-center space-x-6 mb-12">
+        <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-xl">
+          <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>
         </div>
-        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-indigo-600 rounded-full blur-[150px] opacity-10 -mr-64 -mt-64 pointer-events-none"></div>
+        <h2 className="text-3xl font-black italic uppercase tracking-tighter">Data Transfer Node</h2>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-6">
-          {currentStage === 'SETUP' && (
-            <div className="bg-white rounded-[3rem] border border-slate-200 p-12 shadow-sm animate-in slide-in-from-left-4 duration-500">
-              <div className="flex items-center justify-between mb-10">
-                 <h3 className="text-xl font-black text-slate-800 uppercase italic">I/O Configuration</h3>
-                 <button className="text-[10px] font-black text-indigo-600 uppercase hover:underline underline-offset-8 decoration-indigo-200 tracking-[0.2em]">Extract Standard Pattern</button>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-10 mb-12">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Entity Cluster</label>
-                  <select value={selectedEntity} onChange={(e) => setSelectedEntity(e.target.value)} className="w-full px-6 py-4 rounded-2xl border border-slate-200 bg-slate-50 text-sm font-black text-slate-700 outline-none focus:ring-4 focus:ring-indigo-500/10 shadow-inner">
-                    {ENTITIES.map(e => <option key={e} value={e}>{e}</option>)}
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Statutory Format</label>
-                  <div className="flex p-1 bg-slate-100 rounded-2xl border border-slate-200 shadow-inner">
-                    {FORMATS.map(f => (
-                      <button key={f} onClick={() => setTargetFormat(f)} className={`flex-1 py-4 text-[10px] font-black rounded-xl transition-all ${f === targetFormat ? 'bg-white text-indigo-600 shadow-xl' : 'text-slate-400 hover:text-slate-700'}`}>{f}</button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <div onClick={() => activeTab === 'IMPORT' ? fileInputRef.current?.click() : startOperation()} className="border-4 border-dashed rounded-[3rem] p-24 text-center group transition-all cursor-pointer border-slate-100 hover:border-indigo-200 hover:bg-indigo-50/20">
-                <input type="file" ref={fileInputRef} className="hidden" accept={targetFormat === 'CSV' ? '.csv' : (targetFormat === 'XML' ? '.xml' : (targetFormat === 'JSON' ? '.json' : '.xlsx,.xls'))} onChange={handleFileChange} />
-                <div className="w-24 h-24 bg-white rounded-[2rem] flex items-center justify-center mx-auto mb-8 text-slate-200 group-hover:scale-110 group-hover:text-indigo-600 transition-all shadow-sm">
-                   <span className="text-4xl">{activeTab === 'IMPORT' ? '📥' : '📤'}</span>
-                </div>
-                <h4 className="text-2xl font-black text-slate-800 uppercase tracking-tight">{activeTab === 'IMPORT' ? `Verify ${targetFormat} Stream` : `Authorize ${targetFormat} Extraction`}</h4>
-                <p className="text-sm text-slate-400 mt-3 font-medium">Verified data structures required for organizational sync.</p>
-                {selectedFile && (
-                  <div className="mt-6 px-6 py-3 bg-indigo-50 text-indigo-600 rounded-2xl inline-flex items-center space-x-3 border border-indigo-100">
-                    <span className="text-xs font-black uppercase tracking-widest">{selectedFile}</span>
-                    <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {currentStage === 'MAP' && (
-            <div className="bg-white rounded-[3rem] border border-slate-200 p-12 shadow-sm animate-in zoom-in-95 duration-500">
-               <div className="flex items-center justify-between mb-10">
-                  <h3 className="text-xl font-black text-slate-800 uppercase italic">Rehydration Protocol</h3>
-                  <span className="px-4 py-1.5 bg-indigo-50 text-indigo-600 rounded-xl text-[9px] font-black uppercase border border-indigo-100">Found: {detectedHeaders.length} Fields</span>
-               </div>
-               <div className="space-y-4 max-h-[400px] overflow-y-auto pr-4 custom-scrollbar">
-                  {activeSchema.map((field, i) => (
-                    <div key={i} className="flex items-center justify-between p-6 rounded-[2rem] bg-slate-50 border border-slate-100 group hover:border-indigo-200 transition-all">
-                      <div className="flex items-center space-x-4">
-                        <div className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center font-black text-[10px] text-slate-400 group-hover:bg-indigo-600 group-hover:text-white transition-all">{i + 1}</div>
-                        <div>
-                           <span className="font-black text-sm text-slate-800 tracking-tight uppercase italic">{field.target} {field.required && <span className="text-rose-500">*</span>}</span>
-                           <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Class: {field.type}</div>
-                        </div>
-                      </div>
-                      <select value={mapping[field.target] || ''} onChange={(e) => setMapping({...mapping, [field.target]: e.target.value})} className="min-w-[200px] px-5 py-3 rounded-xl border border-slate-200 text-xs font-black text-indigo-600 bg-white shadow-sm outline-none">
-                        <option value="">-- Discard Field --</option>
-                        {detectedHeaders.map(h => <option key={h} value={h}>{h}</option>)}
-                      </select>
-                    </div>
-                  ))}
-               </div>
-               <div className="mt-12 flex justify-between items-center">
-                  <button onClick={resetStage} className="px-8 py-4 text-[10px] font-black uppercase text-slate-400 tracking-widest hover:text-rose-500 transition-colors">Abort</button>
-                  <button disabled={!allRequiredMapped} onClick={startOperation} className={`px-14 py-4 rounded-[1.5rem] font-black text-[11px] uppercase tracking-[0.2em] transition-all transform active:scale-95 shadow-2xl ${allRequiredMapped ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-slate-100 text-slate-300'}`}>Execute Synchronizer &rarr;</button>
-               </div>
-            </div>
-          )}
-
-          {currentStage === 'EXECUTE' && (
-            <div className="bg-slate-950 rounded-[3rem] p-12 shadow-2xl relative overflow-hidden border-4 border-slate-900">
-               <div className="flex items-center justify-between mb-12 relative z-10">
-                  <div>
-                     <h4 className="text-white font-black text-3xl italic tracking-tighter uppercase">Cluster Execution</h4>
-                     <p className="text-[10px] font-black uppercase text-indigo-400 tracking-[0.4em] mt-2 animate-pulse">Syncing organizational shards...</p>
-                  </div>
-                  <span className="text-7xl font-black text-white italic tabular-nums">{progress}%</span>
-               </div>
-               <div className="h-64 bg-black/50 rounded-[2rem] p-8 font-mono text-[10px] text-emerald-500/80 overflow-y-auto custom-scrollbar border border-white/5 shadow-inner">
-                  {logs.map((log, i) => <div key={i} className="mb-1 animate-in slide-in-from-left-2 duration-300"><span className="text-slate-700 mr-4 font-bold select-none">{i.toString().padStart(3, '0')}</span>{log}</div>)}
-                  <div ref={consoleEndRef} />
-               </div>
-               {!isProcessing && (
-                  <div className="mt-10 flex justify-center relative z-10">
-                     <button onClick={resetStage} className="px-16 py-5 bg-white text-slate-900 rounded-[1.5rem] font-black text-[11px] uppercase tracking-[0.3em] shadow-2xl hover:bg-indigo-600 hover:text-white transition-all transform active:scale-95">Reset Bridge Gateway</button>
-                  </div>
-               )}
-               <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-600 rounded-full blur-[100px] opacity-10"></div>
-            </div>
-          )}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+        <div className="space-y-4">
+          <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Entity Cluster</label>
+          <select value={selectedEntity} onChange={e => setSelectedEntity(e.target.value)} className="w-full px-6 py-4 rounded-2xl border border-slate-200 bg-slate-50 font-black text-sm outline-none focus:ring-4 focus:ring-indigo-500/10">
+            {ENTITIES.map(e => <option key={e} value={e}>{e}</option>)}
+          </select>
         </div>
-
-        <div className="space-y-6">
-          <div className="bg-white rounded-[2.5rem] border border-slate-200 p-10 shadow-sm">
-            <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 mb-10 flex items-center">
-               <div className="w-2 h-2 rounded-full bg-indigo-500 mr-3 animate-pulse"></div>
-               Transfer Registry
-            </h3>
-            <div className="space-y-8">
-              {jobs.map((job) => (
-                <div key={job.id} className="flex items-start space-x-5 border-b border-slate-50 pb-6 last:border-0 last:pb-0">
-                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl shadow-inner border ${job.type === 'IMPORT' ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>
-                     {job.type === 'IMPORT' ? '📥' : '📤'}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs font-black text-slate-800 uppercase italic truncate">{job.entity}</span>
-                      <span className="text-[9px] font-black bg-slate-900 text-white px-2 py-0.5 rounded-lg tracking-widest">{job.format}</span>
-                    </div>
-                    <div className="flex items-center space-x-3 mt-2">
-                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{job.records} Records</span>
-                       <div className="w-1 h-1 rounded-full bg-slate-200"></div>
-                       <span className="text-[10px] text-slate-400 font-bold uppercase truncate italic">{job.timestamp.split(' ')[0]}</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="bg-indigo-900 rounded-[3rem] p-10 text-white relative overflow-hidden shadow-2xl border-l-8 border-indigo-500">
-             <div className="relative z-10">
-                <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-indigo-300 mb-6">Security Compliance</h4>
-                <p className="text-xs leading-relaxed font-medium text-indigo-100/70">
-                  Nexus enforces <span className="text-white font-black underline decoration-emerald-500 underline-offset-4">Statutory Schema Matching</span>. CSV and XML payloads must align with organizational parameters before ledger commitment.
-                </p>
-             </div>
-             <div className="absolute -bottom-12 -right-12 w-48 h-48 bg-indigo-600 rounded-full blur-[80px] opacity-20"></div>
-          </div>
+        <div className="space-y-4">
+          <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Statutory Format</label>
+          <select value={targetFormat} onChange={e => setTargetFormat(e.target.value)} className="w-full px-6 py-4 rounded-2xl border border-slate-200 bg-slate-50 font-black text-sm outline-none focus:ring-4 focus:ring-indigo-500/10">
+            {FORMATS.map(f => <option key={f} value={f}>{f}</option>)}
+          </select>
         </div>
+      </div>
+
+      <div className="mt-12 p-20 border-4 border-dashed border-slate-100 rounded-[3rem] text-center group hover:border-indigo-200 hover:bg-indigo-50/20 transition-all cursor-pointer" onClick={executeExport}>
+        <div className="text-4xl mb-6">{isProcessing ? '⚙️' : '🚀'}</div>
+        <h4 className="text-xl font-black uppercase italic text-slate-800">{isProcessing ? 'Processing Shards...' : `Authorize ${targetFormat} Extraction`}</h4>
+        <p className="text-xs font-bold text-slate-400 mt-2 uppercase tracking-widest">Execute binary transmission to local node</p>
       </div>
     </div>
   );
