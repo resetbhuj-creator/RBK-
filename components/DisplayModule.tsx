@@ -129,29 +129,6 @@ const DisplayModule: React.FC<DisplayModuleProps> = ({
           </button>
         ))}
       </div>
-
-      <div className="bg-slate-900 rounded-[4rem] p-16 text-white relative overflow-hidden group shadow-2xl border border-slate-800">
-        <div className="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-16">
-          <div className="space-y-8 max-w-2xl">
-            <div className="inline-block px-4 py-1.5 bg-indigo-600/30 rounded-xl text-[10px] font-black uppercase tracking-[0.4em] border border-indigo-500/20">Compliance Architecture v4.4</div>
-            <h3 className="text-5xl font-black italic tracking-tighter leading-none">Automated Statutory Reconstruction</h3>
-            <p className="text-slate-400 font-medium text-lg leading-relaxed italic">
-              "The Nexus reporting engine utilizes high-fidelity cryptographic ledger mapping to ensure that all financial statements are derivative of a single source of truth."
-            </p>
-            <div className="flex space-x-6">
-               <button className="px-10 py-4 bg-white text-slate-900 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-indigo-500 hover:text-white transition-all shadow-xl transform active:scale-95 border-b-4 border-slate-950">Export Master Archive</button>
-               <button className="px-10 py-4 bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-white/10 transition-all">Verify Chain Consistency</button>
-            </div>
-          </div>
-          <div className="w-full lg:w-96 h-64 bg-white/5 rounded-[3rem] border border-white/10 flex flex-col items-center justify-center shadow-inner backdrop-blur-2xl group-hover:bg-white/10 transition-all">
-             <div className="text-center">
-                <div className="text-5xl font-black text-indigo-400 tracking-tighter italic">99.99%</div>
-                <div className="text-[11px] font-black uppercase tracking-[0.4em] text-slate-500 mt-4">Precision Metric</div>
-             </div>
-          </div>
-        </div>
-        <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-indigo-600 rounded-full blur-[200px] -mr-96 -mt-96 opacity-10 pointer-events-none group-hover:opacity-20 transition-opacity"></div>
-      </div>
     </div>
   );
 

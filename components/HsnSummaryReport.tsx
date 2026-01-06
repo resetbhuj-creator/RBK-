@@ -36,8 +36,12 @@ const HsnSummaryReport: React.FC<HsnSummaryReportProps> = ({ vouchers, activeCom
     return result.sort((a, b) => {
       const valA = a[sortKey];
       const valB = b[sortKey];
-      if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
-      if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+      if (typeof valA === 'string' && typeof valB === 'string') {
+          return sortOrder === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+      }
+      if (typeof valA === 'number' && typeof valB === 'number') {
+          return sortOrder === 'asc' ? valA - valB : valB - valA;
+      }
       return 0;
     });
   }, [vouchers, sortKey, sortOrder]);
@@ -47,6 +51,11 @@ const HsnSummaryReport: React.FC<HsnSummaryReportProps> = ({ vouchers, activeCom
     else { setSortKey(key); setSortOrder('asc'); }
   };
 
+  const SortIndicator = ({ k }: { k: keyof HsnEntry }) => {
+    if (sortKey !== k) return <span className="ml-1 opacity-20">↕</span>;
+    return <span className="ml-1 text-white">{sortOrder === 'asc' ? '↑' : '↓'}</span>;
+  };
+
   return (
     <div className="bg-white rounded-[3rem] border border-slate-200 shadow-sm overflow-hidden animate-in fade-in duration-500 max-w-5xl mx-auto">
       <div className="p-10 bg-slate-900 text-white flex justify-between items-center">
@@ -54,28 +63,28 @@ const HsnSummaryReport: React.FC<HsnSummaryReportProps> = ({ vouchers, activeCom
           <h3 className="text-2xl font-black italic uppercase tracking-tighter">HSN/SAC Aggregate Summary</h3>
           <p className="text-[10px] font-bold text-sky-400 uppercase tracking-widest mt-2">Verified Ledger Shards • {activeCompany.name}</p>
         </div>
-        <button onClick={() => window.print()} className="px-6 py-2.5 bg-sky-600 text-white rounded-xl text-[10px] font-black uppercase shadow-lg">Export XLS</button>
+        <button onClick={() => window.print()} className="px-6 py-2.5 bg-sky-600 text-white rounded-xl text-[10px] font-black uppercase shadow-lg transition-all transform active:scale-95 hover:bg-sky-500">Print Report</button>
       </div>
 
       <div className="overflow-x-auto">
         <table className="w-full text-left">
           <thead className="bg-slate-950 text-[9px] font-black uppercase text-slate-400 tracking-widest">
             <tr>
-              <th className="px-10 py-6 cursor-pointer hover:text-white" onClick={() => handleSort('hsn')}>Code Block {sortKey === 'hsn' && (sortOrder === 'asc' ? '↑' : '↓')}</th>
+              <th className="px-10 py-6 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('hsn')}>Code Node <SortIndicator k="hsn" /></th>
               <th className="px-10 py-6">Description</th>
-              <th className="px-10 py-6 text-center cursor-pointer hover:text-white" onClick={() => handleSort('qty')}>Mass Flow {sortKey === 'qty' && (sortOrder === 'asc' ? '↑' : '↓')}</th>
-              <th className="px-10 py-6 text-right cursor-pointer hover:text-white" onClick={() => handleSort('taxable')}>Taxable Point {sortKey === 'taxable' && (sortOrder === 'asc' ? '↑' : '↓')}</th>
-              <th className="px-10 py-6 text-right cursor-pointer hover:text-white" onClick={() => handleSort('tax')}>Tax Yield {sortKey === 'tax' && (sortOrder === 'asc' ? '↑' : '↓')}</th>
+              <th className="px-10 py-6 text-center cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('qty')}>Volume <SortIndicator k="qty" /></th>
+              <th className="px-10 py-6 text-right cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('taxable')}>Taxable Point <SortIndicator k="taxable" /></th>
+              <th className="px-10 py-6 text-right cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('tax')}>Tax Yield <SortIndicator k="tax" /></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {hsnData.map(row => (
-              <tr key={row.hsn} className="hover:bg-slate-50 transition-colors group">
+              <tr key={row.hsn} className="hover:bg-slate-50 transition-colors">
                 <td className="px-10 py-5 font-mono text-xs font-black text-sky-600">{row.hsn}</td>
                 <td className="px-10 py-5 text-sm font-black text-slate-800 uppercase italic">{row.desc}</td>
                 <td className="px-10 py-5 text-center font-black tabular-nums">{row.qty} <span className="text-[9px] text-slate-400">{row.uom}</span></td>
-                <td className="px-10 py-5 text-right font-black tabular-nums">${row.taxable.toLocaleString()}</td>
-                <td className="px-10 py-5 text-right font-black text-sky-600 tabular-nums">${row.tax.toLocaleString()}</td>
+                <td className="px-10 py-5 text-right font-black tabular-nums italic text-slate-900">${row.taxable.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                <td className="px-10 py-5 text-right font-black text-sky-600 tabular-nums">${row.tax.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
               </tr>
             ))}
           </tbody>
