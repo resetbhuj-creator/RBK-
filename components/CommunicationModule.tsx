@@ -4,6 +4,7 @@ import { COMMUNICATION_SUB_MENUS } from '../constants';
 import PrintCenter from './PrintCenter';
 import EmailGateway from './EmailGateway';
 import SMSGateway from './SMSGateway';
+import DispatchLogs from './DispatchLogs';
 
 interface CommunicationModuleProps {
   activeCompany: any;
@@ -36,7 +37,7 @@ const CommunicationModule: React.FC<CommunicationModuleProps> = ({
       case CommunicationSubMenu.SMS_ALERTS:
         return <SMSGateway vouchers={vouchers} ledgers={ledgers} />;
       case CommunicationSubMenu.DISPATCH_LOGS:
-        return <DispatchLogs />;
+        return <DispatchLogs onViewVoucher={onViewVoucher} />;
       default:
         return <CommunicationDashboard />;
     }
@@ -55,7 +56,7 @@ const CommunicationModule: React.FC<CommunicationModuleProps> = ({
               <div className="text-sm font-black text-emerald-600">Stable</div>
            </div>
            <div className="px-4 py-2 text-center">
-              <div className="text-[8px] font-black text-slate-400 uppercase tracking-tighter">Network Latency</div>
+              <div className="text-[8px] font-black text-slate-400 uppercase tracking-tighter">Latency</div>
               <div className="text-sm font-black text-indigo-600">14ms</div>
            </div>
         </div>
@@ -66,15 +67,15 @@ const CommunicationModule: React.FC<CommunicationModuleProps> = ({
           <button
             key={item.id}
             onClick={() => setActiveSubAction(item.id as CommunicationSubMenu)}
-            className="group relative bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm hover:shadow-2xl hover:border-indigo-200 transition-all duration-300 text-left overflow-hidden"
+            className="group relative bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm hover:shadow-2xl hover:border-indigo-200 transition-all duration-300 text-left overflow-hidden flex flex-col"
           >
             <div className={`w-14 h-14 ${item.color} rounded-2xl flex items-center justify-center text-white mb-8 group-hover:scale-110 transition-transform shadow-xl`}>
               {item.icon}
             </div>
             <h3 className="text-xl font-black text-slate-800 mb-2 group-hover:text-indigo-600 transition-colors uppercase italic leading-none">{item.label}</h3>
-            <p className="text-sm text-slate-400 font-medium leading-relaxed">{item.description}</p>
-            <div className="mt-8 flex items-center text-indigo-600 font-black text-[10px] uppercase tracking-[0.2em] opacity-0 group-hover:opacity-100 transition-all translate-y-2 group-hover:translate-y-0">
-              <span>Enter Workspace</span>
+            <p className="text-sm text-slate-400 font-medium leading-relaxed mb-8">{item.description}</p>
+            <div className="mt-auto flex items-center text-indigo-600 font-black text-[10px] uppercase tracking-[0.2em] opacity-0 group-hover:opacity-100 transition-all translate-y-2 group-hover:translate-y-0">
+              <span>Execute Procedure</span>
               <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" /></svg>
             </div>
           </button>
@@ -85,35 +86,35 @@ const CommunicationModule: React.FC<CommunicationModuleProps> = ({
          <div className="lg:col-span-2 bg-slate-900 rounded-[3rem] p-10 text-white relative overflow-hidden shadow-2xl border-b-8 border-indigo-600">
             <div className="relative z-10 space-y-10">
                <div className="flex items-center justify-between">
-                  <h3 className="text-[10px] font-black uppercase text-indigo-400 tracking-[0.4em]">Global Delivery Analytics</h3>
-                  <span className="bg-white/5 border border-white/10 px-4 py-1 rounded-full text-[9px] font-black uppercase">Live Cluster: US-EAST-1</span>
+                  <h3 className="text-[10px] font-black uppercase text-indigo-400 tracking-[0.4em]">Global Dispatch Telemetry</h3>
+                  <span className="bg-white/5 border border-white/10 px-4 py-1 rounded-full text-[9px] font-black uppercase">Cluster: CORE-01</span>
                </div>
                
                <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
                   <div>
                     <div className="text-4xl font-black italic tracking-tighter tabular-nums">{deliveryStats.total.toLocaleString()}</div>
-                    <div className="text-[8px] font-black uppercase text-slate-500 mt-1">Total Requests</div>
+                    <div className="text-[8px] font-black uppercase text-slate-500 mt-1">Total Shards</div>
                   </div>
                   <div>
                     <div className="text-4xl font-black text-emerald-400 italic tracking-tighter tabular-nums">{deliveryStats.success}%</div>
-                    <div className="text-[8px] font-black uppercase text-slate-500 mt-1">Success Rate</div>
+                    <div className="text-[8px] font-black uppercase text-slate-500 mt-1">SLA Accuracy</div>
                   </div>
                   <div>
                     <div className="text-4xl font-black text-indigo-400 italic tracking-tighter tabular-nums">{deliveryStats.email.toLocaleString()}</div>
-                    <div className="text-[8px] font-black uppercase text-slate-500 mt-1">Mails Dispatched</div>
+                    <div className="text-[8px] font-black uppercase text-slate-500 mt-1">Mail Dispatched</div>
                   </div>
                   <div>
                     <div className="text-4xl font-black text-blue-400 italic tracking-tighter tabular-nums">{deliveryStats.sms.toLocaleString()}</div>
-                    <div className="text-[8px] font-black uppercase text-slate-500 mt-1">SMS Alerts Sent</div>
+                    <div className="text-[8px] font-black uppercase text-slate-500 mt-1">Signal Outbound</div>
                   </div>
                </div>
 
-               <div className="p-8 bg-white/5 rounded-[2rem] border border-white/10 flex flex-col md:flex-row items-center justify-between gap-6 backdrop-blur-md">
+               <div className="p-8 bg-white/5 rounded-[2.5rem] border border-white/10 flex flex-col md:flex-row items-center justify-between gap-6 backdrop-blur-md">
                   <div className="flex items-center space-x-6">
                      <div className="w-12 h-12 bg-indigo-600/30 rounded-2xl flex items-center justify-center text-2xl border border-indigo-500/30">🎯</div>
                      <div>
-                        <h4 className="text-sm font-black italic uppercase tracking-tight">Outreach Performance</h4>
-                        <p className="text-[10px] text-slate-400 font-medium leading-relaxed">System reached <span className="text-white font-bold">12.4% more</span> counterparties this month compared to previous period.</p>
+                        <h4 className="text-sm font-black italic uppercase tracking-tight">Channel Velocity</h4>
+                        <p className="text-[10px] text-slate-400 font-medium leading-relaxed">Network reach is <span className="text-white font-bold">12.4% above</span> quarterly baseline.</p>
                      </div>
                   </div>
                   <div className="w-32 h-10 bg-white/5 rounded-xl flex items-center justify-center border border-white/5">
@@ -125,13 +126,13 @@ const CommunicationModule: React.FC<CommunicationModuleProps> = ({
          </div>
 
          <div className="bg-white rounded-[3rem] border border-slate-200 p-10 shadow-sm space-y-8">
-            <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-[0.3em]">Channel Reliability</h3>
+            <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-[0.3em]">Module Integrity</h3>
             <div className="space-y-6">
                {[
-                 { label: 'Thermal Print Bridge', val: 100, color: 'bg-emerald-500' },
-                 { label: 'SMTP Relay Cluster', val: 98.4, color: 'bg-indigo-500' },
-                 { label: 'SMS Gateway Pool', val: 94.2, color: 'bg-amber-500' },
-                 { label: 'PDF Rendering Node', val: 100, color: 'bg-blue-500' }
+                 { label: 'Print Relay Node', val: 100, color: 'bg-emerald-500' },
+                 { label: 'SMTP Authorized Cluster', val: 98.4, color: 'bg-indigo-500' },
+                 { label: 'SMS Gateway Shard', val: 94.2, color: 'bg-amber-500' },
+                 { label: 'Statutory PDF Parser', val: 100, color: 'bg-blue-500' }
                ].map((c, i) => (
                  <div key={i} className="space-y-2">
                     <div className="flex justify-between text-[10px] font-black uppercase text-slate-500 tracking-tighter">
@@ -145,89 +146,19 @@ const CommunicationModule: React.FC<CommunicationModuleProps> = ({
                ))}
             </div>
             <div className="pt-6 border-t border-slate-100 flex flex-col items-center">
-               <button className="text-[9px] font-black text-indigo-600 uppercase tracking-widest hover:underline underline-offset-4 decoration-indigo-200">Execute System Diagnostic</button>
+               <button className="text-[9px] font-black text-indigo-600 uppercase tracking-widest hover:underline underline-offset-4 decoration-indigo-200">System Diagnostic</button>
             </div>
          </div>
       </div>
     </div>
   );
 
-  const DispatchLogs = () => {
-    const logs = [
-      { id: 'TXN-9082', vchId: 'SL/23-24/0001', type: 'Email', party: 'Acme Global', target: 'finance@acme.com', time: '2 mins ago', status: 'Sent' },
-      { id: 'TXN-9081', vchId: 'PY/23-24/0001', type: 'SMS', party: 'Retailers Inc', target: '+141500022', time: '14 mins ago', status: 'Delivered' },
-      { id: 'TXN-9080', vchId: null, type: 'Print', party: 'Self-Pickup', target: 'Local LPT1', time: '1 hour ago', status: 'Printed' },
-      { id: 'TXN-9079', vchId: 'SL/23-24/0001', type: 'Email', party: 'Global Supp', target: 'billing@global.net', time: '2 hours ago', status: 'Bounced' },
-    ];
-
-    return (
-      <div className="bg-white rounded-[3rem] border border-slate-200 overflow-hidden shadow-sm animate-in fade-in duration-500">
-        <div className="px-10 py-8 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
-           <h3 className="text-xl font-black italic uppercase text-slate-800 tracking-tight leading-none">Comprehensive Dispatch Audit</h3>
-           <div className="flex items-center space-x-3">
-              <input type="text" placeholder="Search Logs..." className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm" />
-              <button className="px-6 py-2 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all">Export XLS</button>
-           </div>
-        </div>
-        <div className="overflow-x-auto custom-scrollbar">
-           <table className="w-full text-left">
-              <thead className="bg-slate-900 text-[10px] font-black uppercase text-slate-400">
-                 <tr>
-                    <th className="px-10 py-5">Audit HASH</th>
-                    <th className="px-10 py-5">Originating Vch</th>
-                    <th className="px-10 py-5">Communication Mode</th>
-                    <th className="px-10 py-5">Counterparty Node</th>
-                    <th className="px-10 py-5 text-center">Status</th>
-                    <th className="px-10 py-5 text-right">Time Offset</th>
-                 </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                 {logs.map(l => (
-                   <tr key={l.id} className="hover:bg-slate-50/80 transition-colors group">
-                      <td className="px-10 py-6 font-mono text-[10px] font-black text-indigo-500 italic">{l.id}</td>
-                      <td className="px-10 py-6">
-                        {l.vchId ? (
-                           <button onClick={() => onViewVoucher(l.vchId!)} className="text-[10px] font-black text-slate-900 bg-slate-100 px-3 py-1 rounded-lg border border-slate-200 hover:bg-indigo-600 hover:text-white transition-all shadow-sm">
-                             #{l.vchId}
-                           </button>
-                        ) : (
-                           <span className="text-[10px] font-bold text-slate-300 uppercase italic">Direct</span>
-                        )}
-                      </td>
-                      <td className="px-10 py-6">
-                         <span className={`px-2.5 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest border ${
-                           l.type === 'Email' ? 'bg-indigo-50 text-indigo-600 border-indigo-100' :
-                           l.type === 'SMS' ? 'bg-blue-50 text-blue-600 border-blue-100' :
-                           'bg-slate-50 text-slate-600 border-slate-100'
-                         }`}>{l.type}</span>
-                      </td>
-                      <td className="px-10 py-6">
-                         <div className="text-xs font-black text-slate-800 uppercase italic">{l.party}</div>
-                         <div className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter mt-0.5">{l.target}</div>
-                      </td>
-                      <td className="px-10 py-6 text-center">
-                         <span className={`px-2.5 py-1 rounded text-[9px] font-black uppercase border ${
-                           l.status === 'Sent' || l.status === 'Delivered' || l.status === 'Printed' 
-                           ? 'bg-emerald-50 text-emerald-600 border-emerald-100' 
-                           : 'bg-rose-50 text-rose-600 border-rose-100'
-                         }`}>{l.status}</span>
-                      </td>
-                      <td className="px-10 py-6 text-right text-[10px] font-black text-slate-400 uppercase">{l.time}</td>
-                   </tr>
-                 ))}
-              </tbody>
-           </table>
-        </div>
-      </div>
-    );
-  };
-
   return (
     <div className="space-y-8 min-h-[70vh]">
       {activeSubAction && (
-        <button onClick={() => setActiveSubAction(null)} className="flex items-center space-x-2 text-[10px] font-black uppercase text-slate-400 hover:text-indigo-600 transition-colors">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7" /></svg>
-          <span>Return to Communication Dashboard</span>
+        <button onClick={() => setActiveSubAction(null)} className="flex items-center space-x-2 text-[10px] font-black uppercase text-slate-400 hover:text-indigo-600 transition-colors group mb-6">
+          <svg className="w-5 h-5 group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7" /></svg>
+          <span className="tracking-widest">Return to Communication Lab</span>
         </button>
       )}
       {renderContent()}

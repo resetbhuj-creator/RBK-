@@ -25,15 +25,14 @@ const SubMenuItem: React.FC<{ label: string, id: string, activeId: string | null
   return (
     <button 
       onClick={onClick} 
-      className={`w-full text-left px-4 py-2.5 rounded-xl text-[10px] uppercase tracking-widest transition-all relative group/sub flex items-center ${
+      className={`w-full text-left px-4 py-2 rounded-xl text-[10px] uppercase tracking-widest transition-all relative group/sub flex items-center border ${
         isActive 
-          ? 'text-indigo-700 bg-indigo-100/80 font-black ring-1 ring-indigo-200' 
-          : 'text-slate-500 font-bold hover:text-indigo-600 hover:bg-slate-50'
+          ? 'text-indigo-700 bg-indigo-50 border-indigo-200 font-black shadow-sm' 
+          : 'text-slate-500 font-bold border-transparent hover:text-indigo-600 hover:bg-slate-50'
       }`}
     >
-      <div className={`w-1.5 h-1.5 rounded-full mr-3 transition-all ${isActive ? 'bg-indigo-600 scale-125 shadow-[0_0_8px_rgba(79,70,229,0.5)]' : 'bg-slate-300'}`} />
+      <div className={`w-1 h-1 rounded-full mr-3 transition-all ${isActive ? 'bg-indigo-600 scale-150' : 'bg-slate-300'}`} />
       <span className="truncate">{label}</span>
-      {isActive && <div className="absolute right-3 w-1 h-1 rounded-full bg-indigo-400" />}
     </button>
   );
 };
